@@ -88,3 +88,20 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 
 **D-21 应用内不打开外部网站**
 报告、导图里的外部链接统一拦截，交给系统浏览器打开：报告通过接口返回时临时注入拦截脚本（不修改磁盘上的文件），导图在容器上拦截点击。
+
+---
+
+以下决策于 **2026-09-25** 里程碑 M0 实施期间补充。
+
+**D-22 根工作区依赖后端包；httpx 只进 dev 组**
+问题：Done When 和 CI 的命令是根目录下的 `uv run pytest backend/tests`，而 `uv run` 只同步根项目的依赖；如果根项目不声明依赖，CI 的新环境装不上 backend 与 VRA。
+决定：根 `pyproject.toml` 的 `dependencies = ["prometheus-backend"]`（经 `tool.uv.sources` 指向工作区），形成 prometheus → prometheus-backend → video-report-agent 的链；`httpx==0.28.1` 放根 dev 组（fastapi 的 TestClient 需要，仅测试用，VRA 本身也依赖它）。
+代价：根项目成为元包；后续给 backend 加依赖仍只改 `backend/pyproject.toml`。
+
+**D-23 前端补两个规格未列出的类型包**
+问题：`tsc --noEmit` 编译 React 需要 `@types/react` / `@types/react-dom`，第 4 节版本表没有列出（类型包不是技术选型）。
+决定：devDependencies 增加 `@types/react==19.3.0`、`@types/react-dom==19.3.0`，与 react 19.3.0 同步升级。
+
+**D-24 占位应用图标**
+问题：`tauri-build` 在 Windows 上必须有 `src-tauri/icons/icon.ico` 才能生成资源文件，`cargo check` 才能通过；规格未规定图标内容。
+决定：用标准库脚本生成 32×32、强调色 #c8562e 的占位 ICO（PNG 压缩格式）提交进仓库；正式图标在 M8 打包时再定。
