@@ -23,19 +23,19 @@
 | 索引 | 知识库、思维导图、字幕三个页签共用同一套分类和标题。三级浏览：分类列表 → 条目列表 → 内容。条目标题显示为「报告标题」，下方小字显示「原视频标题 · UP 主 · 时长 · 导入日期」 |
 | 导入 | 单个视频链接：B 站 BV 号、完整链接、`b23.tv` 短链、`?p=N` 分 P；YouTube 的 `watch?v=`、`youtu.be/`、`shorts/` 链接。可以一次粘贴多行，按顺序排队，**串行**处理。每次导入可以单独开关「配图」 |
 | 时长 | **不限时长**。Pi 超时 = `1800 + 600 × ⌈时长秒数 / 3600⌉` 秒 |
-| 转写 | 本地 faster-whisper `large-v3-turbo`（默认；CUDA 运行库和模型在设置里首次启用时下载到数据目录）；百炼云端（沿用 VRA 的 paraformer 适配器）。设置里切换 |
+| 转写 | 二选一，在设置里切换：**本地** faster-whisper `large-v3-turbo`（默认；CUDA 运行库和模型在首次启用时下载到数据目录）；**云端**百炼（沿用 VRA 的 paraformer 适配器，需要 DashScope Key）。只面向 Windows，不接入 VRA 的 MLX 后端（仅限 Mac） |
 | 字幕 | ASR 原始分段，不经 AI 改写。界面显示为带时间戳的列表，点击时间戳在浏览器里打开视频对应时刻。可以导出 SRT / TXT |
 | 精读 | 只做 Standard 模式，报告一律中文。通过 Pi 驱动 VRA Skill；Pi 使用 `read,write,edit,powershell` 工具 |
 | 配图 | 写作前按场景切换抽候选帧，由写报告的 Agent 看图、挑图、就地插入 `<figure>`；程序最后把图片内联为 base64。配图规则放在附加文件里，**不修改 VRA 原 Skill 文件**。当前模型不能看图时自动关闭配图并提示 |
 | 思维导图 | 由报告正文提炼 Markdown 大纲，用 markmap 渲染；一级分支带跳转到视频时刻的链接 |
 | 分类 | 只有一层。报告完成后由模型从已有分类里选一个，都不合适时新建；用户可以改名、移动条目、合并分类、删除空分类 |
-| 设置 | 模型提供商 / 模型 / API Key（自定义 OpenAI 兼容提供商需填 Base URL，并勾选「支持看图」）；转写后端与 DashScope Key；代理地址；YouTube cookies.txt 路径；配图默认开关；数据目录（首次启动时选择） |
+| 设置 | 模型提供商 / 模型 / API Key（自定义 OpenAI 兼容提供商需填 Base URL，并勾选「支持看图」）；**转写方式（本地 / 云端）**：选本地时，DashScope Key 和云端模型输入框置灰、不能输入；选云端时才能输入，同时「启用本地转写」按钮置灰；切换不会清空已保存的 Key；选云端但 Key 为空时不能保存；代理地址；YouTube cookies.txt 路径；配图默认开关；数据目录（首次启动时选择） |
 | 条目操作 | 重新生成（复用已有转写）、删除（整个条目文件夹）、取消进行中的任务、重试失败的任务。同一个视频重复导入时提示「已存在」，可选重新生成 |
 | 仓库 | MIT 许可。VRA 以 git subtree 放在 `vendor/video-report-agent`（不 squash，锁定 `d060dfb`）。每个里程碑一个分支，合并后推送到 `origin` |
 
 ### 2.2 明确不做
 
-问答 / RAG、标签网络、B 站登录、使用平台自带字幕、合集或播放列表批量导入、本地文件导入、速览（Brief）模式、PNG 长图、费用显示、深色模式、自动更新、多级分类、多语言界面、加密保存 API Key（Key 明文存数据目录，与 VRA 的 `.env` 做法一致）。
+macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B 站登录、使用平台自带字幕、合集或播放列表批量导入、本地文件导入、速览（Brief）模式、PNG 长图、费用显示、深色模式、自动更新、多级分类、多语言界面、加密保存 API Key（Key 明文存数据目录，与 VRA 的 `.env` 做法一致）。
 
 ## 3. Done When
 
@@ -45,7 +45,7 @@
 |---|---|---|
 | **D1** | 上游 VRA 全部测试在本机 Windows 通过（只允许跳过 mlx 专属用例） | `uv run --package video-report-agent --extra enhancement --directory vendor/video-report-agent pytest -q`（如果参数需要调整，在 M1 定稿后写回本行，之后不再改） |
 | **D2** | 后端测试全绿；第 12 节各里程碑列出的测试都存在；M0–M8 每个里程碑分支上都至少有一个 `(red)` 提交，而且它比对应的 `feat`/`fix` 提交更早 | `uv run pytest backend/tests -q -m "not live"`；`uv run ruff check backend`；`git log --oneline --grep "(red)" main` 按里程碑逐一核对（由执行 agent 在第 13 节贴出结果） |
-| **D3** | 前端单测 + E2E 全绿。E2E 断言：① 侧栏五项的顺序；② 知识库、思维导图、字幕三个页签显示的分类名和条目标题**完全一致**；③ 点进条目后分别看到报告 iframe、markmap SVG、字幕行；④ 设置保存后刷新页面仍然保留；⑤ 控制台导入一条链接后，队列出现该条并最终显示「完成」（后端假流水线模式） | `npm --prefix app run test`；`npm --prefix app run e2e` |
+| **D3** | 前端单测 + E2E 全绿。E2E 断言：① 侧栏五项的顺序；② 知识库、思维导图、字幕三个页签显示的分类名和条目标题**完全一致**；③ 点进条目后分别看到报告 iframe、markmap SVG、字幕行；④ 设置保存后刷新页面仍然保留；⑤ 控制台导入一条链接后，队列出现该条并最终显示「完成」（后端假流水线模式）；⑥ 设置里选「本地」时 DashScope Key 和云端模型输入框为 disabled，选「云端」时可以输入、「启用本地转写」按钮变为 disabled；来回切换后已填的 Key 仍在；选云端且 Key 为空时点保存会失败并显示提示 | `npm --prefix app run test`；`npm --prefix app run e2e` |
 | **D4** | 界面所有颜色、字体只在 `app/src/shared/tokens.css` 里定义，且取值都来自第 9.2 节色板；五个页面的截图保存在 `docs/screenshots/` | `npm --prefix app run lint:design`；**「极简」由用户看截图判定**，结论记入 `docs/acceptance.md` |
 | **D5** | 真实链路：一个时长约 3 小时的公开 B 站视频产出三件套。报告：没有外部资源引用、`data-source-units` ≥ 30、包含 `<h1>` 和 `section-time`、不残留 `{{VIDEO_DESCRIPTION}}`；导图：`##` 一级分支 ≥ 3；字幕：SRT 能解析，最后一条的结束时间与视频时长相差 ±60 秒以内。端到端耗时（从入队到完成）：云端转写且不配图 ≤ 20 分钟；本地转写且不配图 ≤ 25 分钟；云端转写且配图 ≤ 30 分钟 | `scripts/acceptance/live.ps1`（会产生 API 费用，手动触发） |
 | **D6** | 加入配图规则后，文字质量不下降：同一份转写、同一模型和推理档位，分别用「原版 Skill」和「原版 Skill + 配图规则 + 候选帧」各生成一份报告，两份都通过 VRA 的 `inspect_report` 程序检查 | `scripts/acceptance/ab-figures.ps1` 判程序检查；**质量由用户并排阅读后签字**，记入 `docs/acceptance.md` |
@@ -355,6 +355,8 @@ CREATE TABLE items (
 }
 ```
 
+- `asr.backend` 只有 `local` 和 `cloud` 两个值（`cloud` 对应 vendor 的 `paraformer` 后端）。vendor 的 `resolve_media_config`（`media_config.py` 第 38–40 行）在不传参数时默认用 `mlx`，而且只接受 `mlx` / `paraformer`：因此**只有云端路径**调用它，并显式传 `asr_backend="paraformer"`；本地路径不调用它，`build_transcript` 需要的 `ocr_backend` 直接传 `"rapidocr"`（OCR 处于关闭状态），并且要有测试保证环境变量 `ASR_BACKEND` 不会影响本地路径。
+- 校验：`asr.backend == "cloud"` 且 `dashscope_api_key` 为空时，`PUT /settings` 返回 422 `{"code": "DASHSCOPE_KEY_REQUIRED"}`。切换 `asr.backend` 时不清空已保存的 `dashscope_api_key` 和 `cloud_model`。
 - 提供商选项：`deepseek`、`zhipu`（沿用 VRA 的 `models.json`）、`custom`（OpenAI 兼容：写入 `models.json` 的 `custom` 提供商，`api` 为 `openai-completions`）。
 - 首次运行时把 vendor 的 `defaults/models.json` 复制到 `config/pi/models.json`，之后只改 `custom` 这一项。
 - `GET /settings` 返回的 Key 只显示后 4 位。
@@ -408,7 +410,11 @@ CREATE TABLE items (
     - 思维导图：markmap 渲染（可以缩放、拖拽、折叠），右上角「导出 .md」；
     - 字幕：分段列表，每行为 `[时间] 文本`；点时间通过 opener 插件在浏览器打开视频时刻；右上角「导出 SRT / 导出 TXT」。列表使用 CSS `content-visibility: auto` 应对上千行。
   - 三个页签共享同一个「当前分类 / 当前条目」状态：在知识库里打开一个条目后切到思维导图，直接显示同一条目的导图。
-- **设置**：「模型」「转写」「网络」「数据」四组表单，底部一个「保存」主按钮。「测试模型」按钮显示结果文字（是否可用、能否看图）。「启用本地转写」按钮显示下载进度文字。
+- **设置**：「模型」「转写」「网络」「数据」四组表单，底部一个「保存」主按钮。「测试模型」按钮显示结果文字（是否可用、能否看图）。
+  - 「转写」组最上方是一个二选一的分段控件「本地 / 云端」，下面依次是：「启用本地转写」按钮（显示下载进度文字）、DashScope Key 输入框、云端模型输入框；
+  - 选「本地」时，DashScope Key 和云端模型两个输入框用原生 `disabled` 属性禁用，外观置灰（文字 `--muted`、背景 `--canvas`）；选「云端」时恢复可输入，同时「启用本地转写」按钮变为 `disabled`；
+  - 切换不会清空已经填写的内容；
+  - 选「云端」且 Key 为空时点「保存」：不提交，在 Key 输入框下方显示「请填写 DashScope API Key」。
 
 ### 9.4 platform.ts
 
@@ -478,7 +484,7 @@ CREATE TABLE items (
 - 分类：改名、重名 409、合并、删除非空分类 409、`count` 只统计 done 条目；
 - 鉴权：401；`?token=` 只对内容类 GET 接口有效；
 - 队列：两个条目时第二个保持 queued，直到第一个结束；取消；启动时把 running 改为 interrupted；
-- 设置：保存、读取、Key 掩码；首次运行复制 `models.json`；`custom` 提供商写入 `models.json`；
+- 设置：保存、读取、Key 掩码；首次运行复制 `models.json`；`custom` 提供商写入 `models.json`；`asr.backend='cloud'` 且 Key 为空时返回 422 `DASHSCOPE_KEY_REQUIRED`；切换 `asr.backend` 后已保存的 Key 仍在；`asr.backend` 只接受 `local` / `cloud`；
 - 假流水线（`PROMETHEUS_FAKE=1`）：用 `backend/tests/fixtures/` 里的现成报告、导图、字幕，在 3 秒内完成全部阶段。报告夹具使用 `vendor/video-report-agent/docs/examples/report.html`。
 
 **Done When**：D2 的两条命令 = 0，并且上面每一项都有对应测试。
@@ -521,7 +527,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 
 ### M7 前端（分支 `m7-frontend`）
 
-先写的测试（Vitest）：侧栏的顺序；`LibraryBrowser` 三级切换与面包屑；三个页签共享当前条目状态；字幕时间格式和时刻链接；设置表单校验。然后写 E2E（Playwright，后端用假流水线，前端 `VITE_E2E=1`）覆盖 D3 的 ①–⑤，并把五个页面的截图保存到 `docs/screenshots/`。之后接入 Tauri：后端进程的启动与关闭、`backend_info`、`platform.ts`。
+先写的测试（Vitest）：侧栏的顺序；`LibraryBrowser` 三级切换与面包屑；三个页签共享当前条目状态；字幕时间格式和时刻链接；设置表单校验；转写方式切换时各输入框和按钮的 `disabled` 状态，以及切换后已填内容保留。然后写 E2E（Playwright，后端用假流水线，前端 `VITE_E2E=1`）覆盖 D3 的 ①–⑥，并把五个页面的截图保存到 `docs/screenshots/`。之后接入 Tauri：后端进程的启动与关闭、`backend_info`、`platform.ts`。
 
 **Done When**：D3、D4 的命令 = 0；`npm --prefix app run tauri dev` 能打开窗口并显示控制台（附一张截图）；**停下来请用户查看截图**，把结论记入 `docs/acceptance.md`（D4）。
 

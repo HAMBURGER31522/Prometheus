@@ -42,8 +42,11 @@ BiliSum 的做法是 LLM 输出 JSON 节点树，再用 React Flow 自己画。m
 **D-09 不限视频时长**
 VRA 在 `ingest.py:21` 写死了 3 小时上限，单任务超时 30 分钟，文档里没有给出理由。默认模型 `deepseek-flash` 的上下文是 100 万 token，足以容纳十几个小时的中文转写。决定：去掉上限，Pi 超时改为 `1800 + 600 × ⌈时长(小时)⌉` 秒。
 
-**D-10 转写：本地 + 云端**
-本地 faster-whisper large-v3-turbo（默认，本机 RTX 4060 8GB），CUDA 运行库和模型在首次启用时下载到数据目录；保留 VRA 已实现的百炼云端（paraformer / Fun-ASR）。不使用平台自带字幕，因为 VRA 的质量是在带时间戳的 ASR 转写上调出来的。
+**D-10 转写：本地 + 云端，只面向 Windows**
+VRA 原本有两个转写后端：MLX Whisper（只能在 Apple 芯片的 Mac 上运行，作者自己开发用）和百炼云端 paraformer（`paraformer.py`）。在 Windows 上，VRA 原本只有云端可用。
+决定：新增本地 faster-whisper large-v3-turbo（默认，本机 RTX 4060 8GB），CUDA 运行库和模型在首次启用时下载到数据目录；原样保留 VRA 的百炼云端（paraformer / Fun-ASR），不做修改；**不考虑 macOS，不接入 MLX**。设置里二选一：选本地时云端的 Key 和模型输入框禁用，选云端时才能输入；切换不清空已保存的 Key。
+不使用平台自带字幕，因为 VRA 的质量是在带时间戳的 ASR 转写上调出来的。
+费用参考：paraformer-v2 官方标价 0.00008 元/秒（约 0.29 元/小时），只对识别出的说话部分计费（2026-09-25 查证）。
 
 **D-11 YouTube 需要 cookies**
 2026-09-25 实测：经本机代理（7897）访问 YouTube，不带 cookies 会返回 "Sign in to confirm you're not a bot"。决定：设置里提供「YouTube cookies.txt」选项。yt-dlp 的 JS 运行时复用随包分发的 Node。B 站只支持公开视频，不做登录。
@@ -55,7 +58,7 @@ VRA 在 `ingest.py:21` 写死了 3 小时上限，单任务超时 30 分钟，�
 `items/<ID>/{report,mindmap,subtitle,work}/`：删除或重新生成一个视频时只动一个文件夹；子文件夹名直接说明内容类型。
 
 **D-14 不做的东西**
-问答 / RAG、标签网络、B 站登录、平台字幕、合集或播放列表批量导入、本地文件导入、速览模式、PNG 长图、费用显示、深色模式、自动更新、多级分类。
+macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B 站登录、平台字幕、合集或播放列表批量导入、本地文件导入、速览模式、PNG 长图、费用显示、深色模式、自动更新、多级分类。
 
 **D-15 API Key 明文保存在数据目录**
 和 VRA 的 `.env` 做法一致，Key 放在仓库之外的数据目录里。这是已知局限，没有接入 Windows DPAPI。
