@@ -1,0 +1,11 @@
+/* Only place in the app where colors and fonts are defined (PLAN 9.2, D4). */
+:root {
+  --paper: #fff;      --canvas: #f2f5f7;  --ink: #414b55;   --heading: #242d35;
+  --muted: #65717d;   --accent: #c8562e;  --line: #e9edf0;  --wash: #fff8e8;
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
+  --radius: 6px;
+  --text-sm: 12px; --text-base: 14px; --text-lg: 16px; --text-xl: 20px;
+  --shadow-pop: 0 1px 3px rgba(36,45,53,.08);
+}
