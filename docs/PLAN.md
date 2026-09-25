@@ -576,7 +576,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 
 | 里程碑 | 状态 | 完成日期 | 合并 commit | Done When 结果（命令 = 退出码） |
 |---|---|---|---|---|
-| M0 仓库骨架 | 完成 | 2026-09-25 | 待合并后填写 | `uv run pytest backend/tests -q` = 0；`npm --prefix app run test` = 0；`npm --prefix app run build` = 0；`cargo check --manifest-path app/src-tauri/Cargo.toml` = 0；`npm --prefix app run lint:design` = 0；`git cat-file -t d060dfb` = `commit`；CI 绿（windows-latest，run 36188439025） |
+| M0 仓库骨架 | 完成 | 2026-09-25 | f1ac34c | `uv run pytest backend/tests -q` = 0；`npm --prefix app run test` = 0；`npm --prefix app run build` = 0；`cargo check --manifest-path app/src-tauri/Cargo.toml` = 0；`npm --prefix app run lint:design` = 0；`git cat-file -t d060dfb` = `commit`；CI 绿（windows-latest，run 36188439025） |
 | M1 Windows 兼容 | 未开始 | | | |
 | M2 后端核心 | 未开始 | | | |
 | M3 导入/转写/字幕 | 未开始 | | | |
