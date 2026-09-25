@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prometheus-backend"
+version = "0.1.0"
+description = "Prometheus backend: FastAPI server driving ingest, ASR, reports, mindmaps"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn==0.54.0",
+    "pydantic==2.13.5",
+    "yt-dlp[default]==2026.8.19",
+    "faster-whisper==1.2.1",
+    "video-report-agent",
+]
+
+[tool.uv.sources]
+video-report-agent = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prometheus"]
