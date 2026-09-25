@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    env:
+      UV_PYTHON: "3.12.14"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.9"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.3"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Backend tests
+        run: uv run pytest backend/tests -q -m "not live"
+      - name: Backend lint
+        run: uv run ruff check backend
+      - name: Install frontend dependencies
+        run: npm --prefix app ci
+      - name: Frontend tests
+        run: npm --prefix app run test
+      - name: Design-token lint
+        run: npm --prefix app run lint:design
