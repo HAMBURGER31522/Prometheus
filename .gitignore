@@ -1,0 +1,41 @@
+# Local scratch (reference clones, experiments)
+tmp/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage/
+build/
+
+# Node / frontend
+node_modules/
+app/dist/
+app/test-results/
+app/playwright-report/
+
+# Tauri / Rust
+app/src-tauri/target/
+app/src-tauri/gen/
+# Bundled runtimes are copied from E:\tools\Prometheus-Desktop at package time
+app/src-tauri/resources/runtime/
+
+# Secrets and personal data - never commit
+.env
+.env.*
+!.env.example
+*cookies*.txt
+*.db
+data/
+acceptance-output/
+
+# Editors / agents
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# Logs
+*.log
