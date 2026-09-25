@@ -1,7 +1,6 @@
 """M0: /api/health needs no auth; every other /api path requires the bearer token."""
 
 from fastapi.testclient import TestClient
-
 from prometheus.server import create_app
 
 TOKEN = "test-token"
