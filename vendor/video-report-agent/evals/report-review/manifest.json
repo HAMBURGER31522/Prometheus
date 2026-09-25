@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "scope": "Synthetic smoke only; not a real-world benchmark or model quality claim",
+  "cases": [
+    {
+      "id": "numbers",
+      "material": "materials/numbers",
+      "review_checks": [
+        {
+          "source_ids": [
+            "unit-000001",
+            "unit-000002"
+          ],
+          "criterion": "保留每月 20 元、3 个月共 60 元及不含存储费的条件。"
+        }
+      ]
+    },
+    {
+      "id": "conditions",
+      "material": "materials/conditions",
+      "review_checks": [
+        {
+          "source_ids": [
+            "unit-000001",
+            "unit-000002"
+          ],
+          "criterion": "保留两个启动条件和删除原件前的检查条件。"
+        }
+      ]
+    },
+    {
+      "id": "attribution",
+      "material": "materials/attribution",
+      "review_checks": [
+        {
+          "source_ids": [
+            "unit-000001",
+            "unit-000002"
+          ],
+          "criterion": "保留虚构讲者归属、未计时与适用性不确定，不改写为已验证提效。"
+        }
+      ]
+    }
+  ]
+}

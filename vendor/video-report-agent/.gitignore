@@ -1,0 +1,34 @@
+.venv/
+.env
+.env.*
+!.env.example
+!.env.docker.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+artifacts/
+*.mp4
+*.m4v
+*.mov
+*.wav
+models/
+
+runs/
+.DS_Store
+:memory:.ses
+Archify/
+
+# Pi project credentials and runtime state
+config/pi/*
+
+# WorkBuddy agent workspace (local tool state: memory logs, tmp scratch files)
+.workbuddy/
+
+/.local/
+
+/.impeccable/
+
+# Real-source evaluation data belongs in the private service repository
+/evals/asr/
+/evals/private/
