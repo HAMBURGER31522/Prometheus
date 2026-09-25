@@ -1,0 +1,31 @@
+[project]
+name = "prometheus"
+version = "0.1.0"
+description = "Prometheus - video deep-read reports, mindmaps and subtitles on Windows"
+requires-python = "==3.12.*"
+dependencies = [
+    "prometheus-backend",
+]
+
+[tool.uv.workspace]
+members = ["backend", "vendor/video-report-agent"]
+
+[tool.uv]
+# Windows-only project: keep macOS-only packages (e.g. VRA's mlx extra) out of the lockfile.
+environments = ["sys_platform == 'win32'"]
+
+[tool.uv.sources]
+prometheus-backend = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.16.9",
+    # fastapi.testclient needs httpx; test-only, VRA already pins the same floor
+    "httpx==0.28.1",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "live: tests that call real services and cost money (deselect with -m 'not live')",
+]
