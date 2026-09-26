@@ -46,7 +46,7 @@ def _pipeline(source: str, platform: str, video_id: str):
     data_dir = paths.init_data_dir(DATA_DIR)
     item_id = "b" * 32
     work = paths.work_dir(data_dir, item_id)
-    work.mkdir(parents=True)
+    work.mkdir(parents=True, exist_ok=True)
     row = {
         "id": item_id, "platform": platform, "video_id": video_id, "source_url": source,
         "figures": 0,
@@ -78,7 +78,7 @@ def _transcript_assertions(work: Path, asr_path: Path, row: dict) -> None:
 
 @requires_bv
 @requires_dashscope
-def test_bilibili_cloud_transcribe_to_transcript(tmp_path):
+def test_bilibili_cloud_transcribe_to_transcript():
     data_dir, item_id, work, row, wav = _pipeline(
         f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
     )
@@ -87,7 +87,7 @@ def test_bilibili_cloud_transcribe_to_transcript(tmp_path):
 
 
 @requires_bv
-def test_bilibili_local_transcribe_to_transcript(tmp_path):
+def test_bilibili_local_transcribe_to_transcript():
     data_dir, item_id, work, row, wav = _pipeline(
         f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
     )
