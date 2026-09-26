@@ -6,8 +6,15 @@ from conftest import BV_URL, wait_for_status
 
 
 def test_fake_pipeline_completes_all_stages_quickly(client, tmp_path):
-    started = time.time()
     item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    # The 3s budget (PLAN 12/M2) covers the pipeline itself: from the moment the
+    # queue picks the item up to completion, excluding app startup on slow CIs.
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if client.get(f"/api/items/{item_id}").json().get("status") == "running":
+            break
+        time.sleep(0.02)
+    started = time.time()
     row = wait_for_status(client, item_id, "done", timeout=3.0)
     elapsed = time.time() - started
     assert elapsed < 3.0

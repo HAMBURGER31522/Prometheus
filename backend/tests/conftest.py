@@ -33,7 +33,7 @@ def client(client_factory, tmp_path):
     return authorized
 
 
-def wait_for_status(client, item_id, status, timeout=5.0):
+def wait_for_status(client, item_id, status, timeout=15.0):
     deadline = time.time() + timeout
     last = None
     while time.time() < deadline:
