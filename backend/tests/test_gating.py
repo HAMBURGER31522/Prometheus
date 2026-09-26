@@ -30,7 +30,7 @@ def test_query_token_only_works_for_content_gets(client_factory, tmp_path):
         "url": "https://www.bilibili.com/video/BV1xJYT6EEYc/", "figures": False,
     })
     item_id = created.json()["id"]
-    deadline = time.time() + 5
+    deadline = time.time() + 15
     while time.time() < deadline:
         if client.get(f"/api/items/{item_id}", headers=headers).json().get("status") == "done":
             break

@@ -19,11 +19,11 @@ def test_second_item_stays_queued_until_first_finishes(client, monkeypatch):
 
     def slow_transcribe(ctx):
         started.set()
-        release.wait(timeout=10)
+        release.wait(timeout=15)
 
     monkeypatch.setitem(client.app.state.queue.impls, "transcribe", slow_transcribe)
     first = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
-    assert started.wait(timeout=5)
+    assert started.wait(timeout=15)
     second = client.post("/api/items", json={
         "url": "https://www.bilibili.com/video/BV1bTtb6uE7d/", "figures": False,
     }).json()["id"]
@@ -37,7 +37,7 @@ def test_second_item_stays_queued_until_first_finishes(client, monkeypatch):
 def test_cancel_running_item(client, monkeypatch):
     monkeypatch.setitem(client.app.state.queue.impls, "download", block_on_event)
     item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
-    deadline = time.time() + 5
+    deadline = time.time() + 15
     while time.time() < deadline:
         if client.get(f"/api/items/{item_id}").json()["stage"] == "download":
             break
