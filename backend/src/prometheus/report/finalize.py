@@ -17,7 +17,7 @@ _FIGURE_STYLE = (
     "figure.report-figure figcaption{color:var(--muted);font-size:13px;"
     "margin-top:8px}</style>"
 )
-_H1_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.S | re.I)
+_H1_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.DOTALL | re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
 _FRAME_SRC_RE = re.compile(r'src="frames/([^"]+)"')
 _EXTERNAL_RE = re.compile(

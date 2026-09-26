@@ -5,10 +5,9 @@ import json
 import os
 from pathlib import Path
 
-from video_report_agent.pi import PiRunner
-
 from prometheus import paths
 from prometheus.report.timing import pi_timeout_seconds
+from video_report_agent.pi import PiRunner
 
 PLATFORM_LABELS = {"bilibili": "Bilibili", "youtube": "YouTube"}
 FIGURES_MD = Path(__file__).parent / "overlays" / "figures.md"

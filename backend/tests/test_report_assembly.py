@@ -67,7 +67,6 @@ def test_runner_kwargs_figures_require_image_support():
 
 
 def test_report_stage_runs_pi_and_writes_input_json(tmp_path, monkeypatch):
-    import asyncio
 
     from prometheus import paths
     from prometheus.report import workspace as workspace_mod
@@ -87,15 +86,12 @@ def test_report_stage_runs_pi_and_writes_input_json(tmp_path, monkeypatch):
         def __init__(self, **kwargs):
             seen.update(kwargs)
 
-        def run(self, work_dir):
-            return asyncio.Event().loop if False else _fake_run(work_dir)
-
-    def _fake_run(work_dir):
-        (work_dir / "report.html").write_text(
-            "<html><head></head><body><h1>财政再平衡</h1><p>正文</p></body></html>",
-            encoding="utf-8",
-        )
-        return work_dir / "report.html"
+        async def run(self, work_dir):
+            (work_dir / "report.html").write_text(
+                "<html><head></head><body><h1>财政再平衡</h1><p>正文</p></body></html>",
+                encoding="utf-8",
+            )
+            return work_dir / "report.html"
 
     monkeypatch.setattr(workspace_mod, "PiRunner", FakeRunner)
     report = workspace_mod.run_report_stage(

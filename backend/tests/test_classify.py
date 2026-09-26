@@ -1,6 +1,5 @@
 """Auto classification: parse, validate, retry, fallback (PLAN 8.6)."""
 
-import pytest
 
 from prometheus.report.classify import (
     build_classify_prompt,
@@ -37,23 +36,23 @@ def test_build_classify_prompt_contains_inputs():
 
 
 def test_classify_prefers_existing_and_falls_back(tmp_path):
-    calls = []
-
     def one_shot_ok(work_dir, *, prompt, **kwargs):
-        calls.append(prompt)
         return '{"category": "历史"}'
 
     assert classify_report(
         tmp_path, "标题", "导语", ["h2"], EXISTING, one_shot=one_shot_ok,
     ) == "历史"
 
+    bad_calls = []
+
     def one_shot_bad(work_dir, *, prompt, **kwargs):
+        bad_calls.append(prompt)
         return "模型胡言乱语"
 
     assert classify_report(
         tmp_path, "标题", "导语", ["h2"], EXISTING, one_shot=one_shot_bad,
     ) == "未分类"
-    assert len(calls) == 2  # 重试一次
+    assert len(bad_calls) == 2  # 重试一次
 
     state = {"n": 0}
 

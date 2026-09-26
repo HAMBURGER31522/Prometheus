@@ -2,10 +2,8 @@
 
 import base64
 import json
-from pathlib import Path
 
 import pytest
-
 from prometheus.report.finalize import (
     FinalizeError,
     extract_report_title,

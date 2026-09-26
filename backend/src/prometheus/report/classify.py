@@ -4,7 +4,7 @@ import json
 import re
 
 FORBIDDEN = {"其他", "综合", "杂项"}
-_JSON_RE = re.compile(r"\{.*\}", re.S)
+_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
 def parse_category_response(text: str):
