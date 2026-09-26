@@ -1,11 +1,10 @@
 """Real stage implementations wired into the queue (PLAN 8.3)."""
 
 import json
-import os
-import shutil
 from pathlib import Path
 
 from prometheus import paths
+from prometheus import runtime as runtime_mod
 from prometheus.ingest import download as download_mod
 from prometheus.ingest import resolve as resolve_mod
 from prometheus.library import categories as categories_store
@@ -16,24 +15,13 @@ from prometheus.report import one_shot as one_shot_mod
 from prometheus.report import workspace as workspace_mod
 from prometheus.report.classify import classify_report
 from prometheus.report.finalize import finalize_report
-from prometheus.settings import store
+from prometheus.settings import capability, store
 from prometheus.subtitle import convert as subtitle_convert
 from prometheus.subtitle import format as subtitle_format
 from prometheus.transcribe import cloud as cloud_mod
 from prometheus.transcribe import local as local_mod
 from prometheus.transcribe.audio import to_wav
 from prometheus.transcribe.transcript import build_transcript_md
-
-
-def _node_exe() -> str:
-    return os.getenv("PROMETHEUS_NODE") or shutil.which("node") or "node"
-
-
-def _pi_cli() -> str:
-    return os.getenv("PROMETHEUS_PI_CLI") or (
-        "E:/tools/Prometheus-Desktop/pi/node_modules/@earendil-works"
-        "/pi-coding-agent/dist/bundle/cli.js"
-    )
 
 
 def _row(data_dir, ctx):
@@ -72,7 +60,19 @@ def _write_subtitle_files(data_dir, ctx, asr_path) -> None:
     )
 
 
-def build_real_impls(data_dir) -> dict:
+def build_real_impls(data_dir, runtime=None) -> dict:
+    """``runtime``: a resolved Runtime, or a zero-argument callable returning one."""
+
+    def _rt():
+        found = runtime() if callable(runtime) else runtime
+        return found if found is not None else runtime_mod.resolve(None)
+
+    def _node_exe() -> str:
+        return str(_rt().node)
+
+    def _pi_cli() -> str:
+        return str(_rt().pi_cli)
+
     def resolve(ctx):
         row = _row(data_dir, ctx)
         updates = resolve_mod.resolve_stage(
@@ -132,7 +132,10 @@ def build_real_impls(data_dir) -> dict:
         settings = store.load(data_dir)
         work = _work(data_dir, ctx)
         figures = bool(row["figures"]) and (work / "frames" / "frames.json").is_file()
-        supports_images = bool((settings["llm"].get("custom") or {}).get("supports_images"))
+        # Ask Pi (built-in and custom providers alike) only when frames exist.
+        supports_images = figures and capability.query_supports_images(
+            _node_exe(), _pi_cli(), data_dir, settings["llm"],
+        )
         workspace_mod.run_report_stage(
             data_dir, ctx.item_id, row, settings,
             node_exe=_node_exe(), pi_cli=_pi_cli(),

@@ -8,7 +8,7 @@ DEFAULTS = {
     "llm": {
         "provider": "deepseek", "model": "deepseek-flash", "api_key": "",
         "thinking": "low",
-        "custom": {"base_url": "", "supports_images": False},
+        "custom": {"base_url": "", "supports_images": False, "protocol": "openai"},
     },
     "asr": {"backend": "local", "dashscope_api_key": "", "cloud_model": "paraformer-v2"},
     "network": {"proxy": "", "youtube_cookies_file": ""},

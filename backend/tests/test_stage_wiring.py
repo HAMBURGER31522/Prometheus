@@ -5,6 +5,7 @@ the queue does, which the module-level stage tests never exercised.
 """
 
 import pytest
+from conftest import DUMMY_RUNTIME
 from prometheus import paths
 from prometheus.library import db
 from prometheus.library import items as items_store
@@ -45,7 +46,7 @@ def test_transcribe_converts_the_audio_not_the_info_json_sidecar(data_dir, monke
 
     monkeypatch.setattr(stages_mod, "to_wav", fake_to_wav)
     with pytest.raises(_Stop):
-        stages_mod.build_real_impls(data_dir)["transcribe"](ctx)
+        stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
     assert seen["source"].name == "media.m4a"
 
 
@@ -60,7 +61,7 @@ def test_frames_extracts_from_the_video_not_the_info_json_sidecar(data_dir, monk
         seen["video"] = video
 
     monkeypatch.setattr(stages_mod.frames_mod, "extract_frames", fake_extract)
-    stages_mod.build_real_impls(data_dir)["frames"](ctx)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["frames"](ctx)
     assert seen["video"].name == "video.mp4"
 
 
@@ -73,14 +74,14 @@ def test_report_stage_receives_the_item_row(data_dir, monkeypatch):
         seen["row_id"] = row["id"]
 
     monkeypatch.setattr(stages_mod.workspace_mod, "run_report_stage", fake_run)
-    stages_mod.build_real_impls(data_dir)["report"](ctx)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](ctx)
     assert seen == {"item_id": ctx.item_id, "row_id": ctx.item_id}
 
 
 def test_finalize_stage_records_the_report_title(data_dir, monkeypatch):
     ctx = _ctx(data_dir)
     monkeypatch.setattr(stages_mod, "finalize_report", lambda source, target, work: "报告标题")
-    stages_mod.build_real_impls(data_dir)["finalize"](ctx)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["finalize"](ctx)
     assert items_store.get_item(data_dir, ctx.item_id)["report_title"] == "报告标题"
 
 
@@ -99,7 +100,7 @@ def test_classify_stage_assigns_a_category(data_dir, monkeypatch):
     ctx = _ctx(data_dir)
     _write_report(data_dir, ctx.item_id)
     monkeypatch.setattr(stages_mod, "classify_report", lambda *args, **kwargs: "测试分类")
-    stages_mod.build_real_impls(data_dir)["classify"](ctx)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["classify"](ctx)
     assert items_store.get_item(data_dir, ctx.item_id)["category_id"] is not None
 
 
@@ -107,5 +108,24 @@ def test_mindmap_stage_marks_failure_when_output_never_validates(data_dir, monke
     ctx = _ctx(data_dir)
     _write_report(data_dir, ctx.item_id)
     monkeypatch.setattr(stages_mod.one_shot_mod, "run_one_shot", lambda *args, **kwargs: "")
-    stages_mod.build_real_impls(data_dir)["mindmap"](ctx)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["mindmap"](ctx)
     assert items_store.get_item(data_dir, ctx.item_id)["mindmap_status"] == "failed"
+
+
+def test_report_stage_asks_pi_whether_a_builtin_model_sees_images(data_dir, monkeypatch):
+    ctx = _ctx(data_dir, figures=1)
+    work = paths.work_dir(data_dir, ctx.item_id)
+    (work / "frames").mkdir(parents=True)
+    (work / "frames" / "frames.json").write_text("[]", encoding="utf-8")
+    seen = {}
+
+    def fake_run(data_dir_arg, item_id, row, settings, **kwargs):
+        seen.update(kwargs)
+
+    from prometheus.settings import capability
+
+    # Default settings use the built-in deepseek provider (no custom checkbox involved).
+    monkeypatch.setattr(capability, "query_supports_images", lambda *a, **k: True, raising=False)
+    monkeypatch.setattr(stages_mod.workspace_mod, "run_report_stage", fake_run)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](ctx)
+    assert seen["model_supports_images"] is True

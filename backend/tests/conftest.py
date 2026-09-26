@@ -1,13 +1,17 @@
 """Shared fixtures for the backend test suite."""
 
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from prometheus.runtime import Runtime
 from prometheus.server import create_app
 
 TOKEN = "test-token"
 BV_URL = "https://www.bilibili.com/video/BV1xJYT6EEYc/"
+# Paths only; unit tests never execute them (CI has no toolchain).
+DUMMY_RUNTIME = Runtime(Path("node.exe"), Path("cli.js"), Path("ffmpeg.exe"), Path("ffprobe.exe"))
 
 
 @pytest.fixture
@@ -15,7 +19,7 @@ def client_factory():
     created = []
 
     def factory(data_dir=None, fake=False):
-        app = create_app(token=TOKEN, data_dir=data_dir, fake=fake)
+        app = create_app(token=TOKEN, data_dir=data_dir, fake=fake, runtime=DUMMY_RUNTIME)
         client = TestClient(app)
         client.__enter__()
         created.append(client)

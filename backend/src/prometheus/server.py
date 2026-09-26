@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus import paths
+from prometheus import runtime as runtime_mod
 from prometheus.api import app as app_api
 from prometheus.api import asr_components as asr_components_api
 from prometheus.api import categories as categories_api
@@ -32,11 +33,19 @@ CORS_ORIGINS = ["http://tauri.localhost", "http://localhost:1420"]
 
 
 class AppState:
-    def __init__(self, fake: bool | None):
+    def __init__(self, fake: bool | None, runtime_dir=None, found_runtime=None):
         self.data_dir: Path | None = None
         self.config_dir: Path | None = None
         self.queue: TaskQueue | None = None
         self.fake = bool(os.getenv("PROMETHEUS_FAKE") == "1") if fake is None else fake
+        self.runtime_dir = Path(runtime_dir) if runtime_dir else None
+        self._runtime = found_runtime
+
+    def get_runtime(self) -> runtime_mod.Runtime:
+        """Resolve node / Pi / ffmpeg on first use (PLAN 15.2-1)."""
+        if self._runtime is None:
+            self._runtime = runtime_mod.resolve(self.runtime_dir)
+        return self._runtime
 
     def initialize(self, data_dir: Path) -> None:
         self.data_dir = Path(data_dir)
@@ -46,7 +55,7 @@ class AppState:
         # Startup recovery (PLAN 7.1): a running row means the process died.
         db.mark_running_as_interrupted(self.data_dir)
         if self.queue is None:
-            impls = build_fake_impls(self.data_dir) if self.fake else build_real_impls(self.data_dir)
+            impls = build_fake_impls(self.data_dir) if self.fake else build_real_impls(self.data_dir, runtime=self.get_runtime)
             self.queue = TaskQueue(self.data_dir, impls)
             self.queue.start()
 
@@ -61,9 +70,11 @@ def create_app(
     data_dir: str | Path | None = None,
     fake: bool | None = None,
     config_dir: str | Path | None = None,
+    runtime_dir: str | Path | None = None,
+    runtime: "runtime_mod.Runtime | None" = None,
 ):
     app = FastAPI(title="Prometheus")
-    state = AppState(fake)
+    state = AppState(fake, runtime_dir=runtime_dir, found_runtime=runtime)
     if data_dir is not None:
         state.data_dir = Path(data_dir)
     state.config_dir = Path(config_dir) if config_dir else None
@@ -136,10 +147,18 @@ def main() -> None:
         if app_json.is_file():
             data_dir = json.loads(app_json.read_text(encoding="utf-8")).get("data_dir")
 
+    found = None
+    if not fake:
+        # Fail loudly when an install is missing its runtime; development resolves
+        # from env.ps1. Either way the bundled ffmpeg/node go first on PATH.
+        found = runtime_mod.resolve(args.runtime_dir)
+        runtime_mod.activate(found, runtime_dir=args.runtime_dir)
+
     import uvicorn
 
     uvicorn.run(
-        create_app(token=args.token, data_dir=data_dir, fake=fake, config_dir=config_dir),
+        create_app(token=args.token, data_dir=data_dir, fake=fake, config_dir=config_dir,
+                   runtime_dir=args.runtime_dir, runtime=found),
         host=args.host, port=args.port, log_level="info",
     )
 
