@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from prometheus.report.frames import extract_frames, filter_frames, parse_showinfo
+from prometheus.figures.frames import extract_frames, filter_frames, parse_showinfo
 
 
 def _fake_ffmpeg(scene_times, grabbed):

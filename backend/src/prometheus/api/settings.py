@@ -3,8 +3,9 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus import paths
-from prometheus.report.one_shot import OneShotError, run_one_shot
-from prometheus.settings import capability, pi_models, store
+from prometheus.llm import capability, pi_models
+from prometheus.llm.one_shot import OneShotError, run_one_shot
+from prometheus.settings import store
 
 router = APIRouter()
 

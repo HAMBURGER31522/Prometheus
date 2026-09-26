@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from prometheus.report.one_shot import ONE_SHOT_FLAGS, run_one_shot
+from prometheus.llm.one_shot import ONE_SHOT_FLAGS, run_one_shot
 
 LONG_PROMPT = "讲解要点。" * 2000  # > 9000 chars
 

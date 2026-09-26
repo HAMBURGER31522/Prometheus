@@ -10,7 +10,7 @@ from prometheus.report.timing import pi_timeout_seconds
 from video_report_agent.pi import PiRunner
 
 PLATFORM_LABELS = {"bilibili": "Bilibili", "youtube": "YouTube"}
-FIGURES_MD = Path(__file__).parent / "overlays" / "figures.md"
+FIGURES_MD = Path(__file__).parents[1] / "figures" / "figures.md"
 
 WINDOWS_PROMPT = (
     "本机为 Windows，命令工具是 PowerShell；运行 Python 用"

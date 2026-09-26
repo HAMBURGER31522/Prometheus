@@ -1,6 +1,6 @@
 """Model capability parsing from `pi --offline --list-models` (PLAN 8.7)."""
 
-from prometheus.settings.capability import model_supports_images, parse_capabilities
+from prometheus.llm.capability import model_supports_images, parse_capabilities
 
 LIST_OUTPUT = """provider  model                         context  max-out  thinking  images
 deepseek  deepseek-flash                1M       384K     yes       yes
@@ -30,7 +30,7 @@ def test_capability_query_uses_the_data_dir_config_and_the_key(tmp_path, monkeyp
     import subprocess
 
     from prometheus import paths
-    from prometheus.settings import capability
+    from prometheus.llm import capability
 
     seen = {}
 

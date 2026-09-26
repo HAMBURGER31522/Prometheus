@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from prometheus.report.mindmap import (
+from prometheus.mindmap.markdown import (
     build_mindmap_prompt,
-    extract_outline,
     moment_link,
     validate_mindmap,
 )
+from prometheus.report.outline import extract_outline
 
 
 def load_example():
