@@ -70,3 +70,5 @@
 1. **带配图的完整报告 live trial 未跑成**：中转站 oapi.firedog.dev 对图片输入（multimodal content）返回 `SUBSCRIPTION_NOT_FOUND — No active subscription found for this group`（gpt-6-sol / gpt-5.5 / gpt-6-luna 全部如此；纯文本正常）。Agent 读取帧图片后的下一次模型请求即 403。
 2. 解除条件：需要一个支持看图的供应商——计划书默认的 DeepSeek 官方 `deepseek-flash` 即支持图片（vendor models.json input 含 image）。提供 DeepSeek Key 后即可跑 A/B（D6 需用户并排阅读签字）。
 3. D5/D6 的 A/B 对比：待上述条件 + 配图版报告生成成功后进行。
+
+补充（2026-09-26）：用户随后提供的第二个中转站 `https://ai.venlacy.com/v1`（key sk-eLFM…，分组 codex）实测：`/v1/models` 仅列出 gpt-5.6-sol，但 chat/completions 与 responses 两种接口均返回 `No available channel for model gpt-5.6-sol under group codex`——该分组当前无可用通道，key 暂不可用。两个中转站均无法进行配图（多模态）请求，M5 的 A/B 解除条件不变：需要支持看图的供应商（如 DeepSeek 官方 deepseek-flash）。
