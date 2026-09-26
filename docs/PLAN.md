@@ -578,7 +578,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 |---|---|---|---|---|
 | M0 仓库骨架 | 完成 | 2026-09-25 | f1ac34c | `uv run pytest backend/tests -q` = 0；`npm --prefix app run test` = 0；`npm --prefix app run build` = 0；`cargo check --manifest-path app/src-tauri/Cargo.toml` = 0；`npm --prefix app run lint:design` = 0；`git cat-file -t d060dfb` = `commit`；CI 绿（windows-latest，run 36188439025） |
 | M1 Windows 兼容 | 完成 | 2026-09-25 | 32b41d8（merge） | D1：`uv run --package video-report-agent --extra enhancement --directory vendor/video-report-agent pytest -q` = 0（241 passed；基线 29 failed / 212 passed）；`uv run --directory vendor/video-report-agent ruff check src tests` = 5 个错误 ≤ 基线 7 个；附录 A V1 已登记；Playwright 浏览器补装到 chromium-1243（环境问题，不改代码） |
-| M2 后端核心 | 完成 | 2026-09-25 | 见本行合并后回填 | D2：`uv run pytest backend/tests -q -m "not live"` = 0（46 passed）；`uv run ruff check backend` = 0；M2 测试清单（数据目录布局、表结构、条目 201/409/422、分类、鉴权/门控/CORS、队列串行/取消/interrupted、设置/掩码/models.json、假流水线 3 秒内完成）全部在 backend/tests 有对应用例，先红（ac2bd1a，36 失败）后绿（a997553） |
+| M2 后端核心 | 完成 | 2026-09-25 | 949dc07（merge） | D2：`uv run pytest backend/tests -q -m "not live"` = 0（46 passed）；`uv run ruff check backend` = 0；M2 测试清单（数据目录布局、表结构、条目 201/409/422、分类、鉴权/门控/CORS、队列串行/取消/interrupted、设置/掩码/models.json、假流水线 3 秒内完成）全部在 backend/tests 有对应用例，先红（ac2bd1a，36 失败）后绿（a997553） |
 | M3 导入/转写/字幕 | 未开始 | | | |
 | M4 精读与分类 | 未开始 | | | |
 | M5 配图 | 未开始 | | | |
