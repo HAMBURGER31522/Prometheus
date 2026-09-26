@@ -127,3 +127,30 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 **D-28 input.json 字段集**
 问题：PLAN 8.6 要求 input.json 含「vendor 写入的字段」+ platform/title 等，但 vendor 的字段含 media_config（转写运行时配置，与报告 Agent 无关，且本地路径不调用 resolve_media_config）。
 决定：input.json = url、video_id、report_mode=standard、transcript_mode=asr-only、ocr_mode=off、ocr_roi、subtitle_file、platform（Bilibili/YouTube）、title、uploader、attribution（`{平台}；{uploader}；《{title}》；{url}`，与 vendor 格式一致）。media_config 字段不进 input.json。
+
+---
+
+以下决策于 **2026-09-26** 第二阶段规格确认时补充（详见 PLAN 第 15 节）。
+
+**D-29 界面方向：C 液态玻璃（墨夜外壳 + 浅色纸页报告）**
+依据：用户在三个可交互原型（A 宣纸·墨 / B Mica / C 液态玻璃）中选定 C。报告不做深色：Agent 生成的图表按白纸配色，深色背景下会看不清。
+用户的修改意见：侧栏不能遮挡内容；滚动条静止时淡出、滚动时显现；打开条目后侧栏高亮停留在当前页签；三个内容页签使用同一套「分类 → 条目 → 内容」版式；字幕按时间戳完整展示原文。
+
+**D-30 思维导图改为 BiliSum 式知识树，替代 D-08 的 markmap**
+问题：markmap 大纲过于简略；用户要求参考 BiliSum 的设计与写作思路。
+决定：分层 JSON（root/theme/topic/leaf，节点带摘要和时间锚点），React Flow 画布加自写的横向树布局；另外导出 `思维导图.md` 供 Obsidian / XMind 使用。D-08 不再生效。
+
+**D-31 知识库存储：可读文件夹 + PDC 式 AI 索引，替代 D-13**
+问题：`items/<32位ID>` 在资源管理器里认不出是哪个视频；中间文件每小时视频约 220MB，库会越积越大。
+决定：按「分类 / 日期 标题 / 精读.html·精读.md·思维导图.md·字幕.srt·字幕.txt·来源.url」存放；库根目录放 `llms.txt` 和 `index.json`（参考 PDC 协议「给人的 HTML 与给 AI 的 Markdown/JSON 两条通道 + 分层索引」的思路）；内部数据放隐藏的 `.prometheus\`；任务成功后清理中间文件。
+实测（BV1yPb46xExH，104 分钟）：最终成果 1.4MB，中间文件 391MB；清理后每个视频约 2.5MB。
+
+**D-32 云端转写改为必剪（免费，无需配置），替代 D-10 的百炼云端**
+依据：用户的 DashScope Key 属于国际站（新加坡），那里没有 `paraformer-v2`；用户希望云端免费、开箱即用。2026-09-26 实测：原版 bcut-asr 返回 412；改用 VideoCaptioner 维护版的请求头后可用，8 分钟音频上传 16.5 秒、识别 12.9 秒，得到 192 段带时间戳的结果，中文错字比 Whisper 少，但几乎没有标点。
+代价：这是非官方的逆向接口，随时可能失效或限流，所以失败时自动退回本地转写。
+
+**D-32a 本地转写引擎待实测后由用户选定**
+公开基准显示 Whisper-large-v3 的中文明显落后（WenetSpeech net 字错率 9.86%，Qwen3-ASR-1.7B 为 4.97%）。先在真实样本上比较 4 个引擎再定（PLAN 15.4.3）。
+
+**D-33 自定义提供商支持 OpenAI / Anthropic 两种协议**
+依据：用户的 justwoker 中转只开放 Anthropic 协议（`/v1/messages`，`/v1/chat/completions` 被 Cloudflare 拦截，返回 403）；venlacy 中转走 OpenAI 协议。2026-09-26 实测：两者的文本和图片输入都正常（justwoker `claude-opus-4-8`，venlacy `gpt-6-sol`）。中转站返回「分组无可用通道」时，是该 Key 所在分组没有上游，与模型能否识图无关。
