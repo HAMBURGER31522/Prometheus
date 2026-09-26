@@ -7,7 +7,7 @@ TEMPLATE = (
 
 
 def test_video_description_placeholder_reuses_source_details_contract():
-    template = TEMPLATE.read_text()
+    template = TEMPLATE.read_text(encoding="utf-8")
 
     assert "{{VIDEO_DESCRIPTION}}" in template
     assert "<details><summary>来源与处理说明</summary>{{SOURCES}}</details>" in template
@@ -18,7 +18,7 @@ def test_video_description_placeholder_reuses_source_details_contract():
 
 
 def test_footer_keeps_report_label_left_and_domain_right():
-    template = TEMPLATE.read_text()
+    template = TEMPLATE.read_text(encoding="utf-8")
 
     assert "footer{display:flex;align-items:baseline;justify-content:space-between;" in template
     assert (
@@ -30,7 +30,7 @@ def test_footer_keeps_report_label_left_and_domain_right():
 
 
 def test_header_contract_keeps_summary_and_full_source_metadata():
-    template = TEMPLATE.read_text()
+    template = TEMPLATE.read_text(encoding="utf-8")
 
     assert '<p class="lead">{{LEAD}}</p>' in template
     assert '<p class="meta">{{ATTRIBUTION}}</p>' in template
@@ -40,13 +40,13 @@ def test_header_contract_keeps_summary_and_full_source_metadata():
 
 
 def test_template_keeps_paper_white_and_canvas_light_gray():
-    template = TEMPLATE.read_text()
+    template = TEMPLATE.read_text(encoding="utf-8")
 
     assert "--paper:#fff;--canvas:#f2f5f7;" in template
 
 
 def test_standard_navigation_lives_outside_paper_and_hides_for_long_image():
-    template = TEMPLATE.read_text()
+    template = TEMPLATE.read_text(encoding="utf-8")
 
     assert ".report-nav{counter-reset:report-nav;position:fixed;" in template
     assert "left:calc(50vw - 724px);" in template
@@ -64,7 +64,7 @@ def test_bar_component_pins_block_display_on_fill():
     历史故障：模型自写 `.bar-fill{height:100%}` 挂在 <span> 上，行内元素的
     width/height 不生效，getBoundingClientRect() 返回 0×0，整条柱子渲染成空白。
     """
-    template = TEMPLATE.read_text()
+    template = TEMPLATE.read_text(encoding="utf-8")
 
     assert ".bars{" in template
     assert ".bar-track{" in template
@@ -75,7 +75,7 @@ def test_bar_component_pins_block_display_on_fill():
 def test_brief_template_fills_shared_delivery_contract(tmp_path):
     from video_report_agent.report_content import fill_video_description
 
-    brief = TEMPLATE.with_name("brief-report-template.html").read_text()
+    brief = TEMPLATE.with_name("brief-report-template.html").read_text(encoding="utf-8")
     rendered = brief
     for name, value in {
         "TITLE": "Fixture", "SUBTITLE": "", "LEAD": "Source overview",
@@ -85,11 +85,13 @@ def test_brief_template_fills_shared_delivery_contract(tmp_path):
         rendered = rendered.replace("{{" + name + "}}", value)
     rendered = rendered.split("<!-- BRIEF_EXAMPLES_START")[0]
     report = tmp_path / "report.html"
-    report.write_text(rendered)
+    report.write_text(rendered, encoding="utf-8")
     (tmp_path / "download").mkdir()
-    (tmp_path / "download/source.info.json").write_text('{"description":"Original <source>"}')
+    (tmp_path / "download/source.info.json").write_text(
+        '{"description":"Original <source>"}', encoding="utf-8",
+    )
     fill_video_description(report, tmp_path)
-    html = report.read_text()
+    html = report.read_text(encoding="utf-8")
     assert "{{" not in html
     assert "Original &lt;source&gt;" in html
     assert "视频报告·速览" in html

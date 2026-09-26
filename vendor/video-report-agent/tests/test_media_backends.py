@@ -61,9 +61,9 @@ def test_config_snapshot_not_changed_by_environment(env, tmp_path):
 
     run = create_run(tmp_path, "https://www.bilibili.com/video/BV1cZ8x6sEhF/")
     env.setenv("ASR_BACKEND", "paraformer")
-    data = json.loads((run / "input.json").read_text())
+    data = json.loads((run / "input.json").read_text(encoding="utf-8"))
     assert data["asr_backend"] == "mlx"
-    assert "sk-test-secret" not in (run / "input.json").read_text()
+    assert "sk-test-secret" not in (run / "input.json").read_text(encoding="utf-8")
 
 
 def service(mode="ok", model="paraformer-v2"):

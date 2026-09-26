@@ -10,7 +10,7 @@ def test_span_failure_and_redaction(tmp_path):
     with pytest.raises(ValueError):
         with RunTrace(tmp_path).span("asr", backend="test", api_key="secret"):
             raise ValueError("request https://example.com/private?token=x sk-secret failed")
-    lines = (tmp_path / "run.trace.jsonl").read_text().splitlines()
+    lines = (tmp_path / "run.trace.jsonl").read_text(encoding="utf-8").splitlines()
     start, end = map(json.loads, lines)
     assert start["span_id"] == end["span_id"]
     assert end["status"] == "error"
@@ -27,7 +27,8 @@ def test_pipeline_download_failure_closes_span(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pipeline, "reuse_download", fail)
     assert pipeline.generate(run)["state"] == "FAILED"
-    events = [json.loads(line) for line in (run / "run.trace.jsonl").read_text().splitlines()]
+    trace_text = (run / "run.trace.jsonl").read_text(encoding="utf-8")
+    events = [json.loads(line) for line in trace_text.splitlines()]
     assert [e["type"] for e in events] == ["stage_start", "stage_end"]
     assert events[-1]["stage"] == "download"
     assert events[-1]["status"] == "error"

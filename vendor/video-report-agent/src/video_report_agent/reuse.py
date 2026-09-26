@@ -17,7 +17,7 @@ def previous_runs(run: Path, video_id: str):
         if candidate == run or not candidate.is_dir():
             continue
         try:
-            metadata = json.loads((candidate / "input.json").read_text())
+            metadata = json.loads((candidate / "input.json").read_text(encoding="utf-8"))
             if metadata.get("video_id") == video_id:
                 yield candidate, metadata
         except (OSError, ValueError, AttributeError):
@@ -40,8 +40,8 @@ def same_asr_config(previous: dict, metadata: dict) -> bool:
 
 def validated_asr(candidate: Path, metadata: dict):
     try:
-        previous = json.loads((candidate / "input.json").read_text())
-        payload = json.loads((candidate / "asr.json").read_text())
+        previous = json.loads((candidate / "input.json").read_text(encoding="utf-8"))
+        payload = json.loads((candidate / "asr.json").read_text(encoding="utf-8"))
         segments = payload.get("segments")
         if (
             not same_asr_config(previous, metadata)
@@ -69,7 +69,7 @@ def reuse_asr(run: Path, metadata: dict):
 def validated_transcript(candidate: Path, metadata: dict):
     """Return the reusable transcript files and units, or ``None``."""
     try:
-        manifest = json.loads((candidate / "transcript-manifest.json").read_text())
+        manifest = json.loads((candidate / "transcript-manifest.json").read_text(encoding="utf-8"))
         if (
             manifest.get("status") != "READY"
             or manifest.get("video_id") != metadata["video_id"]
@@ -83,10 +83,8 @@ def validated_transcript(candidate: Path, metadata: dict):
         names = list(manifest["artifacts"].values()) + ["asr.json"]
         if any(Path(name).name != name or not (candidate / name).is_file() for name in names):
             return None
-        units = [
-            json.loads(line)
-            for line in (candidate / "canonical-transcript.jsonl").read_text().splitlines()
-        ]
+        canonical_text = (candidate / "canonical-transcript.jsonl").read_text(encoding="utf-8")
+        units = [json.loads(line) for line in canonical_text.splitlines()]
         if not units or len(units) != manifest["canonical_unit_count"]:
             return None
         return names, units
@@ -183,7 +181,8 @@ def reuse_transcript(run: Path, metadata: dict):
         for name in names:
             shutil.copy2(candidate / name, run / name)
         (run / "transcript.md").write_text(
-            "\n".join([f"# {metadata['title']}", metadata["attribution"], "", *lines])
+            "\n".join([f"# {metadata['title']}", metadata["attribution"], "", *lines]),
+            encoding="utf-8",
         )
         return candidate.name
     return None

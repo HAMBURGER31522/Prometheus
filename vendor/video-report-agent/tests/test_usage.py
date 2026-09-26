@@ -17,7 +17,7 @@ def message(cost=0.12, tokens=120):
 
 def test_cached_matches_full_and_does_not_open_unchanged_log(tmp_path, monkeypatch):
     log = tmp_path / "pi.events.jsonl"
-    log.write_text(message() + message(0) + '{"type":"agent_end"}\n')
+    log.write_text(message() + message(0) + '{"type":"agent_end"}\n', encoding="utf-8")
     expected = usage.call_costs(tmp_path, {}, None)
     assert expected["llm_calls"] == 2
     assert expected["tokens"] == 240
@@ -37,20 +37,20 @@ def test_cached_matches_full_and_does_not_open_unchanged_log(tmp_path, monkeypat
 @pytest.mark.parametrize("change", ["append", "truncate", "rewrite", "replace", "delete"])
 def test_log_changes_invalidate(tmp_path, change):
     log = tmp_path / "pi.events.jsonl"
-    log.write_text(message())
+    log.write_text(message(), encoding="utf-8")
     usage.cached_call_costs(tmp_path, {}, None)
     if change == "append":
         with log.open("a") as stream:
             stream.write(message())
     elif change == "truncate":
-        log.write_text("")
+        log.write_text("", encoding="utf-8")
     elif change == "rewrite":
         size = log.stat().st_size
-        log.write_text(message(0.34))
+        log.write_text(message(0.34), encoding="utf-8")
         assert log.stat().st_size == size
     elif change == "replace":
         replacement = tmp_path / "replacement"
-        replacement.write_text(message(0.34))
+        replacement.write_text(message(0.34), encoding="utf-8")
         replacement.replace(log)
     else:
         log.unlink()
@@ -59,26 +59,26 @@ def test_log_changes_invalidate(tmp_path, change):
 
 @pytest.mark.parametrize("bad", ["{", "[]", '{"version":1}', "invalid_llm", "version"])
 def test_invalid_cache_is_rebuilt(tmp_path, monkeypatch, bad):
-    (tmp_path / "pi.events.jsonl").write_text(message())
+    (tmp_path / "pi.events.jsonl").write_text(message(), encoding="utf-8")
     expected = usage.cached_call_costs(tmp_path, {}, None)
     path = tmp_path / "usage.json"
     if bad == "version":
         monkeypatch.setattr(usage, "USAGE_CACHE_VERSION", usage.USAGE_CACHE_VERSION + 1)
     elif bad == "invalid_llm":
-        cache = json.loads(path.read_text())
+        cache = json.loads(path.read_text(encoding="utf-8"))
         cache["llm"]["tokens"] = "broken"
-        path.write_text(json.dumps(cache))
+        path.write_text(json.dumps(cache), encoding="utf-8")
     else:
-        path.write_text(bad)
+        path.write_text(bad, encoding="utf-8")
     assert usage.cached_call_costs(tmp_path, {}, None) == expected
-    cache = json.loads(path.read_text())
+    cache = json.loads(path.read_text(encoding="utf-8"))
     assert cache["version"] == usage.USAGE_CACHE_VERSION
     assert cache["llm"]["tokens"] == 120
 
 
 def test_partial_line_is_counted_only_after_newline(tmp_path):
     log = tmp_path / "pi.events.jsonl"
-    log.write_text(message() + message().rstrip("\n"))
+    log.write_text(message() + message().rstrip("\n"), encoding="utf-8")
     assert usage.cached_call_costs(tmp_path, {}, None)["llm_calls"] == 1
     with log.open("a") as stream:
         stream.write("\n")
@@ -87,7 +87,7 @@ def test_partial_line_is_counted_only_after_newline(tmp_path):
 
 def test_append_during_read_does_not_publish_cache(tmp_path, monkeypatch):
     log = tmp_path / "pi.events.jsonl"
-    log.write_text(message())
+    log.write_text(message(), encoding="utf-8")
     original = usage._llm_costs
 
     def append_after_read(run):
@@ -113,7 +113,7 @@ def test_asr_is_fresh_on_cache_hit(tmp_path, monkeypatch):
     asr = tmp_path / "asr.json"
     asr.write_text(json.dumps({
         "backend": "paraformer", "usage": {"content_duration_ms": 60000},
-    }))
+    }), encoding="utf-8")
     original_read = usage.read_object
     asr_reads = []
 
@@ -129,14 +129,15 @@ def test_asr_is_fresh_on_cache_hit(tmp_path, monkeypatch):
     assert usage.cached_call_costs(
         tmp_path, {"transcript_reused_from": "old"}, 0.0004,
     )["asr_basis"] == "reused"
-    asr.write_text('{"backend":"mlx"}')
+    asr.write_text('{"backend":"mlx"}', encoding="utf-8")
     assert usage.cached_call_costs(tmp_path, {}, None)["asr_basis"] == "local"
     assert len(asr_reads) == 2
-    assert "asr_cny_estimate" not in json.loads((tmp_path / "usage.json").read_text())["llm"]
+    usage_payload = json.loads((tmp_path / "usage.json").read_text(encoding="utf-8"))
+    assert "asr_cny_estimate" not in usage_payload["llm"]
 
 
 def test_cache_write_failure_returns_usage_and_cleans_same_directory_temp(tmp_path, monkeypatch):
-    (tmp_path / "pi.events.jsonl").write_text(message())
+    (tmp_path / "pi.events.jsonl").write_text(message(), encoding="utf-8")
     expected = usage.call_costs(tmp_path, {}, None)
     seen = []
 
@@ -194,8 +195,8 @@ def test_cny_backfill_keeps_usd_separate_and_invalidates_old_cache(tmp_path):
     m = priced_message("qwen3.8-flash")
     m["usage"]["cost"] = {"total": 42}
     (tmp_path / "pi.events.jsonl").write_text(
-        json.dumps({"type": "message_end", "message": m}) + '\n' + message(.12))
-    (tmp_path / "usage.json").write_text('{"version":1}')
+        json.dumps({"type": "message_end", "message": m}) + '\n' + message(.12), encoding="utf-8")
+    (tmp_path / "usage.json").write_text('{"version":1}', encoding="utf-8")
     result = usage.cached_call_costs(tmp_path, {}, None)
     assert result["llm_cny_estimate"] == pytest.approx(.00207)
     assert result["llm_usd_estimate"] == .12

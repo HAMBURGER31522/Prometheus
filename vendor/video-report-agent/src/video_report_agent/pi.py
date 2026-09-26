@@ -53,7 +53,7 @@ class PiRunner:
         )
         auth_path = PI_AGENT_DIR / "auth.json"
         if api_key is None and provider is not None and auth_path.is_file():
-            if provider in json.loads(auth_path.read_text()):
+            if provider in json.loads(auth_path.read_text(encoding="utf-8")):
                 configured_key = None
         self.api_key = configured_key.strip() if configured_key and configured_key.strip() else None
         self.thinking = thinking if thinking is not None else DEFAULT_THINKING
@@ -72,7 +72,10 @@ class PiRunner:
         env["PI_CODING_AGENT_DIR"] = str(PI_AGENT_DIR)
         env["VIDEO_REPORT_PYTHON"] = sys.executable
         metadata_path = workspace / "input.json"
-        metadata = json.loads(metadata_path.read_text()) if metadata_path.is_file() else {}
+        metadata = (
+            json.loads(metadata_path.read_text(encoding="utf-8"))
+            if metadata_path.is_file() else {}
+        )
         report_mode = metadata.get("report_mode", "standard")
         if report_mode not in ("standard", "brief"):
             raise PiError("INPUT_REJECTED", "report_mode must be standard or brief")
@@ -173,7 +176,7 @@ class PiRunner:
                 {"command": logged_command, "cwd": str(workspace), "prompt": prompt},
                 ensure_ascii=False,
                 indent=2,
-            )
+            ), encoding="utf-8"
         )
         with (workspace / "pi.stderr.log").open("wb") as stderr:
             try:
@@ -207,7 +210,7 @@ class PiRunner:
         if report.is_symlink() or not report.is_file():
             raise PiError("EXTERNAL_MODEL_FAILURE", "Pi ended without report.html")
         fill_video_description(report, workspace)
-        html = report.read_text().lower()
+        html = report.read_text(encoding="utf-8").lower()
         if "<html" not in html or "</html>" not in html or "<body" not in html:
             raise PiError("EXTERNAL_MODEL_FAILURE", "report.html is not a complete HTML document")
         return report

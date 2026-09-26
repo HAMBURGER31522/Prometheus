@@ -56,7 +56,8 @@ def inspect_report(run: Path, label: str = "final") -> dict:
     # Preview the same postprocessing as delivery without changing the agent's working file.
     # Metadata is deliberately read from the original run, while source.html stays raw.
     fill_video_description(target / "report.html", run)
-    source_ids = set(re.findall(r"^\[([^ |]+) \|", (run / "transcript.md").read_text(), re.M))
+    transcript = (run / "transcript.md").read_text(encoding="utf-8")
+    source_ids = set(re.findall(r"^\[([^ |]+) \|", transcript, re.M))
     result = {"status": "error", "inspector_version": "1.1",
               "scope": "layout_and_reference_integrity_only",
               "preview": "delivery-filled copy; working report.html is unchanged",
@@ -97,7 +98,9 @@ def inspect_report(run: Path, label: str = "final") -> dict:
     except Exception as exc:
         result.update(status="error", error=f"{type(exc).__name__}: {exc}")
     result["elapsed_seconds"] = round(time.monotonic() - started, 3)
-    (target / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
+    (target / "result.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
     return result
 
 

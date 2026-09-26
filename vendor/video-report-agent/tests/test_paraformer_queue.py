@@ -38,7 +38,7 @@ def test_task_id_saved_before_poll_and_blocks_resubmit(tmp_path, monkeypatch):
             return httpx.Response(200)
         if request.url.path.endswith("/transcription"):
             return httpx.Response(200, json={"output": {"task_id": "cloud-123"}})
-        assert json.loads(checkpoint.read_text()) == {"task_id": "cloud-123"}
+        assert json.loads(checkpoint.read_text(encoding="utf-8")) == {"task_id": "cloud-123"}
         raise httpx.ConnectError("interrupted", request=request)
 
     with httpx.Client(transport=httpx.MockTransport(handle)) as client:

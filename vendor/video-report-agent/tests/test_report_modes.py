@@ -3,6 +3,8 @@
 import asyncio
 import json
 import shutil
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -10,11 +12,34 @@ from video_report_agent import cli
 from video_report_agent.pi import SKILL, PiError, PiRunner
 from video_report_agent.pipeline import create_run
 
+FAKE_PI_SETUP = (
+    "import json, pathlib, sys\n"
+    "sys.stdin.reconfigure(encoding='utf-8')\n"
+    "sys.stdout.reconfigure(encoding='utf-8')\n"
+)
+
+
+def make_fake_pi(tmp_path: Path, body: str) -> Path:
+    """Runnable stand-in for the pi CLI; Windows cannot exec shebang scripts."""
+    lines = body.splitlines(keepends=True)
+    if lines and lines[0].startswith("#!"):
+        body = "".join(lines[1:])
+    script = tmp_path / "fake_pi_script.py"
+    script.write_text(FAKE_PI_SETUP + body, encoding="utf-8")
+    if sys.platform == "win32":
+        launcher = tmp_path / "fake-pi.cmd"
+        launcher.write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+        return launcher
+    executable = tmp_path / "fake-pi"
+    executable.write_text("#!/usr/bin/env python3\n" + body, encoding="utf-8")
+    executable.chmod(0o755)
+    return executable
+
 
 @pytest.mark.parametrize("mode", ["standard", "brief"])
 def test_create_run_saves_mode(tmp_path, mode):
     run = create_run(tmp_path, "BV1aTtb6uE7d", report_mode=mode)
-    assert json.loads((run / "input.json").read_text())["report_mode"] == mode
+    assert json.loads((run / "input.json").read_text(encoding="utf-8"))["report_mode"] == mode
 
 
 @pytest.mark.parametrize("mode", ["auto", "", None, ["brief"]])
@@ -31,20 +56,19 @@ def test_pi_uses_saved_mode_and_copies_only_selected_rules(
 ):
     run = create_run(tmp_path, "BV1aTtb6uE7d", report_mode=mode or "standard")
     if mode is None:
-        metadata = json.loads((run / "input.json").read_text())
+        metadata = json.loads((run / "input.json").read_text(encoding="utf-8"))
         metadata.pop("report_mode")
-        (run / "input.json").write_text(json.dumps(metadata))
+        (run / "input.json").write_text(json.dumps(metadata), encoding="utf-8")
     original = (run / "input.json").read_bytes()
     # Old working directories may still contain resources staged by an earlier runner.
     (run / "modes").mkdir()
     (run / "assets").mkdir()
     for name in ("standard.md", "brief.md"):
-        (run / "modes" / name).write_text("stale guide")
+        (run / "modes" / name).write_text("stale guide", encoding="utf-8")
     for name in ("report-template.html", "brief-report-template.html"):
-        (run / "assets" / name).write_text("stale template")
-    (run / "transcript.md").write_text("Complete source text")
-    executable = tmp_path / "fake-pi"
-    executable.write_text('''#!/usr/bin/env python3
+        (run / "assets" / name).write_text("stale template", encoding="utf-8")
+    (run / "transcript.md").write_text("Complete source text", encoding="utf-8")
+    executable = make_fake_pi(tmp_path, '''#!/usr/bin/env python3
 import json, pathlib, sys
 prompt = json.loads(sys.stdin.readline())["message"]
 metadata = json.loads(pathlib.Path("input.json").read_text())
@@ -63,7 +87,6 @@ pathlib.Path("report.html").write_text("<html><body>generated</body></html>")
 print(json.dumps({"type":"message_end","message":{"role":"assistant","stopReason":"stop"}}))
 print(json.dumps({"type":"agent_settled"}), flush=True)
 ''')
-    executable.chmod(0o755)
     monkeypatch.setattr("video_report_agent.pi.shutil.which", lambda _: str(executable))
     monkeypatch.setattr("video_report_agent.pi.PI_AGENT_DIR", tmp_path / "pi-config")
     copied = tmp_path / "copied-skill"
@@ -81,7 +104,7 @@ def test_cli_passes_mode(tmp_path, monkeypatch):
     ])
 
     def generate(run):
-        captured.append(json.loads((run / "input.json").read_text())["report_mode"])
+        captured.append(json.loads((run / "input.json").read_text(encoding="utf-8"))["report_mode"])
         return {"state": "RENDERED"}
 
     monkeypatch.setattr(cli, "generate", generate)
@@ -97,7 +120,7 @@ def test_packaged_brief_never_falls_back_to_standard(tmp_path, monkeypatch):
     monkeypatch.setattr("video_report_agent.pi.shutil.which", lambda _: "unused")
     monkeypatch.setattr("video_report_agent.pi.PI_AGENT_DIR", tmp_path / "pi-config")
     run = create_run(tmp_path / "runs", "BV1aTtb6uE7d", report_mode="brief")
-    (run / "transcript.md").write_text("Source")
+    (run / "transcript.md").write_text("Source", encoding="utf-8")
     with pytest.raises(PiError, match="Selected template is missing"):
         asyncio.run(PiRunner().run(run))
     assert not (run / "assets/report-template.html").exists()

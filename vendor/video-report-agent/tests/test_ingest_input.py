@@ -16,7 +16,7 @@ URL = "https://www.bilibili.com/video/BV1bFbK6BEut"
 ])
 def test_share_text_creates_canonical_run(tmp_path, value):
     run = create_run(tmp_path, value)
-    metadata = json.loads((run / "input.json").read_text())
+    metadata = json.loads((run / "input.json").read_text(encoding="utf-8"))
     assert metadata["url"] == URL + "/"
     assert metadata["video_id"] == "bilibili-BV1bFbK6BEut-p1"
 
@@ -61,7 +61,7 @@ AGENT_TITLE = "【Agent planning 核心就是把复杂长任务拆成可执行�
 ])
 def test_agent_share_and_schemeless_url(tmp_path, value):
     run = create_run(tmp_path, value)
-    assert json.loads((run / "input.json").read_text())["url"] == AGENT_URL + "/"
+    assert json.loads((run / "input.json").read_text(encoding="utf-8"))["url"] == AGENT_URL + "/"
 
 
 def test_schemeless_url_preserves_page():
@@ -114,7 +114,7 @@ def test_download_selects_audio_only_when_requested(tmp_path, monkeypatch, audio
         media = tmp_path / "download" / ("source.m4a" if audio_only else "source.mp4")
         media.write_bytes(b"media")
         (media.parent / "source.info.json").write_text(
-            json.dumps({"title": "Title", "uploader": "UP", "duration": 60})
+            json.dumps({"title": "Title", "uploader": "UP", "duration": 60}), encoding="utf-8"
         )
         return SimpleNamespace(returncode=0, stderr="", stdout=str(media))
 
@@ -126,13 +126,14 @@ def test_download_selects_audio_only_when_requested(tmp_path, monkeypatch, audio
 
 @pytest.mark.parametrize("duration,allowed", [(10800, True), (10800.1, False), (None, False)])
 def test_duration_limit(tmp_path, duration, allowed):
-    from video_report_agent.ingest import _metadata
     from yt_dlp.utils import match_filter_func
+
+    from video_report_agent.ingest import _metadata
 
     info = {"title": "Test", "uploader": "UP", "duration": duration}
     assert (match_filter_func("duration <= 10800")(info) is None) == allowed
     path = tmp_path / "info.json"
-    path.write_text(json.dumps(info))
+    path.write_text(json.dumps(info), encoding="utf-8")
     if allowed:
         assert _metadata(path, validate_bilibili_url(URL))[0] == "Test"
     else:
@@ -166,7 +167,7 @@ def test_short_share_validates_redirect(tmp_path, monkeypatch, destination):
     value = "【电诈，进化到这种程度了？【大国之治·反诈系统】-哔哩哔哩】 [https://b23.tv/Rfx6XG4](https://b23.tv/Rfx6XG4)"
     if destination.startswith(URL):
         run = create_run(tmp_path, value)
-        assert json.loads((run / "input.json").read_text())["url"] == URL + "/?p=2"
+        assert json.loads((run / "input.json").read_text(encoding="utf-8"))["url"] == URL + "/?p=2"
     else:
         with pytest.raises(UrlIngestError):
             create_run(tmp_path, value)

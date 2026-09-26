@@ -247,7 +247,7 @@ def download_bilibili_video(
         command.extend(["--write-subs", "--sub-langs", "all", "--sub-format", "srt/vtt/ass/best"])
     command.append(source.canonical_url)
     completed = _run_command(command, runner, category="DOWNLOAD_ERROR")
-    (run_dir / "download.log").write_text(str(getattr(completed, "stderr", "")))
+    (run_dir / "download.log").write_text(str(getattr(completed, "stderr", "")), encoding="utf-8")
     if getattr(completed, "returncode", None) == 101 or (
         not str(getattr(completed, "stdout", "")).strip()
         and "does not pass filter" in str(getattr(completed, "stderr", ""))

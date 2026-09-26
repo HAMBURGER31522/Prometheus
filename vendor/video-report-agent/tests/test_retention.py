@@ -15,9 +15,9 @@ def make_run(root, name, state="RENDERED", age=0):
         "download/source.mp4", "download/source.m4a", "audio.wav", "report.html", "transcript.md",
         "download/source.info.json", "download/source.zh.srt", "assets/image.png", "failure.log",
     ):
-        (run / name).write_text("keep or remove")
+        (run / name).write_text("keep or remove", encoding="utf-8")
     status = run / "status.json"
-    status.write_text(json.dumps({"state": state}))
+    status.write_text(json.dumps({"state": state}), encoding="utf-8")
     timestamp = time.time() - age * 86400
     os.utime(status, (timestamp, timestamp))
     return run
@@ -61,7 +61,7 @@ def test_age_and_disabled_limits(tmp_path, monkeypatch):
 
 def test_cancel_keeps_reusable_inputs_and_removes_partial_outputs(tmp_path):
     run = pipeline.create_run(tmp_path, "BV1cZ8x6sEhF")
-    metadata = json.loads((run / "input.json").read_text())
+    metadata = json.loads((run / "input.json").read_text(encoding="utf-8"))
     (run / "download").mkdir()
     (run / "download/source.m4a").write_bytes(b"media")
     pipeline.write_json(
@@ -70,8 +70,8 @@ def test_cancel_keeps_reusable_inputs_and_removes_partial_outputs(tmp_path):
     )
     (run / "download/source.m4a.part").write_bytes(b"partial")
     unit = {"unit_id": "unit-1", "start_ms": 0, "end_ms": 1000, "canonical_text": "text"}
-    (run / "canonical-transcript.jsonl").write_text(json.dumps(unit) + "\n")
-    (run / "source-text-events.jsonl").write_text("{}\n")
+    (run / "canonical-transcript.jsonl").write_text(json.dumps(unit) + "\n", encoding="utf-8")
+    (run / "source-text-events.jsonl").write_text("{}\n", encoding="utf-8")
     pipeline.write_json(
         run / "asr.json",
         {
@@ -80,7 +80,7 @@ def test_cancel_keeps_reusable_inputs_and_removes_partial_outputs(tmp_path):
             ]
         },
     )
-    (run / "transcript.md").write_text("text")
+    (run / "transcript.md").write_text("text", encoding="utf-8")
     pipeline.write_json(
         run / "transcript-manifest.json",
         {
@@ -98,9 +98,9 @@ def test_cancel_keeps_reusable_inputs_and_removes_partial_outputs(tmp_path):
         },
     )
     for name in ("audio.wav", "report.html", "report.png", "pi.events.jsonl", "asr-task.json"):
-        (run / name).write_text("partial")
+        (run / name).write_text("partial", encoding="utf-8")
     (run / "sessions").mkdir()
-    (run / "sessions/partial.jsonl").write_text("partial")
+    (run / "sessions/partial.jsonl").write_text("partial", encoding="utf-8")
 
     cleanup_cancelled_run(run)
 
@@ -121,8 +121,8 @@ def test_cancel_removes_incomplete_download_and_transcript(tmp_path):
     run = pipeline.create_run(tmp_path, "BV1cZ8x6sEhF")
     (run / "download").mkdir()
     (run / "download/source.m4a.part").write_bytes(b"partial")
-    (run / "asr.json").write_text("{}")
-    (run / "canonical-transcript.jsonl").write_text("")
+    (run / "asr.json").write_text("{}", encoding="utf-8")
+    (run / "canonical-transcript.jsonl").write_text("", encoding="utf-8")
     (run / "audio.wav").write_bytes(b"partial")
 
     cleanup_cancelled_run(run)
@@ -145,7 +145,7 @@ def test_cancel_keeps_completed_asr_before_transcript_is_ready(tmp_path):
             ]
         },
     )
-    (run / "canonical-transcript.jsonl").write_text("")
+    (run / "canonical-transcript.jsonl").write_text("", encoding="utf-8")
 
     cleanup_cancelled_run(run)
 

@@ -70,7 +70,7 @@ class ParaformerBackend:
     def transcribe(self, audio_path: Path, language="zh") -> AsrRun:
         started = time.perf_counter()
         if self.task_path is not None and self.task_path.exists():
-            saved = json.loads(self.task_path.read_text())
+            saved = json.loads(self.task_path.read_text(encoding="utf-8"))
             if saved.get("task_id") or saved.get("chunks"):
                 raise CloudAsrError(
                     "existing_task", "已有云端任务；未重新提交", saved.get("task_id")

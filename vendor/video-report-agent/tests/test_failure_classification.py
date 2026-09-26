@@ -65,4 +65,5 @@ def test_pipeline_persists_public_asr_error(tmp_path, monkeypatch):
     assert status['http_status'] == 400
     assert status['provider_code'] == 'Arrearage'
     assert '欠费' in status['error']
-    assert json.loads((run / 'asr-error.json').read_text())['provider_code'] == 'Arrearage'
+    asr_error = json.loads((run / 'asr-error.json').read_text(encoding="utf-8"))
+    assert asr_error['provider_code'] == 'Arrearage'

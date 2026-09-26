@@ -22,7 +22,7 @@ def test_comparison_uses_same_audio_and_asr_only_once_per_backend(tmp_path, monk
                     }
                 ]
             }
-        )
+        ), encoding="utf-8"
     )
     extraction, calls = [], []
 
@@ -62,10 +62,11 @@ def test_comparison_uses_same_audio_and_asr_only_once_per_backend(tmp_path, monk
     assert calls[1][1]["model"] == "paraformer-v2"
     for backend in ("mlx", "paraformer"):
         root = run / "clip" / backend
-        canonical = json.loads((root / "canonical-transcript.jsonl").read_text().strip())
+        canonical_text = (root / "canonical-transcript.jsonl").read_text(encoding="utf-8")
+        canonical = json.loads(canonical_text.strip())
         assert canonical["provenance"]["asr_backend"] == backend
         assert canonical["start_ms"] == 100
         assert canonical["canonical_text"] == "原始识别"
-        mapped = json.loads((root / "source-mapping.json").read_text())
+        mapped = json.loads((root / "source-mapping.json").read_text(encoding="utf-8"))
         assert mapped["segments"][0]["source_start_ms"] == 4100
-    assert json.loads((run / "status.json").read_text())["state"] == "COMPLETE"
+    assert json.loads((run / "status.json").read_text(encoding="utf-8"))["state"] == "COMPLETE"

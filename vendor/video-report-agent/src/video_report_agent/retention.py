@@ -29,7 +29,7 @@ def cleanup_media(root: Path) -> None:
                 continue
             status = run / "status.json"
             try:
-                if json.loads(status.read_text()).get("state") in {
+                if json.loads(status.read_text(encoding="utf-8")).get("state") in {
                     "RENDERED", "FAILED", "CANCELLED",
                 }:
                     terminal.append((status.stat().st_mtime, run))
@@ -60,7 +60,7 @@ def cleanup_media(root: Path) -> None:
 def cleanup_cancelled_run(run: Path) -> None:
     """Keep only complete reusable inputs and small run diagnostics after cancellation."""
     try:
-        metadata = json.loads((run / "input.json").read_text())
+        metadata = json.loads((run / "input.json").read_text(encoding="utf-8"))
     except (OSError, ValueError, AttributeError):
         metadata = {}
 
