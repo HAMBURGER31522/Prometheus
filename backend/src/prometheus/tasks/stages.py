@@ -90,10 +90,10 @@ def build_real_impls(data_dir) -> dict:
 
     def transcribe(ctx):
         work = _work(data_dir, ctx)
-        audio_files = list(work.glob("media.*"))
-        if not audio_files:
+        audio = download_mod.downloaded_file(work, "media")
+        if audio is None:
             raise FileNotFoundError("work/media.* is missing after download")
-        wav = to_wav(audio_files[0], work / "audio.wav")
+        wav = to_wav(audio, work / "audio.wav")
         backend = store.load(data_dir)["asr"]["backend"]
         if backend == "cloud":
             asr_path = cloud_mod.transcribe_cloud(data_dir, ctx.item_id, wav)
@@ -118,19 +118,19 @@ def build_real_impls(data_dir) -> dict:
         build_transcript_md(work, work / "asr.json", metadata)
 
     def frames(ctx):
-        row = _row(data_dir, ctx.item_id)
-        work = _work(data_dir, ctx.item_id)
+        row = _row(data_dir, ctx)
+        work = _work(data_dir, ctx)
         if not row["figures"]:
             return
-        videos = [p for p in work.glob("video.*") if p.is_file()]
-        if not videos:
+        video = download_mod.downloaded_file(work, "video")
+        if video is None:
             return
-        frames_mod.extract_frames(videos[0], work)
+        frames_mod.extract_frames(video, work)
 
     def report(ctx):
-        row = _row(data_dir, ctx.item_id)
+        row = _row(data_dir, ctx)
         settings = store.load(data_dir)
-        work = _work(data_dir, ctx.item_id)
+        work = _work(data_dir, ctx)
         figures = bool(row["figures"]) and (work / "frames" / "frames.json").is_file()
         supports_images = bool((settings["llm"].get("custom") or {}).get("supports_images"))
         workspace_mod.run_report_stage(
@@ -140,7 +140,7 @@ def build_real_impls(data_dir) -> dict:
         )
 
     def finalize(ctx):
-        work = _work(data_dir, ctx.item_id)
+        work = _work(data_dir, ctx)
         title = finalize_report(
             work / "report.html", paths.report_file(data_dir, ctx.item_id), work,
         )
@@ -148,7 +148,7 @@ def build_real_impls(data_dir) -> dict:
 
     def classify(ctx):
         settings = store.load(data_dir)
-        work = _work(data_dir, ctx.item_id)
+        work = _work(data_dir, ctx)
         html = paths.report_file(data_dir, ctx.item_id).read_text(encoding="utf-8")
         outline = mindmap_mod.extract_outline(html)
         h2_titles = [section["title"] for section in outline["sections"]]
@@ -166,9 +166,9 @@ def build_real_impls(data_dir) -> dict:
         items_store.update_item(data_dir, ctx.item_id, category_id=category_id)
 
     def mindmap(ctx):
-        row = _row(data_dir, ctx.item_id)
+        row = _row(data_dir, ctx)
         settings = store.load(data_dir)
-        work = _work(data_dir, ctx.item_id)
+        work = _work(data_dir, ctx)
         html = paths.report_file(data_dir, ctx.item_id).read_text(encoding="utf-8")
         outline = mindmap_mod.extract_outline(html)
         llm = settings["llm"]
@@ -177,7 +177,7 @@ def build_real_impls(data_dir) -> dict:
         text = ""
         for _ in range(2):
             text = one_shot_mod.run_one_shot(
-                work, prompt=prompt + (errors and "\n上次输出的问题：" + "；".join(errors)),
+                work, prompt=prompt + ("\n上次输出的问题：" + "；".join(errors) if errors else ""),
                 provider=llm["provider"], model=llm["model"],
                 api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
                 node_exe=_node_exe(), pi_cli=_pi_cli(),
