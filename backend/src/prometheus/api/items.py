@@ -1,6 +1,8 @@
 """Item endpoints and the queue view (PLAN 8.2)."""
 
+import asyncio
 import sqlite3
+import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -72,9 +74,20 @@ async def patch_item(request: Request, item_id: str):
 
 @router.delete("/api/items/{item_id}", status_code=204)
 async def delete_item(request: Request, item_id: str):
-    row = items_store.delete_item(request.app.state.data_dir, item_id)
+    state = request.app.state
+    row = items_store.get_item(state.data_dir, item_id)
     if row is None:
         return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
+    if row["status"] in ("queued", "running"):
+        # Deleting a live task: stop it first so no stage recreates the folder.
+        state.queue.cancel(item_id)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            current = items_store.get_item(state.data_dir, item_id)
+            if current["status"] not in ("queued", "running"):
+                break
+            await asyncio.sleep(0.05)
+    items_store.delete_item(state.data_dir, item_id)
     return None
 
 

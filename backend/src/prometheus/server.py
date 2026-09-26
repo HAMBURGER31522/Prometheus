@@ -17,8 +17,8 @@ from prometheus.api import settings as settings_api
 from prometheus.fake.pipeline import build_impls as build_fake_impls
 from prometheus.library import db
 from prometheus.settings import pi_models
-from prometheus.tasks import runner
 from prometheus.tasks.queue import TaskQueue
+from prometheus.tasks.stages import build_real_impls
 
 # Only this endpoint is reachable without the bearer token (PLAN 8.1).
 PUBLIC_ENDPOINTS = {("GET", "/api/health")}
@@ -43,7 +43,7 @@ class AppState:
         # Startup recovery (PLAN 7.1): a running row means the process died.
         db.mark_running_as_interrupted(self.data_dir)
         if self.queue is None:
-            impls = build_fake_impls(self.data_dir) if self.fake else runner.REAL_IMPLS
+            impls = build_fake_impls(self.data_dir) if self.fake else build_real_impls(self.data_dir)
             self.queue = TaskQueue(self.data_dir, impls)
             self.queue.start()
 
