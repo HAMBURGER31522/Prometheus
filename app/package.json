@@ -11,7 +11,12 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@playwright/test": "1.63.0",
     "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-dialog": "2.7.3",
+    "@tauri-apps/plugin-opener": "2.5.5",
+    "markmap-lib": "0.18.12",
+    "markmap-view": "0.18.12",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
