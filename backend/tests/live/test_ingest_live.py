@@ -97,9 +97,11 @@ def test_bilibili_local_transcribe_to_transcript():
 
 
 @requires_cookies
-@requires_dashscope
-def test_youtube_full_chain_with_cookies():
+def test_youtube_cookies_chain_local_transcribe():
+    """Cookie gate is the thing under test; transcription runs locally because the
+    DashScope cloud path is deferred (user decision 2026-09-25, see acceptance.md)."""
     data_dir, item_id, work, row, wav = _pipeline(YT_URL, "youtube", "jNQXAC9IVRw")
     assert row["platform"] == "youtube"
-    asr_path = cloud_mod.transcribe_cloud(data_dir, item_id, wav)
+    components.install_components(data_dir, proxy=PROXY)
+    asr_path = local_mod.transcribe_local(data_dir, item_id, wav)
     _transcript_assertions(work, asr_path, row)
