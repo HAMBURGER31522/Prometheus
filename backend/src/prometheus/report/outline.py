@@ -42,5 +42,6 @@ def extract_outline(html: str) -> dict:
             _TAG_RE.sub("", h).strip()
             for h in re.findall(r"<h3[^>]*>(.*?)</h3>", body, re.DOTALL)
         ]
-        sections.append({"title": clean_title, "start_label": start_label, "h3": h3s})
+        sections.append({"title": clean_title, "start_label": start_label, "h3": h3s,
+                         "start_s": None, "end_s": None, "text": ""})
     return {"title": title, "intro": intro, "sections": sections}

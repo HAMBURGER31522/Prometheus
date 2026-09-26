@@ -94,6 +94,11 @@ def report_file(data_dir: Path, item_id: str) -> Path:
     return out_dir(data_dir, item_id) / "report.html"
 
 
+def mindmap_json(data_dir: Path, item_id: str) -> Path:
+    """The knowledge tree the app renders (kept in the cache for regeneration)."""
+    return cache_dir(data_dir, item_id) / "mindmap.json"
+
+
 def mindmap_file(data_dir: Path, item_id: str) -> Path:
     return out_dir(data_dir, item_id) / "mindmap.md"
 

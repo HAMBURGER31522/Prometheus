@@ -69,3 +69,7 @@ def validate_mindmap(text: str, *, expect_title: str, branch_count: tuple = (3, 
     if expect_title and lines and lines[0].startswith("# ") and expect_title not in lines[0]:
         errors.append("标题与报告不一致")
     return errors
+
+
+def tree_to_markdown(tree: dict, platform: str, video_id: str) -> str:
+    return ""
