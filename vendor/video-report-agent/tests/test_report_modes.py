@@ -71,7 +71,7 @@ def test_pi_uses_saved_mode_and_copies_only_selected_rules(
     executable = make_fake_pi(tmp_path, '''#!/usr/bin/env python3
 import json, pathlib, sys
 prompt = json.loads(sys.stdin.readline())["message"]
-metadata = json.loads(pathlib.Path("input.json").read_text())
+metadata = json.loads(pathlib.Path("input.json").read_text(encoding="utf-8"))
 mode = metadata.get("report_mode", "standard")
 assert f"report_mode={mode}" in prompt
 assert f"modes/{mode}.md" in prompt
@@ -82,7 +82,7 @@ assert f"assets/{template}" in prompt
 assert f"assets/{other}" not in prompt
 assert pathlib.Path("assets", template).is_file()
 assert not pathlib.Path("assets", other).exists()
-assert "stale template" not in pathlib.Path("assets", template).read_text()
+assert "stale template" not in pathlib.Path("assets", template).read_text(encoding="utf-8")
 pathlib.Path("report.html").write_text("<html><body>generated</body></html>")
 print(json.dumps({"type":"message_end","message":{"role":"assistant","stopReason":"stop"}}))
 print(json.dumps({"type":"agent_settled"}), flush=True)
