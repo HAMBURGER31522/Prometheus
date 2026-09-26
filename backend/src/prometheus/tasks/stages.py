@@ -116,6 +116,7 @@ def build_real_impls(data_dir) -> dict:
         build_transcript_md(work, work / "asr.json", metadata)
 
     def report(ctx):
+        row = _row(data_dir, ctx.item_id)
         settings = store.load(data_dir)
         workspace_mod.run_report_stage(
             data_dir, ctx.item_id, row, settings,
@@ -131,7 +132,6 @@ def build_real_impls(data_dir) -> dict:
         items_store.update_item(data_dir, ctx.item_id, report_title=title)
 
     def classify(ctx):
-        row = _row(data_dir, ctx.item_id)
         settings = store.load(data_dir)
         work = _work(data_dir, ctx.item_id)
         html = paths.report_file(data_dir, ctx.item_id).read_text(encoding="utf-8")
