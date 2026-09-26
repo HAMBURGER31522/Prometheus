@@ -59,3 +59,14 @@
 3. D5 预算风险提示：中转站并发限制 + 响应速度可能使「本地转写不配图 ≤ 25 分钟」超标；换 DeepSeek 官方 Key 重跑可对照。
 4. D7 YouTube 完整验收：M3 已验证 cookies 下载链路 + 本地转写（en 5 段）；D5 级完整跑通待 3 小时样本或 YouTube 长视频样本。
 5. D10 CI：本次会话结束前需确认 GitHub Actions 绿（由收尾自动验证）。
+
+## M5 配图（2026-09-26 状态：代码完成，live trial 受阻于中转站订阅）
+
+已完成：
+- 帧提取与筛选（TDD 5 用例）：ffmpeg 场景抽帧 + showinfo 解析 + 20 秒间隔/每小时 20 帧/总 80 帧/稀疏补帧规则；真实视频抽帧成功（BV1bZhQ6VEQK 保留 20 帧候选）。
+- figures.md 正式规则文本（含「不要自己转 base64」关键约束）；frames 阶段接入流水线；报告阶段 figures 旗标贯通（frames.json 存在 + 设置声明支持看图时启用）；定稿 base64 内联逻辑（M4 已测）。
+
+未做/受阻（诚实说明）：
+1. **带配图的完整报告 live trial 未跑成**：中转站 oapi.firedog.dev 对图片输入（multimodal content）返回 `SUBSCRIPTION_NOT_FOUND — No active subscription found for this group`（gpt-6-sol / gpt-5.5 / gpt-6-luna 全部如此；纯文本正常）。Agent 读取帧图片后的下一次模型请求即 403。
+2. 解除条件：需要一个支持看图的供应商——计划书默认的 DeepSeek 官方 `deepseek-flash` 即支持图片（vendor models.json input 含 image）。提供 DeepSeek Key 后即可跑 A/B（D6 需用户并排阅读签字）。
+3. D5/D6 的 A/B 对比：待上述条件 + 配图版报告生成成功后进行。
