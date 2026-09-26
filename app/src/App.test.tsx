@@ -1,5 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+
+// The data-dir gate must render the first-run screen deterministically,
+// regardless of whether a development backend is listening on 8765.
+vi.mock("./shared/api", () => ({
+  api: { getDataDir: async () => ({ data_dir: null }) },
+}));
 
 import App from "./App";
 
