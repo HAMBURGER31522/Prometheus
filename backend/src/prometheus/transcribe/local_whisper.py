@@ -85,10 +85,14 @@ def run_worker(audio_path: str, out_path: str, data_dir) -> None:
     print(f"asr backend=local device={device} model={MODEL_ID}", file=sys.stderr, flush=True)
 
     model = _load_model(data_dir, device, compute_type)
-    language, _probability = model.detect_language(audio_path)
+    # detect_language takes a decoded 16kHz array, not a path (faster-whisper 1.2.1).
+    from faster_whisper.audio import decode_audio
+
+    audio = decode_audio(audio_path, sampling_rate=16000)
+    language, _probability, _languages = model.detect_language(audio)
     kwargs = build_transcribe_kwargs(language)
     started = time.perf_counter()
-    raw_segments, _info = model.transcribe(audio_path, **kwargs)
+    raw_segments, _info = model.transcribe(audio, **kwargs)
     raw_result = {"segments": [
         {"start": segment.start, "end": segment.end, "text": segment.text}
         for segment in raw_segments

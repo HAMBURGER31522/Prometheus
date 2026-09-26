@@ -28,6 +28,10 @@ PROXY = os.getenv("PROMETHEUS_TEST_PROXY", "")
 YT_COOKIES = os.getenv("PROMETHEUS_TEST_YT_COOKIES", "")
 YT_URL = os.getenv("PROMETHEUS_TEST_YT_URL", "https://www.youtube.com/watch?v=jNQXAC9IVRw")
 NODE = os.getenv("PROMETHEUS_NODE") or "node"
+# Stable data dir (gitignored): model and CUDA components survive across runs.
+DATA_DIR = Path(
+    os.getenv("PROMETHEUS_TEST_DATA_DIR", "acceptance-output/live-data")
+).resolve()
 
 requires_bv = pytest.mark.skipif(not BV, reason="PROMETHEUS_TEST_BV 未设置")
 requires_dashscope = pytest.mark.skipif(
@@ -38,8 +42,8 @@ requires_cookies = pytest.mark.skipif(
 )
 
 
-def _pipeline(tmp_path, source: str, platform: str, video_id: str):
-    data_dir = paths.init_data_dir(tmp_path / "data")
+def _pipeline(source: str, platform: str, video_id: str):
+    data_dir = paths.init_data_dir(DATA_DIR)
     item_id = "b" * 32
     work = paths.work_dir(data_dir, item_id)
     work.mkdir(parents=True)
@@ -76,7 +80,7 @@ def _transcript_assertions(work: Path, asr_path: Path, row: dict) -> None:
 @requires_dashscope
 def test_bilibili_cloud_transcribe_to_transcript(tmp_path):
     data_dir, item_id, work, row, wav = _pipeline(
-        tmp_path, f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
+        f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
     )
     asr_path = cloud_mod.transcribe_cloud(data_dir, item_id, wav)
     _transcript_assertions(work, asr_path, row)
@@ -85,7 +89,7 @@ def test_bilibili_cloud_transcribe_to_transcript(tmp_path):
 @requires_bv
 def test_bilibili_local_transcribe_to_transcript(tmp_path):
     data_dir, item_id, work, row, wav = _pipeline(
-        tmp_path, f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
+        f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
     )
     components.install_components(data_dir, proxy=PROXY)
     asr_path = local_mod.transcribe_local(data_dir, item_id, wav)
@@ -94,8 +98,8 @@ def test_bilibili_local_transcribe_to_transcript(tmp_path):
 
 @requires_cookies
 @requires_dashscope
-def test_youtube_full_chain_with_cookies(tmp_path):
-    data_dir, item_id, work, row, wav = _pipeline(tmp_path, YT_URL, "youtube", "jNQXAC9IVRw")
+def test_youtube_full_chain_with_cookies():
+    data_dir, item_id, work, row, wav = _pipeline(YT_URL, "youtube", "jNQXAC9IVRw")
     assert row["platform"] == "youtube"
     asr_path = cloud_mod.transcribe_cloud(data_dir, item_id, wav)
     _transcript_assertions(work, asr_path, row)
