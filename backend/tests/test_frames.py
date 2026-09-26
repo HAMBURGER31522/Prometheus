@@ -1,6 +1,52 @@
 """Scene-frame extraction and candidate filtering (PLAN 8.7, M5)."""
 
-from prometheus.report.frames import filter_frames, parse_showinfo
+import json
+import subprocess
+from pathlib import Path
+
+from prometheus.report.frames import extract_frames, filter_frames, parse_showinfo
+
+
+def _fake_ffmpeg(scene_times, grabbed):
+    """Mimic ffmpeg: a %06d output pattern gets one numbered file per scene cut
+    (showinfo on stderr); a single-frame grab (-ss) writes exactly its target."""
+
+    def run(command, capture_output=True, check=False):
+        output = Path(command[-1])
+        if "%06d" in output.name:
+            lines = []
+            for index, seconds in enumerate(scene_times, start=1):
+                (output.parent / (output.name % index)).write_bytes(f"scene@{seconds}".encode())
+                lines.append(
+                    f"[Parsed_showinfo_1 @ 0] n: {index - 1} pts:0 pts_time:{seconds} pos: 0"
+                )
+            return subprocess.CompletedProcess(command, 0, b"", "\n".join(lines).encode())
+        seconds = float(command[command.index("-ss") + 1])
+        grabbed.append(seconds)
+        output.write_bytes(f"grab@{seconds}".encode())
+        return subprocess.CompletedProcess(command, 0, b"", b"")
+
+    return run
+
+
+def test_extracted_images_match_the_manifest_timestamps(tmp_path, monkeypatch):
+    (tmp_path / "source.info.json").write_text(json.dumps({"duration": 3600}), encoding="utf-8")
+    grabbed: list = []
+    monkeypatch.setattr(subprocess, "run", _fake_ffmpeg([5.0, 80.4, 200.1], grabbed))
+
+    manifest = json.loads(extract_frames(tmp_path / "video.mp4", tmp_path).read_text(encoding="utf-8"))
+
+    frames_dir = tmp_path / "frames"
+    listed = sorted(entry["file"] for entry in manifest)
+    for name in listed:
+        assert (frames_dir / name).is_file(), f"manifest lists {name} but no such image"
+    # every image shows the moment its name and label claim
+    assert (frames_dir / "f_000080.jpg").read_bytes() == b"scene@80.4"
+    # sparse video: the evenly spaced fill frames are actually grabbed from the video
+    assert grabbed == [300.0, 600.0]
+    assert (frames_dir / "f_000300.jpg").read_bytes() == b"grab@300.0"
+    # rejected scene cuts do not linger for the agent to browse
+    assert sorted(p.name for p in frames_dir.glob("*.jpg")) == listed
 
 SHOWINFO_SAMPLE = """[Parsed_showinfo_1 @ 0000025c1d3fbcc0] n:   0 pts:60616 pts_time:6.0616 pos:     1012 \
 crop:0:0:1920:1072
