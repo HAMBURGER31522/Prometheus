@@ -28,7 +28,9 @@ def build_pip_cmd(data_dir, *, proxy: str = "") -> list:
 def install_components(data_dir, *, proxy: str = "") -> None:
     target = Path(data_dir) / "runtime" / "cuda"
     target.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(build_pip_cmd(data_dir, proxy=proxy), capture_output=True)
+    result = subprocess.run(
+        build_pip_cmd(data_dir, proxy=proxy), capture_output=True, check=False,
+    )
     if result.returncode != 0:
         raise ComponentInstallError(
             "CUDA 运行库安装失败：" + result.stderr.decode("utf-8", "replace")[-500:]
