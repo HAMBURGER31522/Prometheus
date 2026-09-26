@@ -5,6 +5,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 from prometheus.transcribe import local
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -36,7 +38,7 @@ def test_asr_backend_env_does_not_affect_local_path(monkeypatch, tmp_path):
     )
 
     data_dir = tmp_path / "data"
-    (data_dir / "runtime" / "cuda" / "nvidia").mkdir(parents=True)
+    (data_dir / "runtime" / "cuda" / "nvidia" / "cublas" / "bin").mkdir(parents=True)
 
     asr_payload = json.loads((FIXTURES / "asr.local.json").read_text(encoding="utf-8"))
 

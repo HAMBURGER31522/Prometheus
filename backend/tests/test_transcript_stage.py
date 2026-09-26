@@ -13,6 +13,7 @@ METADATA = {
     "url": "https://www.bilibili.com/video/BV1xJYT6EEYc/",
     "video_id": "BV1xJYT6EEYc",
     "platform": "bilibili",
+    "duration_s": 3.2,
 }
 
 

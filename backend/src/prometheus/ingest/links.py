@@ -9,10 +9,14 @@ BILIBILI_VIDEO_RE = re.compile(
 YOUTUBE_WATCH_RE = re.compile(
     r"https?://(?:www\.)?youtube\.com/watch\?(?:[^\s]*&)?v=(?P<id>[0-9A-Za-z_-]{11})"
 )
+YOUTUBE_SHORTS_RE = re.compile(
+    r"https?://(?:www\.)?youtube\.com/shorts/(?P<id>[0-9A-Za-z_-]{11})"
+)
 YOUTUBE_SHORT_RE = re.compile(r"https?://youtu\.be/(?P<id>[0-9A-Za-z_-]{11})")
 BARE_BV_RE = re.compile(r"BV[0-9A-Za-z]{10}")
 URL_RE = re.compile(r"https?://[^\s\"'<>（）【】，]+")
 P_PARAM_RE = re.compile(r"[?&]p=(\d+)")
+B23_HOST_RE = re.compile(r"https?://b23\.tv/")
 
 PLATFORMS = ("bilibili", "youtube")
 
@@ -29,10 +33,21 @@ class Source:
     page: int = 1
 
 
+def resolve_redirect(url: str) -> str:
+    """Follow one HTTP redirect chain (b23.tv short links only)."""
+    import httpx
+
+    response = httpx.head(url, follow_redirects=True, timeout=10)
+    return str(response.url)
+
+
 def parse_url(text: str) -> Source:
     match = URL_RE.search(text or "")
     if match:
-        return _parse_absolute(match.group(0))
+        url = match.group(0)
+        if B23_HOST_RE.match(url):
+            return _parse_absolute(resolve_redirect(url))
+        return _parse_absolute(url)
     bare = BARE_BV_RE.search(text or "")
     if bare:
         return Source(
@@ -56,6 +71,13 @@ def _parse_absolute(url: str) -> Source:
     watch = YOUTUBE_WATCH_RE.search(url)
     if watch and "list=" not in url:
         video_id = watch.group("id")
+        return Source(
+            platform="youtube", video_id=video_id,
+            canonical_url=f"https://www.youtube.com/watch?v={video_id}",
+        )
+    shorts = YOUTUBE_SHORTS_RE.search(url)
+    if shorts:
+        video_id = shorts.group("id")
         return Source(
             platform="youtube", video_id=video_id,
             canonical_url=f"https://www.youtube.com/watch?v={video_id}",
