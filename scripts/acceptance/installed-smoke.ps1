@@ -22,7 +22,7 @@ Write-Host "==> poll /api/health via backend.port (D8: within 30 seconds)"
 $deadline = (Get-Date).AddSeconds(30)
 $ok = $false
 while ((Get-Date) -lt $deadline) {
-    $portFile = Join-Path $DataDir "logs\backend.port"
+    $portFile = Join-Path $DataDir ".prometheus\logs\backend.port"
     if (Test-Path $portFile) {
         $port = (Get-Content $portFile -ErrorAction SilentlyContinue | Select-Object -First 1)
         if ($port) {
