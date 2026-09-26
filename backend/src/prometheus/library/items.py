@@ -17,8 +17,11 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def create_item(data_dir, *, platform, video_id, source_url, figures=0, status="queued"):
-    item_id = paths.new_item_id()
+def create_item(data_dir, *, platform, video_id, source_url, figures=0, status="queued",
+                item_id=None):
+    # Callers may pin the id (live tests reuse per-video folders); production
+    # draws a fresh 32-hex id.
+    item_id = item_id or paths.new_item_id()
     for subdirectory in ("report", "mindmap", "subtitle", "work"):
         (paths.item_dir(data_dir, item_id) / subdirectory).mkdir(parents=True, exist_ok=True)
     conn = connect(data_dir)

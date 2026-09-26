@@ -17,7 +17,6 @@ from .ingest import UrlIngestError, download_bilibili_video, validate_bilibili_u
 from .media_config import resolve_media_config
 from .paraformer import CloudAsrError
 from .pi import PiError, PiRunner
-from .report_image import render_report_image
 from .retention import cleanup_media
 from .reuse import reuse_asr, reuse_download, reuse_transcript
 from .trace import RunTrace
@@ -208,6 +207,7 @@ def generate(run: Path) -> dict:
         update("GENERATING_IMAGE")
         try:
             with trace.span("render", input={"artifact": "report.html"}) as detail:
+                from .report_image import render_report_image
                 render_report_image(run)
                 detail.update(output={"artifact": "report.png"})
         except Exception as exc:

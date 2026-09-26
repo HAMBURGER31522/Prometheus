@@ -579,10 +579,15 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | M0 仓库骨架 | 完成 | 2026-09-25 | f1ac34c | `uv run pytest backend/tests -q` = 0；`npm --prefix app run test` = 0；`npm --prefix app run build` = 0；`cargo check --manifest-path app/src-tauri/Cargo.toml` = 0；`npm --prefix app run lint:design` = 0；`git cat-file -t d060dfb` = `commit`；CI 绿（windows-latest，run 36188439025） |
 | M1 Windows 兼容 | 完成 | 2026-09-25 | 32b41d8（merge） | D1：`uv run --package video-report-agent --extra enhancement --directory vendor/video-report-agent pytest -q` = 0（241 passed；基线 29 failed / 212 passed）；`uv run --directory vendor/video-report-agent ruff check src tests` = 5 个错误 ≤ 基线 7 个；附录 A V1 已登记；Playwright 浏览器补装到 chromium-1243（环境问题，不改代码） |
 | M2 后端核心 | 完成 | 2026-09-25 | 949dc07（merge） | D2：`uv run pytest backend/tests -q -m "not live"` = 0（46 passed）；`uv run ruff check backend` = 0；M2 测试清单（数据目录布局、表结构、条目 201/409/422、分类、鉴权/门控/CORS、队列串行/取消/interrupted、设置/掩码/models.json、假流水线 3 秒内完成）全部在 backend/tests 有对应用例，先红（ac2bd1a，36 失败）后绿（a997553） |
+<<<<<<< HEAD
 | M3 导入/转写/字幕 | 完成（云端 live 按用户指示暂缓） | 2026-09-25 | c5f1db5（merge） | D2：`uv run pytest backend/tests -q -m "not live"` = 0（95 passed）；`uv run ruff check backend` = 0；live：`uv run pytest backend/tests/live/test_ingest_live.py -m live -q` = 0（**2 passed 1 skipped**：B 站本地转写 device=cuda 86 段；YouTube cookies 链路本地转写 en 5 段；云端 paraformer 项按用户指示「那个云端先暂时不弄」挂起，待 DashScope Key 补跑）；红绿提交 511f3ae/8eb05d5 → ce6f213 等；链接解析表/超时公式/cookies 门控/AsrRun/子进程取消/繁简转换/黄金文件测试齐全 |
 | M4 精读与分类 | 未开始 | | | |
+=======
+| M3 导入/转写/字幕 | 未开始 | | | |
+| M4 精读与分类 | 完成 | 2026-09-26 | 见本行合并后填写 | D2：offline pytest = 0（120 passed）、ruff = 0；探针：PowerShell 工具执行 matplotlib 绘图成功（chart.png 45,578 字节，DECISIONS D-26）；live：`test_report_live` = 0（11 分钟，BV1bZhQ6VEQK 经 custom 供应商 gpt-6-sol：data-source-units=25、section-time=9、题头含「Bilibili；」、无外部引用、无占位符残留、自动分类「战争伦理」）；红绿提交 e6a09e9 → de96ae9/169839d → d232d9f |
+>>>>>>> m4-report
 | M5 配图 | 未开始 | | | |
-| M6 思维导图 | 未开始 | | | |
+| M6 思维导图 | 完成（随 M4 分支落地，见 DECISIONS） | 2026-09-26 | 同 M4 | 离线：大纲提取（vendor 示例 9 章）/校验规则/两平台时刻链接测试全绿；live：报告导图 7 分支、7 个时刻链接、mindmap_status=ok（并入 test_report_live 验证）；Vendor 示例与黄金链路复用 |
 | M7 前端 | 未开始 | | | |
 | M8 打包 | 未开始 | | | |
 | M9 真实验收 | 未开始 | | | |
@@ -607,8 +612,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | 编号 | 内容 | 状态 |
 |---|---|---|
 | V1 | Windows 兼容：所有文本读写显式使用 UTF-8；`execution.py` 在 Windows 上使用 `CREATE_NEW_PROCESS_GROUP`，并用 `taskkill /T /F` 结束进程树（taskkill 经模块导入时捕获的真实 `Popen` 调用，避免被测试对 `subprocess.Popen` 的拦截劫持）；`pyproject.toml` 增加 `tzdata` 依赖；测试替身改成跨平台写法（fake-pi 在 Windows 上改为 `.cmd` 启动器 + UTF-8 stdio 的 Python 脚本；`test_asr.py` 的 `os.kill(pid, 0)` 探活改为 `OpenProcess` + `WaitForSingleObject` 的跨平台实现） | 完成（2026-09-25，M1） |
-| V2 | `PiRunner.__init__` 增加关键字参数：`tools`（默认 `"read,write,edit,bash"`，review 时追加 `inspect_report` 的逻辑不变）；`extra_prompt`（追加到用户提示末尾）；`extra_files`（复制进工作区）；`agent_dir`（覆盖模块导入时按当前工作目录算出的 `PI_AGENT_DIR`，包括 `auth.json` 的查找、`initialize_pi_config` 和传给子进程的 `PI_CODING_AGENT_DIR`）；`command_prefix`（例如 `[node.exe, cli.js]`，替代 `shutil.which("pi")`）。所有参数都取默认值时，行为与修改前完全一致 | 未开始 |
-| V3 | `pipeline.py` 把 `from .report_image import render_report_image` 从文件顶部移到 `generate()` 函数内部使用它的地方。原因：`paraformer.py` 在运行途中会导入 `pipeline`，顶部导入会连带加载 playwright，而打包版不带 playwright | 未开始 |
+| V2 | `PiRunner.__init__` 增加关键字参数：`tools`（默认 `"read,write,edit,bash"`，review 时追加 `inspect_report` 的逻辑不变）；`extra_prompt`（追加到用户提示末尾）；`extra_files`（复制进工作区）；`agent_dir`（覆盖模块导入时按当前工作目录算出的 `PI_AGENT_DIR`，包括 `auth.json` 的查找、`initialize_pi_config` 和传给子进程的 `PI_CODING_AGENT_DIR`）；`command_prefix`（例如 `[node.exe, cli.js]`，替代 `shutil.which("pi")`）。所有参数都取默认值时，行为与修改前完全一致 | 完成（2026-09-25，M4；基线夹具 tests/fixtures/pi-command-baseline.json 锁定默认命令） |
+| V3 | `pipeline.py` 把 `from .report_image import render_report_image` 从文件顶部移到 `generate()` 函数内部使用它的地方。原因：`paraformer.py` 在运行途中会导入 `pipeline`，顶部导入会连带加载 playwright，而打包版不带 playwright | 完成（2026-09-25，M4） |
 
 新增修改需要先征得用户同意并补进本表。V1、V2 可以整理成补丁提交给上游作者，但**向上游提 PR 之前要征得用户同意**。
 

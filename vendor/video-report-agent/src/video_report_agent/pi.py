@@ -43,15 +43,21 @@ class PiRunner:
         thinking: str | None = None,
         review: bool | None = None,
         skill_dir: Path | None = None,
+        tools: str | None = None,
+        extra_prompt: str | None = None,
+        extra_files: list[Path] | None = None,
+        agent_dir: Path | None = None,
+        command_prefix: list[str] | None = None,
     ):
         self.skill_dir = Path(skill_dir or os.getenv("VIDEO_REPORT_SKILL_DIR") or SKILL).resolve()
         self.provider = provider or os.getenv("PI_PROVIDER", DEFAULT_PROVIDER)
         self.model = model or os.getenv("PI_MODEL", DEFAULT_MODEL)
+        self.agent_dir = Path(agent_dir).resolve() if agent_dir else PI_AGENT_DIR
         configured_key = api_key if api_key is not None else (
             os.getenv("PI_API_KEY")
             if self.provider == os.getenv("PI_PROVIDER", DEFAULT_PROVIDER) else None
         )
-        auth_path = PI_AGENT_DIR / "auth.json"
+        auth_path = self.agent_dir / "auth.json"
         if api_key is None and provider is not None and auth_path.is_file():
             if provider in json.loads(auth_path.read_text(encoding="utf-8")):
                 configured_key = None
@@ -59,17 +65,26 @@ class PiRunner:
         self.thinking = thinking if thinking is not None else DEFAULT_THINKING
         self.timeout = timeout
         self.review = os.getenv("REPORT_REVIEW", "0") == "1" if review is None else review
+        self.tools = tools or "read,write,edit,bash"
+        self.extra_prompt = extra_prompt
+        self.extra_files = [Path(item) for item in (extra_files or [])]
+        self.command_prefix = list(command_prefix) if command_prefix else None
+
+    def _resolve_executable(self) -> list[str]:
+        if self.command_prefix:
+            return [*self.command_prefix]
+        executable = shutil.which("pi")
+        if executable is None:
+            raise PiError("ENVIRONMENT_FAILURE", "pi is not installed")
+        return [executable]
 
     async def run(self, workspace: Path) -> Path:
         workspace = workspace.resolve()
         if not (workspace / "transcript.md").is_file():
             raise PiError("IMPLEMENTATION_FAILURE", "transcript.md is missing")
-        executable = shutil.which("pi")
-        if executable is None:
-            raise PiError("ENVIRONMENT_FAILURE", "pi is not installed")
-        initialize_pi_config(PI_AGENT_DIR)
+        initialize_pi_config(self.agent_dir)
         env = os.environ.copy()
-        env["PI_CODING_AGENT_DIR"] = str(PI_AGENT_DIR)
+        env["PI_CODING_AGENT_DIR"] = str(self.agent_dir)
         env["VIDEO_REPORT_PYTHON"] = sys.executable
         metadata_path = workspace / "input.json"
         metadata = (
@@ -103,8 +118,10 @@ class PiRunner:
             if Path(directory).parent == self.skill_dir else [],
         )
         (workspace / "assets").mkdir(exist_ok=True)
+        for extra in self.extra_files:
+            shutil.copy2(extra, workspace / Path(extra).name)
         command = [
-            executable,
+            *self._resolve_executable(),
             "--mode",
             "rpc",
             "--provider",
@@ -112,7 +129,7 @@ class PiRunner:
             "--model",
             self.model,
             "--tools",
-            "read,write,edit,bash,inspect_report" if self.review else "read,write,edit,bash",
+            f"{self.tools},inspect_report" if self.review else self.tools,
             "--no-extensions",
             "--no-skills",
             "--skill",
@@ -167,6 +184,8 @@ class PiRunner:
                 "不改原始转写，不调用外部搜索或ASR。检查失败时诚实说明，不能声称检查通过。"
                 "若工具没有返回图片，只能声称完成程序检查。"
             )
+        if self.extra_prompt:
+            prompt += self.extra_prompt
         logged_command = list(command)
         if self.api_key:
             api_key_index = logged_command.index("--api-key")
