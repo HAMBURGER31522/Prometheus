@@ -10,6 +10,7 @@ from prometheus.ingest import download as download_mod
 from prometheus.ingest import resolve as resolve_mod
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
+from prometheus.report import frames as frames_mod
 from prometheus.report import mindmap as mindmap_mod
 from prometheus.report import one_shot as one_shot_mod
 from prometheus.report import workspace as workspace_mod
@@ -116,13 +117,26 @@ def build_real_impls(data_dir) -> dict:
         }
         build_transcript_md(work, work / "asr.json", metadata)
 
+    def frames(ctx):
+        row = _row(data_dir, ctx.item_id)
+        work = _work(data_dir, ctx.item_id)
+        if not row["figures"]:
+            return
+        videos = [p for p in work.glob("video.*") if p.is_file()]
+        if not videos:
+            return
+        frames_mod.extract_frames(videos[0], work)
+
     def report(ctx):
         row = _row(data_dir, ctx.item_id)
         settings = store.load(data_dir)
+        work = _work(data_dir, ctx.item_id)
+        figures = bool(row["figures"]) and (work / "frames" / "frames.json").is_file()
+        supports_images = bool((settings["llm"].get("custom") or {}).get("supports_images"))
         workspace_mod.run_report_stage(
             data_dir, ctx.item_id, row, settings,
             node_exe=_node_exe(), pi_cli=_pi_cli(),
-            figures=False, model_supports_images=False,
+            figures=figures, model_supports_images=supports_images,
         )
 
     def finalize(ctx):
@@ -187,6 +201,7 @@ def build_real_impls(data_dir) -> dict:
         "download": download,
         "transcribe": transcribe,
         "transcript": transcript,
+        "frames": frames,
         "report": report,
         "finalize": finalize,
         "classify": classify,
