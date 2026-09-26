@@ -65,3 +65,26 @@ def test_content_endpoints_read_from_the_library(client):
     (folder / "精读.html").write_text("<html><body>edited in library</body></html>", encoding="utf-8")
     report = client.get(f"/api/items/{row['id']}/report")
     assert report.status_code == 200 and "edited in library" in report.text
+
+
+def test_subtitles_are_rebuilt_from_asr_json_when_segments_are_missing(tmp_path):
+    """Items produced before segments.json existed only kept asr.json in the cache."""
+    from prometheus.library import db
+    from prometheus.library import items as items_store
+    from prometheus.library.publish import publish
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    db.init_db(data_dir)
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id="BV1bZhQ6VEQK",
+                                      source_url="https://www.bilibili.com/video/BV1bZhQ6VEQK/",
+                                      status="done")
+    items_store.update_item(data_dir, item_id, report_title="罗素与战争")
+    asr = {"language": "zh", "segments": [{"start_ms": 0, "end_ms": 2400, "text": "這個問題"}]}
+    (paths.cache_dir(data_dir, item_id) / "asr.json").write_text(json.dumps(asr, ensure_ascii=False),
+                                                                encoding="utf-8")
+    folder = publish(data_dir, item_id)
+    assert (folder / "字幕.srt").is_file(), "subtitles were not rebuilt from asr.json"
+    assert "这个问题" in (folder / "字幕.srt").read_text(encoding="utf-8")
+    assert (folder / "字幕.txt").read_text(encoding="utf-8").startswith("[00:00:00] 这个问题")
+    assert paths.segments_file(data_dir, item_id).is_file()
