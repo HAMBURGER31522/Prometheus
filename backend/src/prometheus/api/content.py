@@ -17,11 +17,29 @@ def _read_or_none(path) -> str | None:
     return path.read_text(encoding="utf-8") if path.is_file() else None
 
 
+# Served-time injection (PLAN 9.3): the iframe hands external links to the shell
+# instead of loading them in-app. The file on disk is never modified.
+_OPEN_EXTERNAL_SCRIPT = """
+<script>
+document.addEventListener("click", function (event) {
+  var anchor = event.target.closest && event.target.closest('a[href^="http"]');
+  if (!anchor) return;
+  event.preventDefault();
+  parent.postMessage({ type: "open-external", href: anchor.href }, "*");
+}, true);
+</script>
+</body>"""
+
+
 @router.get("/api/items/{item_id}/report")
 async def report(request: Request, item_id: str):
     text = _read_or_none(paths.report_file(request.app.state.data_dir, item_id))
     if text is None:
         return JSONResponse({"code": "REPORT_NOT_READY"}, status_code=404)
+    if "</body>" in text:
+        text = text.replace("</body>", _OPEN_EXTERNAL_SCRIPT, 1)
+    else:
+        text = text + _OPEN_EXTERNAL_SCRIPT
     return Response(text, media_type="text/html")
 
 
