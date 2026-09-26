@@ -66,14 +66,21 @@ def extract_frames(video_path: Path, work_dir: Path) -> Path:
 
     frames_dir = Path(work_dir) / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
+    for stale in frames_dir.glob("*.jpg"):
+        stale.unlink()
+    # ffmpeg numbers scene cuts sequentially; showinfo gives each one's time.
     command = [
         "ffmpeg", "-y", "-i", str(video_path),
         "-vf", "select='gt(scene,0.3)',showinfo,scale=960:-2",
         "-fps_mode", "vfr", "-q:v", "4",
-        str(frames_dir / "f_%06d.jpg"),
+        str(frames_dir / "scene_%06d.jpg"),
     ]
     result = subprocess.run(command, capture_output=True, check=False)
     pts = parse_showinfo(result.stderr.decode("utf-8", "replace"))
+    scene_files = {
+        seconds: frames_dir / f"scene_{index:06d}.jpg"
+        for index, seconds in enumerate(pts, start=1)
+    }
     media_info = Path(work_dir) / "source.info.json"
     duration_s = 0.0
     if media_info.is_file():
@@ -82,6 +89,22 @@ def extract_frames(video_path: Path, work_dir: Path) -> Path:
         except (ValueError, TypeError):
             duration_s = 0.0
     frames = filter_frames(pts, duration_s=duration_s)
+    for frame in frames:
+        target = frames_dir / frame["file"]
+        source = scene_files.get(frame["t"])
+        if source is not None and source.is_file():
+            source.replace(target)
+        else:  # even-fill frame: no scene cut there, grab that moment directly
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-ss", f"{frame['t']}", "-i", str(video_path),
+                    "-frames:v", "1", "-vf", "scale=960:-2", "-q:v", "4", str(target),
+                ],
+                capture_output=True, check=False,
+            )
+    for rejected in frames_dir.glob("scene_*.jpg"):
+        rejected.unlink()
+    frames = [frame for frame in frames if (frames_dir / frame["file"]).is_file()]
     (frames_dir / "frames.json").write_text(
         json.dumps(frames, ensure_ascii=False, indent=2), encoding="utf-8",
     )
