@@ -75,3 +75,10 @@ def work_dir(data_dir: Path, item_id: str) -> Path:
 
 def new_item_id() -> str:
     return secrets.token_hex(16)
+
+
+LIBRARY_FILES: dict = {}
+
+
+def cache_dir(data_dir: Path, item_id: str) -> Path:
+    return work_dir(data_dir, item_id)

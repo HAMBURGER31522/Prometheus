@@ -58,3 +58,8 @@ def classify_report(work_dir, title: str, intro: str, h2_titles: list, existing:
         if name and validate_category(name, existing):
             return name
     return "未分类"
+
+
+def classify_item(work_dir, title: str, intro: str, h2_titles: list, existing: list, *,
+                  one_shot, **one_shot_kwargs) -> dict:
+    return {"category": None, "tags": None, "description": None}

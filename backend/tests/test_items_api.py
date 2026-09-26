@@ -40,14 +40,22 @@ def test_items_list_filters_by_status(client):
     assert queued == []
 
 
-def test_delete_removes_row_and_folder(client, tmp_path):
+def test_delete_removes_row_library_folder_and_cache(client, tmp_path):
+    from conftest import wait_for_status
+    from prometheus import paths
+
     created = client.post("/api/items", json={"url": BV_URL, "figures": False})
     item_id = created.json()["id"]
-    item_dir = tmp_path / "data" / "items" / item_id
-    assert item_dir.is_dir()
+    row = wait_for_status(client, item_id, "done")
+    data_dir = tmp_path / "data"
+    assert row.get("library_path"), "library_path not recorded"
+    folder = data_dir / row["library_path"]
+    cache = paths.cache_dir(data_dir, item_id)
+    assert folder.is_dir() and cache.is_dir()
     assert client.delete(f"/api/items/{item_id}").status_code == 204
     assert client.get(f"/api/items/{item_id}").status_code == 404
-    assert not item_dir.exists()
+    assert not folder.exists()
+    assert not cache.exists()
 
 
 def test_patch_category_id(client):

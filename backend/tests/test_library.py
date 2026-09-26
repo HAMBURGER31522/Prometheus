@@ -18,9 +18,31 @@ def data_dir(tmp_path):
     return data_dir
 
 
-def test_schema_version_is_1(data_dir):
+def test_schema_version_is_2(data_dir):
     conn = db.connect(data_dir)
-    assert db.get_schema_version(conn) == 1
+    assert db.get_schema_version(conn) == 2
+
+
+def test_version_1_database_is_upgraded_in_place(tmp_path):
+    from prometheus import paths
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    conn = sqlite3.connect(paths.db_path(data_dir))
+    conn.executescript(db.SCHEMA_V1)
+    conn.execute("INSERT INTO schema_version (version) VALUES (1)")
+    conn.execute(
+        "INSERT INTO items (id, platform, video_id, source_url, figures, status, created_at)"
+        " VALUES ('a', 'bilibili', 'BV1', 'u', 0, 'done', 'now')"
+    )
+    conn.commit()
+    conn.close()
+    db.init_db(data_dir)
+    conn = db.connect(data_dir)
+    assert db.get_schema_version(conn) == 2
+    row = dict(conn.execute("SELECT * FROM items WHERE id = 'a'").fetchone())
+    assert {"library_path", "tags", "description"} <= set(row)
+    assert row["video_id"] == "BV1"
 
 
 def test_items_table_columns(data_dir):

@@ -6,6 +6,7 @@ from prometheus import paths
 
 SCHEMA_VERSION = 1
 
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS categories (
@@ -70,3 +71,5 @@ def mark_running_as_interrupted(data_dir) -> None:
         conn.commit()
     finally:
         conn.close()
+
+SCHEMA_V1 = _SCHEMA

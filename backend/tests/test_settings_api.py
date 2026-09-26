@@ -2,6 +2,8 @@
 
 import json
 
+from prometheus import paths
+
 AUTH = {"Authorization": "Bearer test-token"}
 
 
@@ -23,7 +25,7 @@ def test_defaults_round_trip_and_masking(client):
     assert loaded["llm"]["model"] == "deepseek-flash"
 
     on_disk = json.loads(
-        (client.app.state.data_dir / "config" / "settings.json").read_text(encoding="utf-8")
+        paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8")
     )
     assert on_disk["llm"]["api_key"] == "sk-secret-1234"
 
@@ -42,7 +44,7 @@ def test_masked_key_round_trip_keeps_stored_value(client):
     saved = client.put("/api/settings", json=masked, headers=AUTH)
     assert saved.status_code == 200
     on_disk = json.loads(
-        (client.app.state.data_dir / "config" / "settings.json").read_text(encoding="utf-8")
+        paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8")
     )
     assert on_disk["llm"]["api_key"] == "sk-secret-1234"
     assert on_disk["asr"]["dashscope_api_key"] == "dash-key-5678"
@@ -76,7 +78,7 @@ def test_backend_switch_preserves_saved_keys(client):
     switched = client.put("/api/settings", json=masked, headers=AUTH)
     assert switched.status_code == 200
     on_disk = json.loads(
-        (client.app.state.data_dir / "config" / "settings.json").read_text(encoding="utf-8")
+        paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8")
     )
     assert on_disk["asr"]["backend"] == "cloud"
     assert on_disk["asr"]["dashscope_api_key"] == "dash-key-5678"
@@ -90,7 +92,7 @@ def test_backend_only_accepts_local_or_cloud(client):
 
 
 def test_first_run_copies_models_json(client):
-    models_json = client.app.state.data_dir / "config" / "pi" / "models.json"
+    models_json = paths.models_json(client.app.state.data_dir)
     assert models_json.is_file()
     providers = json.loads(models_json.read_text(encoding="utf-8"))["providers"]
     assert "deepseek" in providers
@@ -107,7 +109,7 @@ def test_custom_provider_is_written_to_models_json(client):
         "figures_default": True,
     }
     assert client.put("/api/settings", json=body, headers=AUTH).status_code == 200
-    models_json = client.app.state.data_dir / "config" / "pi" / "models.json"
+    models_json = paths.models_json(client.app.state.data_dir)
     providers = json.loads(models_json.read_text(encoding="utf-8"))["providers"]
     custom = providers["custom"]
     assert custom["api"] == "openai-completions"
@@ -130,7 +132,7 @@ def _custom_body(protocol, base_url):
 def test_custom_anthropic_protocol_writes_anthropic_messages(client):
     body = _custom_body("anthropic", "https://api.justwoker.icu/v1")
     assert client.put("/api/settings", json=body, headers=AUTH).status_code == 200
-    models_json = client.app.state.data_dir / "config" / "pi" / "models.json"
+    models_json = paths.models_json(client.app.state.data_dir)
     custom = json.loads(models_json.read_text(encoding="utf-8"))["providers"]["custom"]
     assert custom["api"] == "anthropic-messages"
     assert custom["baseUrl"] == "https://api.justwoker.icu"

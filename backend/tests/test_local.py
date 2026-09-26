@@ -61,10 +61,11 @@ def test_asr_backend_env_does_not_affect_local_path(monkeypatch, tmp_path):
         or FakeWorker(out_path),
     )
 
-    item_dir = data_dir / "items" / ("a" * 32)
-    (item_dir / "work").mkdir(parents=True)
-    (item_dir / "subtitle").mkdir(parents=True)
-    audio = item_dir / "work" / "media.wav"
+    from prometheus import paths
+
+    work = paths.work_dir(data_dir, "a" * 32)
+    work.mkdir(parents=True)
+    audio = work / "media.wav"
     audio.write_bytes(b"RIFF")
 
     asr_path = local.transcribe_local(data_dir, "a" * 32, audio)
