@@ -19,7 +19,7 @@ def test_filter_enforces_minimum_interval():
 
 
 def test_filter_caps_per_hour_and_total():
-    every_minute = [float(m * 60) for m in range(0, 4 * 60)]  # 4h of 1-min candidates
+    every_minute = [float(m * 60) for m in range(4 * 60)]  # 4h of 1-min candidates
     frames = filter_frames(every_minute, duration_s=4 * 3600)
     assert len(frames) == 80  # 总上限
     first_hour = [f for f in frames if f["t"] < 3600]
