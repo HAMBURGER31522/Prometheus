@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 // Port 1420 / strictPort must match tauri.conf.json devUrl and the backend CORS whitelist (PLAN 8.1).
 export default defineConfig({
@@ -10,5 +10,6 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
 });
