@@ -1,5 +1,7 @@
 """Model image capability from `pi --offline --list-models` output (PLAN 8.7)."""
 
+import subprocess
+
 
 def parse_capabilities(output: str) -> dict:
     capabilities = {}
@@ -12,3 +14,8 @@ def parse_capabilities(output: str) -> dict:
 
 def model_supports_images(output: str, model: str) -> bool:
     return parse_capabilities(output).get(model, False)
+
+
+def query_supports_images(node_exe, pi_cli, data_dir, llm: dict) -> bool:
+    """Ask Pi whether the configured model accepts images (PLAN 8.7, 15.2-1)."""
+    return False

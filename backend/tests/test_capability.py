@@ -24,3 +24,24 @@ def test_model_supports_images():
 
 def test_no_models_available_means_no_images():
     assert model_supports_images("No models available", "deepseek-flash") is False
+
+
+def test_capability_query_uses_the_data_dir_config_and_the_key(tmp_path, monkeypatch):
+    import subprocess
+
+    from prometheus import paths
+    from prometheus.settings import capability
+
+    seen = {}
+
+    def fake_run(command, **kwargs):
+        seen["command"], seen["env"] = command, kwargs.get("env") or {}
+        return subprocess.CompletedProcess(command, 0, LIST_OUTPUT.encode(), b"")
+
+    monkeypatch.setattr(capability.subprocess, "run", fake_run, raising=False)
+    llm = {"provider": "deepseek", "model": "deepseek-flash", "api_key": "sk-key"}
+    assert capability.query_supports_images("node.exe", "cli.js", tmp_path, llm) is True
+    assert seen["command"][:4] == ["node.exe", "cli.js", "--offline", "--list-models"]
+    assert seen["env"]["PI_CODING_AGENT_DIR"] == str(paths.pi_config_dir(tmp_path))
+    assert seen["env"]["PI_API_KEY"] == "sk-key"
+    assert seen["env"]["DEEPSEEK_API_KEY"] == "sk-key"

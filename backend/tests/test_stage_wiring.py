@@ -109,3 +109,22 @@ def test_mindmap_stage_marks_failure_when_output_never_validates(data_dir, monke
     monkeypatch.setattr(stages_mod.one_shot_mod, "run_one_shot", lambda *args, **kwargs: "")
     stages_mod.build_real_impls(data_dir)["mindmap"](ctx)
     assert items_store.get_item(data_dir, ctx.item_id)["mindmap_status"] == "failed"
+
+
+def test_report_stage_asks_pi_whether_a_builtin_model_sees_images(data_dir, monkeypatch):
+    ctx = _ctx(data_dir, figures=1)
+    work = paths.work_dir(data_dir, ctx.item_id)
+    (work / "frames").mkdir(parents=True)
+    (work / "frames" / "frames.json").write_text("[]", encoding="utf-8")
+    seen = {}
+
+    def fake_run(data_dir_arg, item_id, row, settings, **kwargs):
+        seen.update(kwargs)
+
+    from prometheus.settings import capability
+
+    # Default settings use the built-in deepseek provider (no custom checkbox involved).
+    monkeypatch.setattr(capability, "query_supports_images", lambda *a, **k: True, raising=False)
+    monkeypatch.setattr(stages_mod.workspace_mod, "run_report_stage", fake_run)
+    stages_mod.build_real_impls(data_dir)["report"](ctx)
+    assert seen["model_supports_images"] is True
