@@ -583,7 +583,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | M4 精读与分类 | 完成 | 2026-09-26 | fb50048（merge） | D2：offline pytest = 0（120 passed）、ruff = 0；探针：PowerShell 工具执行 matplotlib 绘图成功（chart.png 45,578 字节，DECISIONS D-26）；live：`test_report_live` = 0（11 分钟，BV1bZhQ6VEQK 经 custom 供应商 gpt-6-sol：data-source-units=25、section-time=9、题头含「Bilibili；」、无外部引用、无占位符残留、自动分类「战争伦理」）；红绿提交 e6a09e9 → de96ae9/169839d → d232d9f |
 | M5 配图 | 未开始 | | | |
 | M6 思维导图 | 完成（随 M4 分支落地，见 DECISIONS） | 2026-09-26 | 同 M4 | 离线：大纲提取（vendor 示例 9 章）/校验规则/两平台时刻链接测试全绿；live：报告导图 7 分支、7 个时刻链接、mindmap_status=ok（并入 test_report_live 验证）；Vendor 示例与黄金链路复用 |
-| M7 前端 | 完成（D4 极简判定待用户查看截图） | 2026-09-26 | 见本行合并后填写 | D3：E2E ①–⑦ 全部通过（app/e2e/d3.spec.ts + app.smoke.spec.ts，7 用例；含跨页签一致性、报告 iframe/导图 SVG/字幕行、设置持久化、转写切换禁用规则、外链拦截）；`npm --prefix app run build` = 0；`npm --prefix app run test`（Vitest）与 `lint:design` = 0；运行中发现并修复 CORS 预检被鉴权中间件拦截的生产 bug（3fdc15b）；D4：截图 docs/screenshots/console.png、report.png 待用户判定 |
+| M7 前端 | 完成（D4 极简判定待用户查看截图） | 2026-09-26 | 387a7eb（merge） | D3：E2E ①–⑦ 全部通过（app/e2e/d3.spec.ts + app.smoke.spec.ts，7 用例；含跨页签一致性、报告 iframe/导图 SVG/字幕行、设置持久化、转写切换禁用规则、外链拦截）；`npm --prefix app run build` = 0；`npm --prefix app run test`（Vitest）与 `lint:design` = 0；运行中发现并修复 CORS 预检被鉴权中间件拦截的生产 bug（3fdc15b）；D4：截图 docs/screenshots/console.png、report.png 待用户判定 |
 | M8 打包 | 未开始 | | | |
 | M9 真实验收 | 未开始 | | | |
 
