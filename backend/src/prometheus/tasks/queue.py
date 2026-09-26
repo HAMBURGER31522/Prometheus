@@ -1,11 +1,11 @@
 """Serial task queue (PLAN 8.3): one running item at a time."""
 
 import threading
-import traceback
 from datetime import UTC, datetime
 
+from prometheus import paths
 from prometheus.library import items as items_store
-from prometheus.tasks import runner
+from prometheus.tasks import cleanup, errors, processes, runner
 
 
 def _now() -> str:
@@ -43,6 +43,8 @@ class TaskQueue:
             current = self._current
         if current is not None and current.item_id == item_id:
             current.cancel_requested = True
+            # The running stage is blocked on Pi / whisper / ffmpeg: end them now.
+            processes.kill_children()
             self._wake.set()
             return True
         row = items_store.get_item(self.data_dir, item_id)
@@ -88,13 +90,19 @@ class TaskQueue:
                     finished_at=_now(),
                 )
             except Exception as exc:  # noqa: BLE001 - any stage failure fails the task
-                items_store.update_item(
-                    self.data_dir, item["id"], status="failed", stage=None,
-                    error_code=getattr(exc, "code", None) or type(exc).__name__,
-                    error_message=str(exc) or traceback.format_exc(limit=3),
-                    finished_at=_now(),
-                )
+                if ctx.cancel_requested:  # killed children surface as ordinary errors
+                    items_store.update_item(
+                        self.data_dir, item["id"], status="cancelled", stage=None,
+                        finished_at=_now(),
+                    )
+                else:
+                    code, message = errors.describe(exc)
+                    items_store.update_item(
+                        self.data_dir, item["id"], status="failed", stage=None,
+                        error_code=code, error_message=message, finished_at=_now(),
+                    )
             else:
+                cleanup.clean_work_dir(paths.work_dir(self.data_dir, item["id"]))
                 items_store.update_item(
                     self.data_dir, item["id"], status="done", stage=None,
                     finished_at=_now(),
