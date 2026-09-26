@@ -45,6 +45,7 @@ export async function pickFile(): Promise<string | null> {
 
 export async function openExternal(url: string): Promise<void> {
   recordedExternal.push(url);
+  (window as unknown as { __lastOpenedExternal?: string }).__lastOpenedExternal = url;
   if (!E2E && (window as unknown as { __TAURI__?: unknown }).__TAURI__) {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
     await openUrl(url);
