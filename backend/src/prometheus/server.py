@@ -33,6 +33,7 @@ CORS_ORIGINS = ["http://tauri.localhost", "http://localhost:1420"]
 class AppState:
     def __init__(self, fake: bool | None):
         self.data_dir: Path | None = None
+        self.config_dir: Path | None = None
         self.queue: TaskQueue | None = None
         self.fake = bool(os.getenv("PROMETHEUS_FAKE") == "1") if fake is None else fake
 
@@ -54,12 +55,17 @@ class AppState:
             self.queue = None
 
 
-def create_app(token: str, data_dir: str | Path | None = None, fake: bool | None = None):
+def create_app(
+    token: str,
+    data_dir: str | Path | None = None,
+    fake: bool | None = None,
+    config_dir: str | Path | None = None,
+):
     app = FastAPI(title="Prometheus")
-    app.state.token = token
     state = AppState(fake)
     if data_dir is not None:
         state.data_dir = Path(data_dir)
+    state.config_dir = Path(config_dir) if config_dir else None
     app.state = state
     app.state.token = token
 
@@ -122,10 +128,17 @@ def main() -> None:
     data_dir = os.getenv("PROMETHEUS_TEST_DATA_DIR")
     fake = os.getenv("PROMETHEUS_FAKE") == "1" or None
 
+    # Installed runs persist the chosen data dir in <config-dir>/app.json.
+    config_dir = args.config_dir
+    if config_dir and not data_dir:
+        app_json = Path(config_dir) / "app.json"
+        if app_json.is_file():
+            data_dir = json.loads(app_json.read_text(encoding="utf-8")).get("data_dir")
+
     import uvicorn
 
     uvicorn.run(
-        create_app(token=args.token, data_dir=data_dir, fake=fake),
+        create_app(token=args.token, data_dir=data_dir, fake=fake, config_dir=config_dir),
         host=args.host, port=args.port, log_level="info",
     )
 
