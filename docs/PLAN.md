@@ -584,7 +584,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | M5 配图 | 未开始 | | | |
 | M6 思维导图 | 完成（随 M4 分支落地，见 DECISIONS） | 2026-09-26 | 同 M4 | 离线：大纲提取（vendor 示例 9 章）/校验规则/两平台时刻链接测试全绿；live：报告导图 7 分支、7 个时刻链接、mindmap_status=ok（并入 test_report_live 验证）；Vendor 示例与黄金链路复用 |
 | M7 前端 | 完成（D4 极简判定待用户查看截图） | 2026-09-26 | 387a7eb（merge） | D3：E2E ①–⑦ 全部通过（app/e2e/d3.spec.ts + app.smoke.spec.ts，7 用例；含跨页签一致性、报告 iframe/导图 SVG/字幕行、设置持久化、转写切换禁用规则、外链拦截）；`npm --prefix app run build` = 0；`npm --prefix app run test`（Vitest）与 `lint:design` = 0；运行中发现并修复 CORS 预检被鉴权中间件拦截的生产 bug（3fdc15b）；D4：截图 docs/screenshots/console.png、report.png 待用户判定 |
-| M8 打包 | 完成（D9 长视频本地转写验收顺延至 M9 一并执行） | 2026-09-26 | 见本行合并后填写 | `scripts/package.ps1` = 0（一键全流程，含打包资产校验与 300MB 体积断言）；NSIS 安装包 `Prometheus_0.1.0_x64-setup.exe` = **165MB**，已复制到 `E:	ools\Prometheus-Desktopelease\`；D8：`scripts/acceptance/installed-smoke.ps1` = 0（静默安装 → 启动 → backend.port 轮询 /api/health 30 秒内 healthy → 静默卸载 → 数据目录保留）；Rust 壳实现后端进程启动/关闭 + backend_info + CREATE_NO_WINDOW；使用说明第 3 节已补 tauri build 实测 |
+| M8 打包 | 完成（D9 长视频本地转写验收顺延至 M9 一并执行） | 2026-09-26 | 9e188d6（merge） | `scripts/package.ps1` = 0（一键全流程，含打包资产校验与 300MB 体积断言）；NSIS 安装包 `Prometheus_0.1.0_x64-setup.exe` = **165MB**，已复制到 `E:	ools\Prometheus-Desktop
+elease\`；D8：`scripts/acceptance/installed-smoke.ps1` = 0（静默安装 → 启动 → backend.port 轮询 /api/health 30 秒内 healthy → 静默卸载 → 数据目录保留）；Rust 壳实现后端进程启动/关闭 + backend_info + CREATE_NO_WINDOW；使用说明第 3 节已补 tauri build 实测 |
 | M9 真实验收 | 未开始 | | | |
 
 ## 14. 风险与对策
