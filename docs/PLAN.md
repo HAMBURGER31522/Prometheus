@@ -581,12 +581,12 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | M2 后端核心 | 完成 | 2026-09-25 | 949dc07（merge） | D2：`uv run pytest backend/tests -q -m "not live"` = 0（46 passed）；`uv run ruff check backend` = 0；M2 测试清单（数据目录布局、表结构、条目 201/409/422、分类、鉴权/门控/CORS、队列串行/取消/interrupted、设置/掩码/models.json、假流水线 3 秒内完成）全部在 backend/tests 有对应用例，先红（ac2bd1a，36 失败）后绿（a997553） |
 | M3 导入/转写/字幕 | 完成（云端 live 按用户指示暂缓） | 2026-09-25 | c5f1db5（merge） | D2：`uv run pytest backend/tests -q -m "not live"` = 0（95 passed）；`uv run ruff check backend` = 0；live：`uv run pytest backend/tests/live/test_ingest_live.py -m live -q` = 0（**2 passed 1 skipped**：B 站本地转写 device=cuda 86 段；YouTube cookies 链路本地转写 en 5 段；云端 paraformer 项按用户指示「那个云端先暂时不弄」挂起，待 DashScope Key 补跑）；红绿提交 511f3ae/8eb05d5 → ce6f213 等；链接解析表/超时公式/cookies 门控/AsrRun/子进程取消/繁简转换/黄金文件测试齐全 |
 | M4 精读与分类 | 完成 | 2026-09-26 | fb50048（merge） | D2：offline pytest = 0（120 passed）、ruff = 0；探针：PowerShell 工具执行 matplotlib 绘图成功（chart.png 45,578 字节，DECISIONS D-26）；live：`test_report_live` = 0（11 分钟，BV1bZhQ6VEQK 经 custom 供应商 gpt-6-sol：data-source-units=25、section-time=9、题头含「Bilibili；」、无外部引用、无占位符残留、自动分类「战争伦理」）；红绿提交 e6a09e9 → de96ae9/169839d → d232d9f |
-| M5 配图 | 未开始 | | | |
+| M5 配图 | 进行中（代码完成；live trial 受阻，详见 acceptance.md） | 2026-09-26 | — | 代码全部落地并有测试：抽帧筛选（20 秒间隔/每小时 20 帧/总 80 帧/稀疏补帧，5 用例）、showinfo 解析、figures.md 正式规则、frames 阶段接入流水线、figures 旗标贯通报告阶段、定稿 base64 内联；真实视频抽帧实证（BV1bZhQ6VEQK 保留 20 帧候选）。**未做**：带配图的完整报告 live trial 与 A/B——中转站 oapi.firedog.dev 对图片输入返回 SUBSCRIPTION_NOT_FOUND（订阅不含多模态），venlacy.dev 分组无可用通道；解除条件：支持看图的供应商（如 DeepSeek 官方 deepseek-flash）+ 用户 A/B 签字（D6） |
 | M6 思维导图 | 完成（随 M4 分支落地，见 DECISIONS） | 2026-09-26 | 同 M4 | 离线：大纲提取（vendor 示例 9 章）/校验规则/两平台时刻链接测试全绿；live：报告导图 7 分支、7 个时刻链接、mindmap_status=ok（并入 test_report_live 验证）；Vendor 示例与黄金链路复用 |
 | M7 前端 | 完成（D4 极简判定待用户查看截图） | 2026-09-26 | 387a7eb（merge） | D3：E2E ①–⑦ 全部通过（app/e2e/d3.spec.ts + app.smoke.spec.ts，7 用例；含跨页签一致性、报告 iframe/导图 SVG/字幕行、设置持久化、转写切换禁用规则、外链拦截）；`npm --prefix app run build` = 0；`npm --prefix app run test`（Vitest）与 `lint:design` = 0；运行中发现并修复 CORS 预检被鉴权中间件拦截的生产 bug（3fdc15b）；D4：截图 docs/screenshots/console.png、report.png 待用户判定 |
 | M8 打包 | 完成（D9 长视频本地转写验收顺延至 M9 一并执行） | 2026-09-26 | 9e188d6（merge） | `scripts/package.ps1` = 0（一键全流程，含打包资产校验与 300MB 体积断言）；NSIS 安装包 `Prometheus_0.1.0_x64-setup.exe` = **165MB**，已复制到 `E:	ools\Prometheus-Desktop
 elease\`；D8：`scripts/acceptance/installed-smoke.ps1` = 0（静默安装 → 启动 → backend.port 轮询 /api/health 30 秒内 healthy → 静默卸载 → 数据目录保留）；Rust 壳实现后端进程启动/关闭 + backend_info + CREATE_NO_WINDOW；使用说明第 3 节已补 tauri build 实测 |
-| M9 真实验收 | 未开始 | | | |
+| M9 真实验收 | 进行中（本地免费路径已实证；两项受阻，详见 acceptance.md） | 2026-09-26 | — | 已实证：本地转写（8 分钟样本 86 段 device=cuda；104 分钟样本 3716 段 GPU 6.4 分钟）、报告/分类/导图链路（BV1bZhQ6VEQK 全断言通过）、165MB 安装包 + D8 安装冒烟。**未做**：① 云端转写组合与 D5 云端断言——等 DashScope Key（用户指示先不弄）；② D5 约 3 小时样本视频选定——B 站搜索/空间接口持续风控（cookies 亦 1–2 次即封），热门榜 300 条无命中，需用户提供 BV 号或换时段重搜；③ scripts/acceptance/live.ps1 驱动脚本待写（各阶段已有 live 级实证） |
 
 ## 14. 风险与对策
 
