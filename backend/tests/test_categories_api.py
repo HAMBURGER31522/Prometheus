@@ -1,7 +1,6 @@
 """Category rename, merge, delete and counting (PLAN 8.2)."""
 
 from conftest import BV_URL
-
 from prometheus.library import categories as categories_store
 
 

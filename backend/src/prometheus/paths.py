@@ -1,22 +1,28 @@
 """Data directory layout - the only place that composes these paths (PLAN 7)."""
 
+import secrets
 from pathlib import Path
 
 
 def init_data_dir(data_dir: Path) -> Path:
+    data_dir = Path(data_dir)
+    for relative in (
+        "config", "config/pi", "runtime/cuda", "models", "logs", "items",
+    ):
+        (data_dir / relative).mkdir(parents=True, exist_ok=True)
     return data_dir
 
 
 def db_path(data_dir: Path) -> Path:
-    return data_dir / "prometheus.db"
+    return Path(data_dir) / "prometheus.db"
 
 
 def settings_file(data_dir: Path) -> Path:
-    return data_dir / "config" / "settings.json"
+    return Path(data_dir) / "config" / "settings.json"
 
 
 def pi_config_dir(data_dir: Path) -> Path:
-    return data_dir / "config" / "pi"
+    return Path(data_dir) / "config" / "pi"
 
 
 def models_json(data_dir: Path) -> Path:
@@ -24,15 +30,15 @@ def models_json(data_dir: Path) -> Path:
 
 
 def cuda_dir(data_dir: Path) -> Path:
-    return data_dir / "runtime" / "cuda"
+    return Path(data_dir) / "runtime" / "cuda"
 
 
 def models_dir(data_dir: Path) -> Path:
-    return data_dir / "models"
+    return Path(data_dir) / "models"
 
 
 def logs_dir(data_dir: Path) -> Path:
-    return data_dir / "logs"
+    return Path(data_dir) / "logs"
 
 
 def backend_port_file(data_dir: Path) -> Path:
@@ -40,7 +46,7 @@ def backend_port_file(data_dir: Path) -> Path:
 
 
 def items_root(data_dir: Path) -> Path:
-    return data_dir / "items"
+    return Path(data_dir) / "items"
 
 
 def item_dir(data_dir: Path, item_id: str) -> Path:
@@ -68,4 +74,4 @@ def work_dir(data_dir: Path, item_id: str) -> Path:
 
 
 def new_item_id() -> str:
-    return "0" * 32
+    return secrets.token_hex(16)

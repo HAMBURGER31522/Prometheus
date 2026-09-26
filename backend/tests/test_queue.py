@@ -4,7 +4,6 @@ import threading
 import time
 
 from conftest import BV_URL, wait_for_status
-
 from prometheus.tasks import runner
 
 
@@ -58,7 +57,8 @@ def test_queue_lists_active_and_recent_done(client):
 
 def test_startup_marks_running_as_interrupted(client_factory, tmp_path):
     from prometheus import paths
-    from prometheus.library import db, items as items_store
+    from prometheus.library import db
+    from prometheus.library import items as items_store
 
     data_dir = tmp_path / "data"
     paths.init_data_dir(data_dir)

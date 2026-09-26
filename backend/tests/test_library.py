@@ -1,9 +1,11 @@
 """SQLite schema, migrations and item/category persistence (PLAN 7.1)."""
 
-import pytest
+import sqlite3
 
+import pytest
 from prometheus.library import categories as categories_store
-from prometheus.library import db, items as items_store
+from prometheus.library import db
+from prometheus.library import items as items_store
 
 
 @pytest.fixture
@@ -36,13 +38,13 @@ def test_items_table_columns(data_dir):
 def test_unique_platform_video_id(data_dir):
     items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
                             source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/")
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
                                 source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/")
 
 
 def test_status_check_constraint(data_dir):
-    with pytest.raises(Exception):
+    with pytest.raises(sqlite3.IntegrityError):
         items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
                                 source_url="u", status="bogus")
 

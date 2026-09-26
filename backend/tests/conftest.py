@@ -4,7 +4,6 @@ import time
 
 import pytest
 from fastapi.testclient import TestClient
-
 from prometheus.server import create_app
 
 TOKEN = "test-token"
@@ -29,7 +28,9 @@ def client_factory():
 
 @pytest.fixture
 def client(client_factory, tmp_path):
-    return client_factory(data_dir=tmp_path / "data", fake=True)
+    authorized = client_factory(data_dir=tmp_path / "data", fake=True)
+    authorized.headers["Authorization"] = f"Bearer {TOKEN}"
+    return authorized
 
 
 def wait_for_status(client, item_id, status, timeout=5.0):

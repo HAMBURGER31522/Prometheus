@@ -21,12 +21,20 @@ def test_wrong_token_gets_401(client_factory):
     assert response.status_code == 401
 
 
-def test_query_token_only_works_for_content_gets(client, tmp_path):
+def test_query_token_only_works_for_content_gets(client_factory, tmp_path):
+    import time
+
+    client = client_factory(data_dir=tmp_path / "data", fake=True)
     headers = {"Authorization": f"Bearer {TOKEN}"}
-    created = client.post("/api/items", json={
+    created = client.post("/api/items", headers=headers, json={
         "url": "https://www.bilibili.com/video/BV1xJYT6EEYc/", "figures": False,
     })
     item_id = created.json()["id"]
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if client.get(f"/api/items/{item_id}", headers=headers).json().get("status") == "done":
+            break
+        time.sleep(0.05)
     report_url = f"/api/items/{item_id}/report"
     assert client.get(report_url).status_code == 401
     assert client.get(f"{report_url}?token={TOKEN}").status_code == 200
