@@ -207,6 +207,7 @@ def generate(run: Path) -> dict:
         update("GENERATING_IMAGE")
         try:
             with trace.span("render", input={"artifact": "report.html"}) as detail:
+                from .report_image import render_report_image
                 render_report_image(run)
                 detail.update(output={"artifact": "report.png"})
         except Exception as exc:
