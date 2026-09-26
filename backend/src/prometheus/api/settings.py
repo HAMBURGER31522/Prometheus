@@ -32,7 +32,7 @@ async def put_settings(request: Request):
 
 
 @router.post("/api/settings/test-model")
-async def test_model(request: Request):
+def test_model(request: Request):
     """One-shot text call + capability query (PLAN 8.2/8.6/8.7)."""
     from pathlib import Path
 

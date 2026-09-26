@@ -28,7 +28,7 @@ def run_one_shot(work_dir, *, prompt: str, provider: str, model: str, api_key: s
     env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir)}
     result = subprocess.run(
         command, input=prompt.encode("utf-8"), capture_output=True,
-        cwd=str(Path(work_dir)), env=env,
+        cwd=str(Path(work_dir)), env=env, check=False,
     )
     if result.returncode != 0:
         raise OneShotError(

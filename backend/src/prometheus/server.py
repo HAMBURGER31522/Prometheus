@@ -1,6 +1,7 @@
 """Prometheus backend: application factory, auth middleware and CLI entry."""
 
 import argparse
+import json
 import os
 import re
 from pathlib import Path
