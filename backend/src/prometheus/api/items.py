@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus.ingest.links import LinkUnsupported, parse_url
 from prometheus.library import items as items_store
+from prometheus.library import publish
 
 router = APIRouter()
 
@@ -38,9 +39,14 @@ async def create_item(request: Request):
 async def list_items(
     request: Request, status: str | None = None, category_id: int | None = None,
 ):
-    return items_store.list_items(
-        request.app.state.data_dir, status=status, category_id=category_id,
-    )
+    data_dir = request.app.state.data_dir
+    rows = items_store.list_items(data_dir, status=status, category_id=category_id)
+    return [_with_file_state(data_dir, row) for row in rows]
+
+
+def _with_file_state(data_dir, row: dict) -> dict:
+    """Flag items whose library folder was moved or deleted outside the app."""
+    return {**row, "files_missing": publish.files_missing(data_dir, row)}
 
 
 @router.get("/api/queue")
@@ -56,7 +62,7 @@ async def get_item(request: Request, item_id: str):
     row = items_store.get_item(request.app.state.data_dir, item_id)
     if row is None:
         return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
-    return row
+    return _with_file_state(request.app.state.data_dir, row)
 
 
 @router.patch("/api/items/{item_id}")
@@ -65,11 +71,10 @@ async def patch_item(request: Request, item_id: str):
     state = request.app.state
     if items_store.get_item(state.data_dir, item_id) is None:
         return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
-    updates = {}
     if "category_id" in body:
-        updates["category_id"] = body["category_id"]
-    items_store.update_item(state.data_dir, item_id, **updates)
-    return items_store.get_item(state.data_dir, item_id)
+        # Moves the library folder along with the category change.
+        publish.move_item(state.data_dir, item_id, body["category_id"])
+    return _with_file_state(state.data_dir, items_store.get_item(state.data_dir, item_id))
 
 
 @router.delete("/api/items/{item_id}", status_code=204)
@@ -87,7 +92,7 @@ async def delete_item(request: Request, item_id: str):
             if current["status"] not in ("queued", "running"):
                 break
             await asyncio.sleep(0.05)
-    items_store.delete_item(state.data_dir, item_id)
+    publish.remove_item(state.data_dir, item_id)
     return None
 
 

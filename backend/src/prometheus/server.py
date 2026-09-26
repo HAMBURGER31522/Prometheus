@@ -18,7 +18,7 @@ from prometheus.api import content as content_api
 from prometheus.api import items as items_api
 from prometheus.api import settings as settings_api
 from prometheus.fake.pipeline import build_impls as build_fake_impls
-from prometheus.library import db
+from prometheus.library import db, migrate
 from prometheus.llm import pi_models
 from prometheus.tasks.queue import TaskQueue
 from prometheus.tasks.stages import build_real_impls
@@ -49,6 +49,8 @@ class AppState:
 
     def initialize(self, data_dir: Path) -> None:
         self.data_dir = Path(data_dir)
+        # Data dirs from before the readable library (M0-M8) move over first.
+        migrate.migrate_legacy_layout(self.data_dir)
         paths.init_data_dir(self.data_dir)
         db.init_db(self.data_dir)
         pi_models.ensure_models_json(self.data_dir)

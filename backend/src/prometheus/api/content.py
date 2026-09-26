@@ -8,6 +8,8 @@ import json
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 from prometheus import paths
+from prometheus.library import items as items_store
+from prometheus.library import publish
 from prometheus.subtitle import format as subtitle_format
 
 router = APIRouter()
@@ -31,9 +33,22 @@ document.addEventListener("click", function (event) {
 </body>"""
 
 
+def _library_file(data_dir, item_id: str, role: str):
+    """(path, error response) for a published item's file in the library."""
+    row = items_store.get_item(data_dir, item_id)
+    if row is None or not row.get("library_path"):
+        return None, None
+    if publish.files_missing(data_dir, row):
+        return None, JSONResponse({"code": "FILES_MISSING"}, status_code=404)
+    return paths.library_folder(data_dir, row["library_path"]) / paths.LIBRARY_FILES[role], None
+
+
 @router.get("/api/items/{item_id}/report")
 async def report(request: Request, item_id: str):
-    text = _read_or_none(paths.report_file(request.app.state.data_dir, item_id))
+    file, error = _library_file(request.app.state.data_dir, item_id, "html")
+    if error is not None:
+        return error
+    text = _read_or_none(file) if file else None
     if text is None:
         return JSONResponse({"code": "REPORT_NOT_READY"}, status_code=404)
     if "</body>" in text:
@@ -45,7 +60,10 @@ async def report(request: Request, item_id: str):
 
 @router.get("/api/items/{item_id}/mindmap")
 async def mindmap(request: Request, item_id: str):
-    text = _read_or_none(paths.mindmap_file(request.app.state.data_dir, item_id))
+    file, error = _library_file(request.app.state.data_dir, item_id, "mindmap")
+    if error is not None:
+        return error
+    text = _read_or_none(file) if file else None
     if text is None:
         return JSONResponse({"code": "MINDMAP_NOT_READY"}, status_code=404)
     return Response(text, media_type="text/markdown")

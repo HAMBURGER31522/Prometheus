@@ -10,11 +10,12 @@ from prometheus.ingest import download as download_mod
 from prometheus.ingest import resolve as resolve_mod
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
+from prometheus.library import publish as publish_mod
 from prometheus.llm import capability
 from prometheus.llm import one_shot as one_shot_mod
 from prometheus.mindmap import generate as mindmap_generate
 from prometheus.report import workspace as workspace_mod
-from prometheus.report.classify import classify_report
+from prometheus.report.classify import classify_item
 from prometheus.report.finalize import finalize_report
 from prometheus.report.outline import extract_outline
 from prometheus.settings import store
@@ -39,21 +40,12 @@ def _work(data_dir, ctx):
     return work
 
 
-def _asr_to_segments(asr_payload: dict) -> list:
-    return [
-        {
-            "start": segment["start_ms"] / 1000,
-            "end": segment["end_ms"] / 1000,
-            "text": segment["text"],
-        }
-        for segment in asr_payload.get("segments", [])
-    ]
-
-
 def _write_subtitle_files(data_dir, ctx, asr_path) -> None:
     payload = json.loads(Path(asr_path).read_text(encoding="utf-8"))
-    segments = subtitle_convert.maybe_simplify(_asr_to_segments(payload), payload.get("language"))
+    segments = subtitle_convert.segments_from_asr(payload)
     segments_file = paths.segments_file(data_dir, ctx.item_id)
+    segments_file.parent.mkdir(parents=True, exist_ok=True)
+    paths.srt_file(data_dir, ctx.item_id).parent.mkdir(parents=True, exist_ok=True)
     segments_file.write_text(
         json.dumps(segments, ensure_ascii=False), encoding="utf-8",
     )
@@ -159,7 +151,7 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         h2_titles = [section["title"] for section in outline["sections"]]
         existing = [c["name"] for c in categories_store.list_categories(data_dir)]
         llm = settings["llm"]
-        name = classify_report(
+        result = classify_item(
             work, outline["title"], outline["intro"][:500], h2_titles, existing,
             one_shot=one_shot_mod.run_one_shot,
             provider=llm["provider"], model=llm["model"],
@@ -167,8 +159,11 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             node_exe=_node_exe(), pi_cli=_pi_cli(),
             agent_dir=paths.pi_config_dir(data_dir),
         )
-        category_id = categories_store.ensure_category(data_dir, name)
-        items_store.update_item(data_dir, ctx.item_id, category_id=category_id)
+        category_id = categories_store.ensure_category(data_dir, result["category"])
+        items_store.update_item(
+            data_dir, ctx.item_id, category_id=category_id,
+            tags=json.dumps(result["tags"], ensure_ascii=False), description=result["description"],
+        )
 
     def mindmap(ctx):
         mindmap_generate.generate_for_item(
@@ -186,4 +181,5 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         "finalize": finalize,
         "classify": classify,
         "mindmap": mindmap,
+        "publish": lambda ctx: publish_mod.publish(data_dir, ctx.item_id),
     }

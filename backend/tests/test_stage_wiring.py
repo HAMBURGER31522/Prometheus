@@ -99,7 +99,8 @@ def _write_report(data_dir, item_id):
 def test_classify_stage_assigns_a_category(data_dir, monkeypatch):
     ctx = _ctx(data_dir)
     _write_report(data_dir, ctx.item_id)
-    monkeypatch.setattr(stages_mod, "classify_report", lambda *args, **kwargs: "测试分类")
+    monkeypatch.setattr(stages_mod, "classify_item", lambda *args, **kwargs: {
+        "category": "测试分类", "tags": ["标签"], "description": "一句话。"})
     stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["classify"](ctx)
     assert items_store.get_item(data_dir, ctx.item_id)["category_id"] is not None
 

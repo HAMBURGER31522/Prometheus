@@ -12,6 +12,7 @@ from pathlib import Path
 from prometheus import paths
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
+from prometheus.library import publish as publish_mod
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 
@@ -43,6 +44,7 @@ def build_impls(data_dir):
         segments_file.write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
         from prometheus.subtitle import format as subtitle_format
 
+        paths.srt_file(data_dir, ctx.item_id).parent.mkdir(parents=True, exist_ok=True)
         paths.srt_file(data_dir, ctx.item_id).write_text(
             subtitle_format.to_srt(segments), encoding="utf-8",
         )
@@ -75,7 +77,10 @@ def build_impls(data_dir):
 
     def classify(ctx):
         category_id = categories_store.ensure_category(data_dir, "未分类")
-        items_store.update_item(data_dir, ctx.item_id, category_id=category_id)
+        items_store.update_item(
+            data_dir, ctx.item_id, category_id=category_id,
+            tags='["示例"]', description="假流水线生成的示例条目。",
+        )
 
     return {
         "resolve": resolve,
@@ -87,4 +92,5 @@ def build_impls(data_dir):
         "finalize": finalize,
         "mindmap": mindmap,
         "classify": classify,
+        "publish": lambda ctx: publish_mod.publish(data_dir, ctx.item_id),
     }

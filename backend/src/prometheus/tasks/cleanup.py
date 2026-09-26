@@ -11,6 +11,7 @@ from pathlib import Path
 KEEP = frozenset({
     "asr.json", "asr-task.json", "canonical-transcript.jsonl", "input.json",
     "run.trace.jsonl", "source.info.json", "transcript-manifest.json", "transcript.md",
+    "segments.json", "mindmap.json",
 })
 
 

@@ -9,7 +9,7 @@ from prometheus.library import items as items_store
 
 STAGES = [
     "resolve", "download", "transcribe", "transcript", "frames",
-    "report", "finalize", "mindmap", "classify",
+    "report", "finalize", "mindmap", "classify", "publish",
 ]
 
 
