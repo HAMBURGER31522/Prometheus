@@ -602,6 +602,184 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | 转写内容里的恶意指令（Agent 能执行命令） | 追加系统提示，把素材声明为数据；限定工作目录；不向 Pi 传递 API Key 以外的密钥。用户已接受残余风险（D-05） |
 | 上游 VRA 以后更新 Skill | `git subtree pull` 后重跑 D1、D2、D6 |
 
+---
+
+## 15. 第二阶段（2026-09-26 起）
+
+> 起因：2026-09-26 的审查（`docs/REVIEW-2026-09-26.md`）发现，通过流水线真实运行时多个阶段必崩；前端基本没有设计；数据目录用户无法浏览。第二阶段的规格已由用户确认（2026-09-26）。第 1–14 节中与本节冲突之处，以本节为准。
+
+### 15.1 Goal
+
+把 Prometheus 修到**通过界面真正可用**；前端按 C 方向（液态玻璃）从零重写；知识库改成人和 AI 都能直接读的文件夹结构；用实测数据选定转写引擎。
+
+### 15.2 Boundaries
+
+**做：**
+
+1. **修完审查问题**（REVIEW 第 5–17 项）：
+   - 取消任务时结束整个子进程树；
+   - 安装版只用自带运行时（后端使用 `--runtime-dir`，删除写死的开发机路径）；
+   - 内置提供商（如 `deepseek-flash`）的看图能力按 `--list-models` 判断；
+   - 「测试模型」列模型时带上 `PI_CODING_AGENT_DIR`；
+   - 每个阶段写入 `run.trace.jsonl`；
+   - 失败时给出中文处理建议；
+   - D1 不依赖 `PYTHONUTF8`；
+   - 任务成功后清理中间文件（见 15.4.1）。
+2. **模型协议**：自定义提供商增加 `protocol`，取值 `openai`（写入 `api: openai-completions`）或 `anthropic`（写入 `api: anthropic-messages`，`baseUrl` 去掉末尾的 `/v1`）。
+3. **后端架构**：
+   - 导图 → `prometheus/mindmap/`；配图 → `prometheus/figures/`；一次性模型调用、模型能力查询、`models.json` 生成 → `prometheus/llm/`；
+   - `tasks/stages.py` 只负责按阶段调用各功能模块，不再包含提示词拼装、重试等功能逻辑。
+4. **知识库存储**：可读文件夹 + PDC 式 AI 索引（见 15.4.1）。分类阶段同时生成 3–5 个标签和一句话摘要。在软件里改名、移动条目、合并分类时，同步移动对应的文件夹。旧版数据目录自动迁移。
+5. **思维导图改为 BiliSum 式知识树**（见 15.4.2）：分层 JSON，节点带摘要和时间锚点；前端用 React Flow 画布；同时导出 `思维导图.md`。
+6. **转写实测**（见 15.4.3）：结果交用户拍板，再接入选定的本地引擎。
+7. **云端转写 = 必剪**（见 15.4.4）：
+   - 不需要任何配置，用户选了「云端」即可使用；
+   - 失败时自动退回本地转写；
+   - 删除 DashScope 相关的设置项和界面（vendor 的 paraformer 代码保持不动）。
+8. **前端从零重写**（见 15.4.5），不在旧界面代码上修补，后端接口契约保持兼容。
+9. **README**：写明技术栈、特色、使用与部署步骤，以及从 VRA 和 BiliSum 各取了什么。
+
+**明确不做：** 浅色/深色主题切换（全局只有 C 的墨夜外壳，报告保持浅色纸页）、问答 / RAG、阿里云与 Groq 云端、说话人区分、在资源管理器里手动挪动文件夹后的自动同步（软件只提示「文件缺失」，提供「删除记录」和「重新生成」两个操作）。
+
+### 15.3 Done When
+
+命令默认在已执行 `env.ps1` 的 PowerShell 中、于仓库根目录运行，以退出码 0 为通过。
+
+| # | 判据 | 判定 |
+|---|---|---|
+| **E1** | 后端全部测试通过；每个修复都有先失败的测试；**每个流水线阶段都有按 `StageContext` 调用的测试**（`test_stage_wiring.py` 一类） | `uv run pytest backend/tests -q -m "not live"`；`uv run ruff check backend` |
+| **E2** | D1 在**没有**设置 `PYTHONUTF8` 的新终端中通过 | `uv run --package video-report-agent --extra enhancement --directory vendor/video-report-agent pytest -q` |
+| **E3** | 真实跑完 `BV1yPb46xExH`（开启配图、本地转写，模型用用户提供的 API）：<br>① 知识库文件夹里有精读.html、精读.md（带 title/date/category/tags/description 的开头）、思维导图.md、字幕.srt、字幕.txt、来源.url；<br>② `index.json` 和 `llms.txt` 包含该条目；<br>③ `mindmap.json` 通过校验（3–6 个主题，叶子都有时间）；<br>④ `run.trace.jsonl` 覆盖全部阶段；<br>⑤ 清理后，该条目的知识库文件夹 + 缓存 ≤ 5MB | `scripts/acceptance/live.ps1 -Url https://www.bilibili.com/video/BV1yPb46xExH/`（会产生 API 费用，手动触发） |
+| **E4** | 报告阶段进行中取消任务，5 秒内不再有该任务的 Pi / ffmpeg / 转写进程，状态为 `cancelled` | live 测试 `test_cancel_live.py` |
+| **E5** | 转写实测表（4 个引擎 × 中英两段样本：字错率/词错率、速度、峰值显存、时间戳、标点） | `docs/asr-bench.md`；**由用户看表后决定默认引擎** |
+| **E6** | 前端单测 + E2E 一条命令跑完，E2E 自动拉起假流水线后端和 Vite。断言：<br>① 侧栏五项顺序；<br>② 在某个页签里打开条目后，侧栏高亮**停留在该页签**；<br>③ 知识库、思维导图、字幕三个页签的分类和条目标题完全一致；<br>④ 导图画布渲染出节点，点节点出现摘要面板；<br>⑤ 字幕页按时间顺序列出**全部**分段；<br>⑥ 外链交给 `openExternal`；<br>⑦ 设置里选「云端」无需填写任何 Key 即可保存；<br>⑧ 自定义提供商可选 OpenAI / Anthropic 协议 | `npm --prefix app run test`；`npm --prefix app run e2e`；`npm --prefix app run lint:design` |
+| **E7** | 界面观感与动效：侧栏不遮挡内容，滚动条滚动时显现、静止时淡出，页面切换顺滑，报告阅读舒适 | **用户看截图并实际试用安装版后判定**，记入 `docs/acceptance.md` |
+| **E8** | 安装包 ≤ 300MB；安装版在**禁止使用开发机工具路径**的条件下（设 `PROMETHEUS_FORBID_DEV_PATHS=1`，后端只要解析到安装目录以外的 node / pi / ffmpeg / python 就立即报错）完整处理一个短视频 | `scripts/acceptance/installed-live.ps1` |
+| **E9** | README 按 15.2 第 9 条更新；远程 `main` 与本地一致；CI 为绿 | `git fetch origin; git rev-parse main origin/main`；CI 状态 |
+
+### 15.4 设计细节
+
+#### 15.4.1 知识库存储（PDC 式）
+
+```
+<知识库文件夹>\                         首次启动时选择
+├── llms.txt                           全库概览：简介、分类列表（名称、条目数、索引路径）、给 AI 的阅读说明
+├── index.json                         {"generated_at", "items": [{"id","title","category","tags","description","date",
+│                                        "source": {"platform","url","uploader","title","duration_s"},
+│                                        "paths": {"html","md","mindmap","srt","txt"}}]}
+├── <分类>\
+│   ├── _index.md                      该分类全部条目：标题、日期、摘要、相对链接
+│   └── <YYYY-MM-DD> <报告标题>\
+│       ├── 精读.html                  给人看（配图已内联）
+│       ├── 精读.md                    给 AI 读：YAML 开头（title/date/category/tags/description/source_url/platform/uploader/duration_s）
+│       │                              + 由 HTML 转出的正文（标题层级、段落、列表、表格、图注；不含 base64 图片）
+│       ├── 思维导图.md                由 mindmap.json 转出的大纲（节点摘要、时刻链接）
+│       ├── 字幕.srt
+│       ├── 字幕.txt
+│       └── 来源.url                   [InternetShortcut] URL=<原视频>
+└── .prometheus\                       设置 Windows「隐藏」属性
+    ├── prometheus.db  config\  logs\  runtime\cuda\  models\
+    └── cache\<条目ID>\                asr.json、transcript.md、canonical-transcript.jsonl、input.json、source.info.json、
+                                       segments.json、mindmap.json、run.trace.jsonl（长期保留，用于重新生成）
+```
+
+- 文件夹命名：日期取任务完成当天（本地时区）；标题取报告 `<h1>`。`<>:"/\|?*` 替换为全角字符，去掉首尾空格和末尾的点，超过 60 个字符截断并加「…」；同名时追加「 (2)」「 (3)」。分类文件夹同样处理，默认分类名为「未分类」。
+- 数据库保存每个条目的相对路径；只有 `done` 状态的条目才有知识库文件夹。
+- **清理**：任务成功后删除缓存里的音视频、`audio.wav`、`frames\`、`sessions\`、`pi.events.jsonl` 和 Skill 副本；失败时保留，供排查，下次成功或删除条目时再清理。
+- 每次条目完成、改名、移动或删除后，重写 `llms.txt`、`index.json` 和受影响分类的 `_index.md`。
+- **旧版迁移**：检测到数据目录根部有 `prometheus.db` 和 `items\` 时，把内部数据移入 `.prometheus\`，把 `done` 条目转换成新的文件夹结构，把 `items\<ID>\work` 移到 `cache\<ID>`。迁移要可重入，中途失败后再次启动能够继续。
+
+#### 15.4.2 思维导图（参考 BiliSum 的写作与呈现思路）
+
+- **输入**：报告大纲（标题、导语、各章 `<h2>` 及 `section-time`、`<h3>`、段落正文）。
+- **输出 JSON**（`cache\<ID>\mindmap.json`）：`{"title", "root": Node}`，`Node = {"label", "type": "root|theme|topic|leaf", "summary", "time", "children"}`：
+  - `label` ≤ 20 字，`summary` ≤ 60 字，直接写信息本体；
+  - 叶子节点必须有 `time`（秒，并落在某一章的时间范围内），其他层级可以没有；
+  - 最深 4 层（root → theme → topic → leaf）。
+- **写作规则**（改写自 BiliSum 的提示词）：
+  - 先做语义归纳，不要把章节原样平移成节点；
+  - theme 3–6 个，彼此区分明显，按「概念 / 方法 / 例子 / 条件 / 结论」这类知识结构组织，评论或资讯类则按观点和因果；
+  - topic 只在某个 theme 下确实有不同子议题时才出现；
+  - 叶子要具体、短、一眼能懂；
+  - 覆盖所有章节，但合并重复内容；
+  - 只输出 JSON。
+- **校验**（确定性）：
+  - 容忍模型在 JSON 前后附带说明文字，也容忍代码围栏，只取第一个完整的 JSON 对象；
+  - 检查类型、层级、数量、字数、叶子时间；
+  - 至少 80% 的章节被某个叶子时间覆盖。
+- 校验失败时带上错误说明重试一次；仍然失败则记 `mindmap_status='failed'`，界面提供「重新生成导图」。
+- **呈现**：
+  - `@xyflow/react` 画布，自写的横向整齐树布局（参照 BiliSum `layoutMindMap` 的思路）；
+  - 节点卡片按类型区分样式，主题节点可以折叠 / 展开；
+  - 支持缩放、拖动、「适应画布」；
+  - 点节点弹出摘要面板，面板里的时刻链接交给 `openExternal`；
+  - 右上角「导出 .md」。
+
+#### 15.4.3 转写实测
+
+- 实测环境放在 `E:\tools\Prometheus-Desktop\asr-bench\`（独立虚拟环境 + 模型缓存），配使用说明，不进入安装包。
+- **样本**：
+  - 一段 5–15 分钟、带**人工中文字幕**（非自动生成）的普通话视频；
+  - 一段 5–15 分钟、带人工英文字幕的英文视频（YouTube，cookies 路径由用户提供）；
+  - 选定后写进 `docs/acceptance.md`。
+- **参赛**：faster-whisper large-v3-turbo（现用）、Qwen3-ASR-1.7B（+ Qwen3-ForcedAligner 出时间戳）、FunASR paraformer-zh + fsmn-vad + ct-punc、必剪。时间允许时加测 Fun-ASR-Nano。
+- **指标**：
+  - 中文字错率：去掉标点和空白、繁转简后计算；阿拉伯数字与中文数字的写法差异单独统计，不计入错误；
+  - 英文词错率：转小写、去标点后计算；
+  - 另记：处理时间 / 音频时长、峰值显存（nvidia-smi 采样）、时间戳粒度、有无标点、安装体积。
+- **产物**：`docs/asr-bench.md`（汇总表 + 典型错误摘录）；原始输出放 `acceptance-output/asr-bench/`（不提交）。
+
+#### 15.4.4 云端转写（必剪）
+
+- `transcribe/bcut.py`：
+  - 流程：上传授权 → 分片上传 → 提交 → 建任务 → 轮询；请求头参照 VideoCaptioner 的维护版实现（2026-09-26 实测：原版 bcut-asr 返回 412，改用维护版请求头后可用）；
+  - 输入：由 ffmpeg 转成 16kHz 单声道 48kbps 的 mp3；
+  - 输出：转成 vendor 的 `AsrRun` 结构（utterance 级时间戳）。
+- 遇到 412 / 429、超时，或任务状态为错误时，**自动改用本地转写**，并在条目上记一条提示「必剪不可用，已改用本地转写」。
+- 设置项 `asr.backend`：`local` | `cloud`；选 `cloud` 时不需要任何配置。
+
+#### 15.4.5 前端（C · 液态玻璃，用户于 2026-09-26 选定）
+
+- **外壳**：墨夜底色（`#1b1e22` 系），报告保持浅色纸页（原因：Agent 生成的图表按白纸配色）。
+- **侧栏**：独立的左列（胶囊宽 196px，外侧留白 14px），玻璃胶囊只悬浮在左列的环境光背景上，**不遮挡内容区**；内容区从左列右侧开始。玻璃效果只用在侧栏胶囊和阅读工具栏这类小面积上。
+- **滚动条**：悬浮细滚动条，静止时几乎透明（约 20% 不透明），滚动或悬停时显现并变宽，停止 800ms 后淡出。报告 iframe 在注入的覆盖样式里做同样处理。
+- **导航**：侧栏高亮始终等于当前页签；阅读页的「精读 / 导图 / 字幕」切换同时切换当前页签，保持同一条目。
+- **三个内容页签**共用「分类 → 条目 → 内容」版式：分类列、条目列表，以及内容区的顶部玻璃工具栏（面包屑 + 三件套切换）。
+- **字幕页**：按时间顺序完整列出全部分段（`[时:分:秒] 原文`），长列表用虚拟滚动；点时间戳在浏览器打开视频对应时刻；可以导出 SRT / TXT。
+- **报告页**：显示时临时注入覆盖样式（配色、字体、渐变条、滚动条），磁盘上的文件不改。
+- **字体**：标题用思源宋体（Noto Serif SC，OFL）的按字切分 woff2，随安装包分发；界面文字用系统字体。
+- **动效**：弹簧曲线（由阻尼振子采样生成 CSS `linear()`；空间类约 500ms、带轻微回弹，效果类约 320ms、无回弹），页面与内容切换用 React 19.3 的 `<ViewTransition>`；遵循 `prefers-reduced-motion`。
+- **测试**：Vitest 覆盖布局与交互逻辑；Playwright 的 `webServer` 自动拉起假流水线后端和 Vite（`npm run e2e` 一条命令）。
+- **设计检查**：颜色只在 `tokens.css` 定义；动效曲线只在 `motion.css` 定义。
+
+### 15.5 里程碑
+
+每个里程碑在单独分支上开发，先写失败测试再实现，测试全绿后 `merge --no-ff` 到 `main` 并推送。
+
+| 里程碑 | 分支 | 内容 | Done When |
+|---|---|---|---|
+| R1 | `r1-fixes` | 15.2 第 1、2 条（取消、运行时路径、看图能力、测试模型、trace、中文错误提示、D1、清理、模型协议） | E1、E2；取消与清理的单测 |
+| R2 | `r2-architecture` | 15.2 第 3 条：模块搬迁，编排变薄；行为不变 | E1（搬迁前后测试集合不变且全绿） |
+| R3 | `r3-library` | 15.4.1：可读文件夹、精读.md、标签与摘要、索引、改名与移动同步、旧版迁移 | E1；迁移、命名、索引的单测 |
+| R4 | `r4-mindmap` | 15.4.2 后端：JSON 知识树生成、校验、导出 .md | E1；校验规则的单测 |
+| R5 | `r5-asr-bench` | 15.4.3 实测 | E5，**停下来等用户选定** |
+| R6 | `r6-asr` | 15.4.4 必剪 + 接入用户选定的本地引擎 | E1；live：两个后端各转写一段样本 |
+| R7 | `r7-frontend` | 15.4.5 前端重写（含导图画布） | E6；**停下来请用户看截图**（E7） |
+| R8 | `r8-release` | 打包、README、完整验收 | E3、E4、E8、E9 |
+
+### 15.6 进度记录
+
+| 里程碑 | 状态 | 完成日期 | 合并 commit | Done When 结果 |
+|---|---|---|---|---|
+| R1 修复与协议 | 未开始 | | | |
+| R2 架构 | 未开始 | | | |
+| R3 知识库存储 | 未开始 | | | |
+| R4 思维导图 | 未开始 | | | |
+| R5 转写实测 | 未开始 | | | |
+| R6 转写接入 | 未开始 | | | |
+| R7 前端 | 未开始 | | | |
+| R8 发布 | 未开始 | | | |
+
 ## 附录 A：对 vendor/video-report-agent 的修改（只允许以下各项）
 
 | 编号 | 内容 | 状态 |
