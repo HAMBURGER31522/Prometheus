@@ -1,0 +1,27 @@
+/* App shell layout on top of the design tokens (PLAN 9.3). */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: var(--text-base) var(--font-ui); }
+.app-frame { display: flex; min-height: 100vh; }
+.sidebar { width: 184px; background: var(--canvas); display: flex; flex-direction: column; padding: var(--space-4) 0; gap: 2px; }
+.sidebar .tab { text-align: left; border: none; background: none; padding: var(--space-2) var(--space-4); cursor: pointer; color: var(--ink); border-left: 2px solid transparent; }
+.sidebar .tab.current { border-left-color: var(--accent); color: var(--heading); font-weight: 600; }
+.app-content { flex: 1; padding: var(--space-6); max-width: 960px; }
+.app-shell { padding: var(--space-8); }
+h1, h2 { color: var(--heading); }
+button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: var(--radius); padding: var(--space-1) var(--space-3); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+button:disabled { opacity: 0.5; cursor: default; }
+textarea, input, select { border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-2); font: inherit; width: 100%; }
+fieldset { border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 var(--space-4); }
+label { display: block; margin: var(--space-2) 0; }
+.row-main { display: block; text-align: left; background: none; border: none; padding: var(--space-2) 0; width: 100%; color: var(--heading); }
+.row-sub { display: block; color: var(--muted); font-size: var(--text-sm); }
+.row-actions { display: inline-flex; gap: var(--space-2); }
+ul { list-style: none; padding: 0; }
+li { border-bottom: 1px solid var(--line); padding: var(--space-2) 0; display: flex; justify-content: space-between; gap: var(--space-3); }
+.empty, .notice { color: var(--muted); }
+.breadcrumb { margin-bottom: var(--space-4); color: var(--muted); }
+.report-frame { width: 100%; min-height: 70vh; border: 1px solid var(--line); border-radius: var(--radius); }
+.markmap-container svg { width: 100%; min-height: 60vh; }
+.subtitle-time { border: none; background: none; color: var(--accent); padding: 0 var(--space-2) 0 0; }
+figures { border: 1px solid var(--line); }

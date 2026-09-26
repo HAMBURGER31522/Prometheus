@@ -78,3 +78,17 @@ def test_cors_allows_only_listed_origins(client):
     assert dev.headers.get("access-control-allow-origin") == "http://localhost:1420"
     other = client.get("/api/health", headers={"Origin": "http://evil.example"})
     assert "access-control-allow-origin" not in other.headers
+
+
+def test_preflight_options_passes_cors(client):
+    """Browser preflight must be answered by CORS, not the 401 gate (D3 ⑥ blocker)."""
+    response = client.options(
+        "/api/app/data-dir",
+        headers={
+            "Origin": "http://localhost:1420",
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:1420"

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus import paths
 from prometheus.api import app as app_api
+from prometheus.api import asr_components as asr_components_api
 from prometheus.api import categories as categories_api
 from prometheus.api import content as content_api
 from prometheus.api import items as items_api
@@ -62,13 +63,6 @@ def create_app(token: str, data_dir: str | Path | None = None, fake: bool | None
     app.state = state
     app.state.token = token
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=CORS_ORIGINS,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     @app.middleware("http")
     async def auth_and_gating(request: Request, call_next):
         path = request.scope["path"]
@@ -83,6 +77,15 @@ def create_app(token: str, data_dir: str | Path | None = None, fake: bool | None
         if state.data_dir is None and path != "/api/app/data-dir":
             return JSONResponse({"code": "DATA_DIR_NOT_SET"}, status_code=409)
         return await call_next(request)
+
+    # Registered last so CORS wraps the auth middleware: the browser's OPTIONS
+    # preflight must be answered here, not rejected by the 401 gate.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/api/health")
     async def health() -> dict:
@@ -102,6 +105,7 @@ def create_app(token: str, data_dir: str | Path | None = None, fake: bool | None
     app.include_router(categories_api.router)
     app.include_router(content_api.router)
     app.include_router(settings_api.router)
+    app.include_router(asr_components_api.router)
     return app
 
 
@@ -114,9 +118,16 @@ def main() -> None:
     parser.add_argument("--runtime-dir", default=None)
     args = parser.parse_args()
 
+    # Test mode (PLAN 8.1): skip first-run data-dir selection; fake pipeline for E2E.
+    data_dir = os.getenv("PROMETHEUS_TEST_DATA_DIR")
+    fake = os.getenv("PROMETHEUS_FAKE") == "1" or None
+
     import uvicorn
 
-    uvicorn.run(create_app(token=args.token), host=args.host, port=args.port, log_level="info")
+    uvicorn.run(
+        create_app(token=args.token, data_dir=data_dir, fake=fake),
+        host=args.host, port=args.port, log_level="info",
+    )
 
 
 if __name__ == "__main__":
