@@ -23,7 +23,12 @@ def _work(tmp_path, html=TEMPLATE, description="这是简介。"):
     work = tmp_path / "work"
     work.mkdir(exist_ok=True)
     (work / "report.html").write_text(html, encoding="utf-8")
+    # vendor reads <work>/download/source.info.json; PLAN 7 keeps a root copy
     (work / "source.info.json").write_text(
+        json.dumps({"description": description}), encoding="utf-8",
+    )
+    (work / "download").mkdir(exist_ok=True)
+    (work / "download" / "source.info.json").write_text(
         json.dumps({"description": description}), encoding="utf-8",
     )
     frames = work / "frames"
