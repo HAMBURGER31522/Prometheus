@@ -47,6 +47,17 @@ class IngestError(RuntimeError):
         super().__init__(message)
 
 
+_SIDECAR_SUFFIXES = (".json", ".part", ".ytdl")
+
+
+def downloaded_file(work_dir: Path, stem: str) -> Path | None:
+    """The media yt-dlp saved as work/<stem>.<ext>, skipping its sidecar files."""
+    for path in sorted(Path(work_dir).glob(f"{stem}.*")):
+        if path.is_file() and not path.name.endswith(_SIDECAR_SUFFIXES):
+            return path
+    return None
+
+
 def download_stage(work_dir: Path, row: dict, settings: dict, node_exe: str, *, media: str):
     """Download into work/media.* (audio) or work/video.* (figures video); PLAN 8.3."""
     opts = build_ytdlp_opts(row["platform"], settings, node_exe=node_exe, media=media)
