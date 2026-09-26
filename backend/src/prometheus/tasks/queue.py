@@ -90,7 +90,7 @@ class TaskQueue:
             except Exception as exc:  # noqa: BLE001 - any stage failure fails the task
                 items_store.update_item(
                     self.data_dir, item["id"], status="failed", stage=None,
-                    error_code=type(exc).__name__,
+                    error_code=getattr(exc, "code", None) or type(exc).__name__,
                     error_message=str(exc) or traceback.format_exc(limit=3),
                     finished_at=_now(),
                 )

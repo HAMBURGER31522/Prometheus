@@ -1,13 +1,12 @@
 """yt-dlp option building and the YouTube cookies gate (PLAN 8.4)."""
 
 import pytest
-from yt_dlp.utils import DownloadError
-
 from prometheus.ingest.download import (
     CookiesRequired,
     build_ytdlp_opts,
     download_error_code,
 )
+from yt_dlp.utils import DownloadError
 
 PROXY = "http://127.0.0.1:7897"
 

@@ -1,7 +1,6 @@
 """Pi timeout formula: 1800 + 600 * ceil(hours) (PLAN 2.1)."""
 
 import pytest
-
 from prometheus.report.timing import pi_timeout_seconds
 
 

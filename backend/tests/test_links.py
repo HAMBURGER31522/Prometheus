@@ -1,7 +1,6 @@
 """Full link table (PLAN 8.4) and the no-duration-limit rule."""
 
 import pytest
-
 from prometheus.ingest.links import LinkUnsupported, parse_url
 
 

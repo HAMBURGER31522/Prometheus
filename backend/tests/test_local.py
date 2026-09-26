@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 
 import pytest
-
 from prometheus.transcribe import local
 
 FIXTURES = Path(__file__).parent / "fixtures"

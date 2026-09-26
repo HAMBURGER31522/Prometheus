@@ -2,14 +2,14 @@
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
-from yt_dlp.utils import DownloadError
-
 from prometheus.ingest import download as download_mod
 from prometheus.ingest import resolve as resolve_mod
 from prometheus.transcribe import cloud as cloud_mod
 from prometheus.transcribe.audio import build_wav_cmd
+from yt_dlp.utils import DownloadError
 
 ROW = {
     "id": "a" * 32, "platform": "bilibili", "video_id": "BV1xJYT6EEYc",
@@ -20,9 +20,9 @@ INFO = {"title": "财政再平衡", "uploader": "示例UP主", "duration": 61.5}
 
 
 class FakeYDL:
-    last_opts = None
-    calls = []
-    prepared = None
+    last_opts: ClassVar[dict | None] = None
+    calls: ClassVar[list] = []
+    prepared: ClassVar[str | None] = None
 
     def __init__(self, opts):
         FakeYDL.last_opts = opts
@@ -60,6 +60,7 @@ def test_download_stage_returns_media_path(tmp_path, monkeypatch):
     work = tmp_path / "work"
     work.mkdir()
     FakeYDL.prepared = str(work / "media.m4a")
+    (work / "media.m4a").write_bytes(b"RIFF")
     path = download_mod.download_stage(work, ROW, SETTINGS, "node.exe", media="audio")
     assert path == Path(work / "media.m4a")
     assert "media.%(ext)s" in FakeYDL.last_opts["outtmpl"]
@@ -124,8 +125,8 @@ def test_cloud_transcribe_uses_paraformer(monkeypatch, tmp_path):
     monkeypatch.setattr(cloud_mod, "resolve_media_config", fake_config)
     monkeypatch.setattr(cloud_mod, "vendor_transcribe_audio", fake_transcribe)
 
-    work = tmp_path / "work"
-    work.mkdir()
+    work = tmp_path / "items" / ("a" * 32) / "work"
+    work.mkdir(parents=True)
     out = cloud_mod.transcribe_cloud(tmp_path, "a" * 32, work / "audio.wav")
 
     assert seen["config_kwargs"]["asr_backend"] == "paraformer"

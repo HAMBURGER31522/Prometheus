@@ -48,4 +48,16 @@ class IngestError(RuntimeError):
 
 
 def download_stage(work_dir: Path, row: dict, settings: dict, node_exe: str, *, media: str):
-    raise NotImplementedError
+    """Download into work/media.* (audio) or work/video.* (figures video); PLAN 8.3."""
+    opts = build_ytdlp_opts(row["platform"], settings, node_exe=node_exe, media=media)
+    stem = "media" if media == "audio" else "video"
+    opts["outtmpl"] = str(Path(work_dir) / f"{stem}.%(ext)s")
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(row["source_url"], download=True)
+            downloaded = Path(ydl.prepare_filename(info))
+    except DownloadError as exc:
+        raise IngestError(download_error_code(exc), str(exc)) from exc
+    if not downloaded.is_file():
+        raise IngestError("DOWNLOAD_FAILURE", f"下载完成但找不到文件：{downloaded}")
+    return downloaded

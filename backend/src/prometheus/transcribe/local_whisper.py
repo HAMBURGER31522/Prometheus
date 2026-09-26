@@ -69,7 +69,6 @@ def enable_cuda_dll_dirs(data_dir) -> None:
 
 def _load_model(data_dir, device: str, compute_type: str):
     from faster_whisper import WhisperModel
-
     from prometheus import paths
 
     return WhisperModel(

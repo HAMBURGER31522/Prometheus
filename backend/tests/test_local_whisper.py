@@ -1,7 +1,6 @@
 """faster-whisper conversion, device selection and call kwargs (PLAN 8.5)."""
 
 import pytest
-
 from prometheus.transcribe.local_whisper import (
     CudaUnavailable,
     assert_cuda_available,

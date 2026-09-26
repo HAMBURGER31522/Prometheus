@@ -30,11 +30,14 @@ def test_unsupported_link_gets_422(client):
 
 
 def test_items_list_filters_by_status(client):
-    client.post("/api/items", json={"url": BV_URL, "figures": False})
-    queued = client.get("/api/items", params={"status": "queued"}).json()
-    assert len(queued) == 1
+    from conftest import wait_for_status
+
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
     done = client.get("/api/items", params={"status": "done"}).json()
-    assert done == []
+    assert [row["id"] for row in done] == [item_id]
+    queued = client.get("/api/items", params={"status": "queued"}).json()
+    assert queued == []
 
 
 def test_delete_removes_row_and_folder(client, tmp_path):
