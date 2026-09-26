@@ -7,6 +7,7 @@ Credentials come from the environment; missing values skip with explicit reasons
 - PROMETHEUS_TEST_PROXY: optional proxy URL, e.g. http://127.0.0.1:7897
 """
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -44,7 +45,9 @@ requires_cookies = pytest.mark.skipif(
 
 def _pipeline(source: str, platform: str, video_id: str):
     data_dir = paths.init_data_dir(DATA_DIR)
-    item_id = "b" * 32
+    # One item folder per video (production semantics): yt-dlp skips existing
+    # media, so sharing an id across videos would transcribe stale audio.
+    item_id = hashlib.sha1(f"{platform}:{video_id}".encode()).hexdigest()[:32]
     work = paths.work_dir(data_dir, item_id)
     work.mkdir(parents=True, exist_ok=True)
     row = {

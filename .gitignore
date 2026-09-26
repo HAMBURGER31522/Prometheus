@@ -39,3 +39,4 @@ acceptance-output/
 
 # Logs
 *.log
+.cache/
