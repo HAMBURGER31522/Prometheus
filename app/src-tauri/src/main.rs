@@ -104,7 +104,7 @@ fn main() {
 
             // Port hand-off for acceptance scripts (PLAN 8.1).
             if let Ok(dir) = std::env::var("PROMETHEUS_TEST_DATA_DIR") {
-                let logs = PathBuf::from(dir).join("logs");
+                let logs = PathBuf::from(dir).join(".prometheus").join("logs");
                 let _ = std::fs::create_dir_all(&logs);
                 if let Ok(mut file) = std::fs::File::create(logs.join("backend.port")) {
                     let _ = writeln!(file, "{}", state.port);
