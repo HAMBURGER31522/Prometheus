@@ -79,7 +79,6 @@ def test_report_stage_runs_pi_and_writes_input_json(tmp_path, monkeypatch):
     (work / "source.info.json").write_text(json.dumps({"description": "简介"}), encoding="utf-8")
     (work / "input.json").unlink(missing_ok=True)
 
-    executable = make_fake_pi_cmd(tmp_path, FAKE_PI)
     seen = {}
 
     class FakeRunner:

@@ -120,7 +120,7 @@ def _ingest_and_transcribe():
 
 @requires_key
 def test_report_generate_finalize_classify_mindmap():
-    data_dir, item_id, work, row, language = _ingest_and_transcribe()
+    data_dir, item_id, work, row, _language = _ingest_and_transcribe()
     store.save(data_dir, _settings())
     pi_models.ensure_models_json(data_dir)
     pi_models.apply_custom_provider(data_dir, _settings()["llm"]["custom"])

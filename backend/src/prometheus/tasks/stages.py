@@ -13,6 +13,7 @@ from prometheus.library import items as items_store
 from prometheus.report import mindmap as mindmap_mod
 from prometheus.report import one_shot as one_shot_mod
 from prometheus.report import workspace as workspace_mod
+from prometheus.report.classify import classify_report
 from prometheus.report.finalize import finalize_report
 from prometheus.settings import store
 from prometheus.subtitle import convert as subtitle_convert
