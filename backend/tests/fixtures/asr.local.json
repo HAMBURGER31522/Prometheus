@@ -1,0 +1,22 @@
+{
+  "backend": "local",
+  "provider": "local",
+  "engine": "faster-whisper",
+  "model": "large-v3-turbo",
+  "language": "zh",
+  "elapsed_ms": 120,
+  "segments": [
+    {
+      "ordinal": 0,
+      "start_ms": 0,
+      "end_ms": 1500,
+      "text": "财政再平衡是当下最关键的议题之一。"
+    },
+    {
+      "ordinal": 1,
+      "start_ms": 1500,
+      "end_ms": 3200,
+      "text": "我们先从央地关系的历史说起。"
+    }
+  ]
+}
