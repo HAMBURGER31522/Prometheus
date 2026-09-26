@@ -1,12 +1,13 @@
-"""SQLite connection and schema management (PLAN 7.1)."""
+"""SQLite connection and schema management (PLAN 7.1, 15.4.1)."""
 
 import sqlite3
 
 from prometheus import paths
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
-_SCHEMA = """
+
+SCHEMA_V1 = """
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS categories (
   id         INTEGER PRIMARY KEY,
@@ -38,6 +39,14 @@ CREATE TABLE IF NOT EXISTS items (
 """
 
 
+# Version 2: where the item lives in the readable library, plus AI metadata.
+_V2_COLUMNS = (
+    ("library_path", "TEXT"),   # "<分类>/<日期 标题>", relative to the data dir
+    ("tags", "TEXT"),           # JSON list of strings
+    ("description", "TEXT"),    # one-sentence summary
+)
+
+
 def connect(data_dir) -> sqlite3.Connection:
     conn = sqlite3.connect(paths.db_path(data_dir), check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -48,12 +57,15 @@ def connect(data_dir) -> sqlite3.Connection:
 def init_db(data_dir) -> None:
     conn = connect(data_dir)
     try:
-        conn.executescript(_SCHEMA)
-        has_version = conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]
-        if not has_version:
-            conn.execute(
-                "INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,),
-            )
+        conn.executescript(SCHEMA_V1)
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+        for name, kind in _V2_COLUMNS:
+            if name not in existing:
+                conn.execute(f"ALTER TABLE items ADD COLUMN {name} {kind}")
+        if conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]:
+            conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
+        else:
+            conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
         conn.commit()
     finally:
         conn.close()

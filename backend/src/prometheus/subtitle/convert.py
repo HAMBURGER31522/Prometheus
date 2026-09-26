@@ -19,3 +19,13 @@ def maybe_simplify(segments: list, language: str) -> list:
         row["text"] = _converter().convert(row["text"])
         converted.append(row)
     return converted
+
+
+def segments_from_asr(asr_payload: dict) -> list:
+    """ASR segments (milliseconds) -> subtitle segments (seconds), simplified for Chinese."""
+    segments = [
+        {"start": segment["start_ms"] / 1000, "end": segment["end_ms"] / 1000,
+         "text": segment["text"]}
+        for segment in asr_payload.get("segments", [])
+    ]
+    return maybe_simplify(segments, asr_payload.get("language"))

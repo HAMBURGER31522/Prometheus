@@ -40,3 +40,6 @@ acceptance-output/
 # Logs
 *.log
 .cache/
+
+# Playwright output when run from the repo root
+test-results/

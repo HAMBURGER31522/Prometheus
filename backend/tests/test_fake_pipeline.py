@@ -23,11 +23,14 @@ def test_fake_pipeline_completes_all_stages_quickly(client, tmp_path):
     assert row["report_title"]
     assert row["category_id"] is not None
 
+    from prometheus import paths
+
     data_dir = tmp_path / "data"
-    assert (data_dir / "items" / item_id / "report" / "report.html").is_file()
-    assert (data_dir / "items" / item_id / "mindmap" / "mindmap.md").is_file()
-    assert (data_dir / "items" / item_id / "subtitle" / "segments.json").is_file()
-    assert (data_dir / "items" / item_id / "subtitle" / "subtitle.srt").is_file()
+    assert row.get("library_path"), "library_path not recorded"
+    folder = data_dir / row["library_path"]
+    for name in paths.LIBRARY_FILES.values():
+        assert (folder / name).is_file(), name
+    assert paths.segments_file(data_dir, item_id).is_file()
 
 
 def test_content_endpoints_serve_fake_artifacts(client):

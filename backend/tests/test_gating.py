@@ -66,7 +66,9 @@ def test_data_dir_gating(client_factory, tmp_path):
     assert client.get(
         "/api/settings", headers={"Authorization": f"Bearer {TOKEN}"}
     ).status_code == 200
-    assert (target / "prometheus.db").is_file()
+    from prometheus import paths
+
+    assert paths.db_path(target).is_file()
 
 
 def test_cors_allows_only_listed_origins(client):

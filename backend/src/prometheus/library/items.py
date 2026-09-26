@@ -10,6 +10,7 @@ _ITEM_FIELDS = {
     "platform", "video_id", "source_url", "source_title", "uploader", "duration_s",
     "report_title", "category_id", "figures", "status", "stage", "mindmap_status",
     "error_code", "error_message", "started_at", "finished_at",
+    "library_path", "tags", "description",
 }
 
 
@@ -22,8 +23,7 @@ def create_item(data_dir, *, platform, video_id, source_url, figures=0, status="
     # Callers may pin the id (live tests reuse per-video folders); production
     # draws a fresh 32-hex id.
     item_id = item_id or paths.new_item_id()
-    for subdirectory in ("report", "mindmap", "subtitle", "work"):
-        (paths.item_dir(data_dir, item_id) / subdirectory).mkdir(parents=True, exist_ok=True)
+    paths.cache_dir(data_dir, item_id).mkdir(parents=True, exist_ok=True)
     conn = connect(data_dir)
     try:
         conn.execute(
@@ -110,5 +110,6 @@ def delete_item(data_dir, item_id):
         conn.close()
     import shutil
 
-    shutil.rmtree(paths.item_dir(data_dir, item_id), ignore_errors=True)
+    # The library folder is removed by library.publish.remove_item.
+    shutil.rmtree(paths.cache_dir(data_dir, item_id), ignore_errors=True)
     return row

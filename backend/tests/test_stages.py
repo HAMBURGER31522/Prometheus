@@ -125,7 +125,9 @@ def test_cloud_transcribe_uses_paraformer(monkeypatch, tmp_path):
     monkeypatch.setattr(cloud_mod, "resolve_media_config", fake_config)
     monkeypatch.setattr(cloud_mod, "vendor_transcribe_audio", fake_transcribe)
 
-    work = tmp_path / "items" / ("a" * 32) / "work"
+    from prometheus import paths
+
+    work = paths.work_dir(tmp_path, "a" * 32)
     work.mkdir(parents=True)
     out = cloud_mod.transcribe_cloud(tmp_path, "a" * 32, work / "audio.wav")
 

@@ -72,3 +72,28 @@ def test_classify_rejects_forbidden_names(tmp_path):
     assert classify_report(
         tmp_path, "标题", "导语", ["h2"], EXISTING, one_shot=one_shot_forbidden,
     ) == "未分类"
+
+
+def test_classify_item_returns_tags_and_description(tmp_path):
+    from prometheus.report.classify import classify_item
+
+    def one_shot(work_dir, *, prompt, **kwargs):
+        assert "tags" in prompt and "description" in prompt
+        return ('{"category": "历史", "tags": ["卡巴拉", "生命树", "卡巴拉", "72神名", '
+                '"十源质", "召唤仪式", "多余标签"], "description": "从生命树讲到 72 神名的召唤。"}')
+
+    result = classify_item(tmp_path, "标题", "导语。第二句。", ["h2"], EXISTING, one_shot=one_shot)
+    assert result["category"] == "历史"
+    assert result["tags"] == ["卡巴拉", "生命树", "72神名", "十源质", "召唤仪式"]  # 去重，最多 5 个
+    assert result["description"] == "从生命树讲到 72 神名的召唤。"
+
+
+def test_classify_item_fills_gaps_from_the_intro(tmp_path):
+    from prometheus.report.classify import classify_item
+
+    def one_shot(work_dir, *, prompt, **kwargs):
+        return '{"category": "历史", "tags": ["这个标签实在是太长太长了超过十二个字"]}'
+
+    result = classify_item(tmp_path, "标题", "导语第一句。第二句。", ["h2"], EXISTING, one_shot=one_shot)
+    assert result["tags"] == []
+    assert result["description"] == "导语第一句。"
