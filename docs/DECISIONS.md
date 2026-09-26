@@ -105,3 +105,25 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 **D-24 占位应用图标**
 问题：`tauri-build` 在 Windows 上必须有 `src-tauri/icons/icon.ico` 才能生成资源文件，`cargo check` 才能通过；规格未规定图标内容。
 决定：用标准库脚本生成 32×32、强调色 #c8562e 的占位 ICO（PNG 压缩格式）提交进仓库；正式图标在 M8 打包时再定。
+
+---
+
+以下决策于 **2026-09-26** M4 实施期间补充。
+
+**D-25 LLM 供应商：任意 OpenAI 兼容端点（custom 提供商路径验证）**
+问题：用户使用第三方 OpenAI 兼容中转（`https://oapi.firedog.dev/v1`，模型 gpt-6-sol / gpt-5.5）而非 DeepSeek 官方；确认接入面。
+决定：一切模型调用都走 Pi 的 provider 机制：内置 deepseek/zhipu 之外，任何 OpenAI 兼容端点通过设置页的 custom 提供商接入（baseUrl + apiKey + model 写入 models.json，api=openai-completions），PiRunner / 一次性文本调用统一从设置读取。用户确认这就是设计意图（「任意供应商接入并非只能 deepseek」）。
+代价：Pi 只说 OpenAI 兼容协议；非兼容 API 需要用户自建中转。
+
+**D-26 探针结论（M4 第 1 步）**
+问题：Pi 的 PowerShell 工具能否执行 Python 绘图脚本（D-05 风险）。
+决定与证据：在真实转写（BV1yPb46xExH，86 段）上手动运行 Pi（`--tools read,write,edit,powershell`，custom 提供商 gpt-6-sol），Agent 成功编写 plot.py 并以 `& $env:VIDEO_REPORT_PYTHON plot.py` 执行，生成 chart.png（45,578 字节，matplotlib 3.11.2）。结论：PowerShell 工具链可用，D-05 风险解除；matplotlib 加入开发 .venv（打包时随依赖安装）。
+注意：中转站账号有严格并发限制（多请求并发报 gateway_concurrency_limit），Pi 的串行调用模式兼容，偶发 429 需重试。
+
+**D-27 M5 配图暂缓，流水线先行**
+问题：M5 的完成标准（D6）需要用户本人并排阅读 A/B 报告签字，阻塞后续里程碑。
+决定：M4/M6 先行（报告、分类、导图全部落地，figures 阶段在流水线中保持关闭，`figures=False && model_supports_images=False`）；M5 的候选帧/figures.md/内联逻辑待用户可参与 A/B 时再实现。应用功能不受影响（配图是可选开关）。
+
+**D-28 input.json 字段集**
+问题：PLAN 8.6 要求 input.json 含「vendor 写入的字段」+ platform/title 等，但 vendor 的字段含 media_config（转写运行时配置，与报告 Agent 无关，且本地路径不调用 resolve_media_config）。
+决定：input.json = url、video_id、report_mode=standard、transcript_mode=asr-only、ocr_mode=off、ocr_roi、subtitle_file、platform（Bilibili/YouTube）、title、uploader、attribution（`{平台}；{uploader}；《{title}》；{url}`，与 vendor 格式一致）。media_config 字段不进 input.json。

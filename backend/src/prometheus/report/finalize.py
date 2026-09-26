@@ -41,6 +41,20 @@ def finalize_report(work_report, final_path, work_dir) -> str:
     if not (download_dir / "source.info.json").is_file() and (work_dir / "source.info.json").is_file():
         download_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(work_dir / "source.info.json", download_dir / "source.info.json")
+    html = work_report.read_text(encoding="utf-8")
+    has_boundary = (
+        "<!-- VIDEO_DESCRIPTION_START -->" in html
+        or "<!-- VIDEO_DESCRIPTION_END -->" in html
+    )
+    if "{{VIDEO_DESCRIPTION}}" not in html and not has_boundary and "</h1>" in html.lower():
+        # Agents sometimes drop the template placeholder; re-anchor it after the
+        # h1 so the description disclosure can still be placed (PLAN 8.6).  A
+        # filled boundary block is already idempotent under fill_video_description.
+        html = re.sub(
+            r"(</h1>)", r'\1\n    <p>{{VIDEO_DESCRIPTION}}</p>', html,
+            count=1, flags=re.IGNORECASE,
+        )
+        work_report.write_text(html, encoding="utf-8")
     fill_video_description(work_report, work_dir)
     html = work_report.read_text(encoding="utf-8")
 

@@ -65,5 +65,16 @@ def test_finalize_rejects_external_references(tmp_path):
         finalize_report(work / "report.html", tmp_path / "out.html", work)
 
 
+def test_finalize_inserts_missing_placeholder_after_h1(tmp_path):
+    html = "<html><head></head><body><h1>标题</h1><p>正文没有占位符</p></body></html>"
+    work = _work(tmp_path, html=html)
+    final = tmp_path / "report" / "report.html"
+    finalize_report(work / "report.html", final, work)
+    filled = final.read_text(encoding="utf-8")
+    assert "这是简介。" in filled
+    assert "{{VIDEO_DESCRIPTION}}" not in filled
+    assert filled.index("这是简介。") < filled.index("正文没有占位符")
+
+
 def test_extract_report_title():
     assert extract_report_title("<html><body><h1>标题 <b>加粗</b></h1></body></html>") == "标题 加粗"

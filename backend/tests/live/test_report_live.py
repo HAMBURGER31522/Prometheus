@@ -63,6 +63,27 @@ def _ingest_and_transcribe():
     db.init_db(data_dir)
     item_id = hashlib.sha1(f"bilibili:{BV}".encode()).hexdigest()[:32]
     work = paths.work_dir(data_dir, item_id)
+    if (work / "transcript.md").is_file():
+        stray = items_store.find_by_video(data_dir, "bilibili", BV)
+        if stray is not None and stray["id"] != item_id:
+            # Earlier attempts inserted the row under a generated id; realign it.
+            items_store.delete_item(data_dir, stray["id"])
+            stray = None
+        if stray is None:
+            info = json.loads((work / "source.info.json").read_text(encoding="utf-8"))
+            items_store.create_item(
+                data_dir, platform="bilibili", video_id=BV,
+                source_url=f"https://www.bilibili.com/video/{BV}/",
+                figures=0, status="done", item_id=item_id,
+            )
+            items_store.update_item(
+                data_dir, item_id, source_title=info.get("title"),
+                uploader=info.get("uploader"), duration_s=info.get("duration"),
+                status="done",
+            )
+        row = items_store.get_item(data_dir, item_id)
+        assert row is not None
+        return data_dir, item_id, work, row, "zh"
     work.mkdir(parents=True, exist_ok=True)
     row = {
         "id": item_id, "platform": "bilibili", "video_id": BV,
@@ -85,6 +106,10 @@ def _ingest_and_transcribe():
         "duration_s": row["duration_s"] or 0.0,
     }
     build_transcript_md(work, asr_path, metadata)
+    items_store.create_item(
+        data_dir, platform="bilibili", video_id=BV,
+        source_url=row["source_url"], figures=0, status="done", item_id=item_id,
+    )
     items_store.update_item(
         data_dir, item_id, source_title=row["source_title"], uploader=row["uploader"],
         duration_s=row["duration_s"], status="done",
