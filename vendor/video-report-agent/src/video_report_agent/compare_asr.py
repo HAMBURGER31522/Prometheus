@@ -16,7 +16,7 @@ from .transcript import build_transcript
 
 
 def compare_asr(manifest_path: Path, runs: Path) -> Path:
-    manifest = json.loads(manifest_path.read_text())
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     run = runs.resolve() / ("asr-compare-" + uuid.uuid4().hex)
     run.mkdir(parents=True)
     configs, unavailable = {}, {}
@@ -119,7 +119,7 @@ def compare_asr(manifest_path: Path, runs: Path) -> Path:
                     manifest={"video_id": clip_id},
                 )
                 texts[name] = "\n".join(u.canonical_text for u in build.canonical_units)
-                (output / "transcript.txt").write_text(texts[name])
+                (output / "transcript.txt").write_text(texts[name], encoding="utf-8")
                 write_json(
                     output / "source-mapping.json",
                     {
@@ -171,7 +171,7 @@ def compare_asr(manifest_path: Path, runs: Path) -> Path:
                     lineterm="",
                 )
             )
-            (root / "text.diff").write_text(diff)
+            (root / "text.diff").write_text(diff, encoding="utf-8")
         summary.append(entry)
         write_json(run / "comparison.json", {"clips": summary})
     lines = [
@@ -195,7 +195,7 @@ def compare_asr(manifest_path: Path, runs: Path) -> Path:
         "人工核听：逐段检查开头、中间、结尾的语音与时间边界；核对术语疑点。",
         "费用：comparison.json 保留服务计量；缺少核实单价时不推算费用。",
     ]
-    (run / "comparison.md").write_text("\n".join(lines))
+    (run / "comparison.md").write_text("\n".join(lines), encoding="utf-8")
     complete = all(r["state"] == "READY" for c in summary for r in c["results"].values())
     write_json(
         run / "status.json",

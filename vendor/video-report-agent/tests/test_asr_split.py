@@ -86,7 +86,7 @@ def test_parallel_merge_offsets_usage_provenance_and_cleanup(
     barrier = threading.Barrier(2)
 
     def recognize(self, path, language):
-        assert json.loads(checkpoint.read_text())["chunks"]
+        assert json.loads(checkpoint.read_text(encoding="utf-8"))["chunks"]
         write_json(self.task_path, {"task_id": path.stem})
         barrier.wait(timeout=5)  # Sequential execution would fail.
         return result(path.stem, missing_usage=missing_usage, dropped=dropped)
@@ -126,7 +126,8 @@ def test_partial_failure_preserves_ids_and_never_resubmits(configured, monkeypat
     with pytest.raises(CloudAsrError) as error:
         backend.transcribe(audio)
     assert error.value.stage == stage
-    assert json.loads((audio.parent / "asr-task.part-1.json").read_text())["task_id"] == "part-1"
+    part_one = json.loads((audio.parent / "asr-task.part-1.json").read_text(encoding="utf-8"))
+    assert part_one["task_id"] == "part-1"
     audio.unlink()
     with pytest.raises(CloudAsrError, match="已有云端任务"):
         backend.transcribe(audio)

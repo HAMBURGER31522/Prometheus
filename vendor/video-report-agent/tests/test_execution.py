@@ -26,16 +26,16 @@ def test_timeout_stops_worker_and_child(tmp_path, monkeypatch):
     assert status["error_category"] == "EXECUTION_TIMEOUT"
     time.sleep(2)
     assert not (run / "survived").exists()
-    assert json.loads((run / "status.json").read_text())["state"] == "FAILED"
+    assert json.loads((run / "status.json").read_text(encoding="utf-8"))["state"] == "FAILED"
 
 
 def test_worker_completes_without_provider_call(tmp_path):
     run = create_run(tmp_path, "BV1aTtb6uE7d")
     # Invalid input fails inside the actual worker before network/provider work.
     path = run / "input.json"
-    metadata = json.loads(path.read_text())
+    metadata = json.loads(path.read_text(encoding="utf-8"))
     metadata["url"] = "https://example.com/invalid"
-    path.write_text(json.dumps(metadata))
+    path.write_text(json.dumps(metadata), encoding="utf-8")
     status = execution.generate(run, timeout=10)
     assert status["state"] == "FAILED"
     assert status["error_category"] != "EXECUTION_TIMEOUT"
@@ -71,10 +71,11 @@ def test_cancel_stops_worker_and_child(tmp_path, monkeypatch):
     status = execution.generate(run, timeout=5)
     thread.join(timeout=1)
     assert status["state"] == "CANCELLED"
-    events = [json.loads(line) for line in (run / "run.trace.jsonl").read_text().splitlines()]
+    trace_text = (run / "run.trace.jsonl").read_text(encoding="utf-8")
+    events = [json.loads(line) for line in trace_text.splitlines()]
     assert events[-1]["type"] == "run_cancelled"
     assert events[-2]["type"] == "stage_end"
     assert events[-2]["status"] == "cancelled"
     time.sleep(1.1)
     assert not (run / "survived").exists()
-    assert json.loads((run / "status.json").read_text())["state"] == "CANCELLED"
+    assert json.loads((run / "status.json").read_text(encoding="utf-8"))["state"] == "CANCELLED"

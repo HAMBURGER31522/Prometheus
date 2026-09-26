@@ -22,14 +22,14 @@ class RunTrace:
             "stage": stage,
             **redact(fields),
         }
-        with self.path.open("a") as stream:
+        with self.path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     def cancelled(self):
         """Close interrupted spans after the worker has stopped writing."""
         active = {}
         if self.path.exists():
-            for line in self.path.read_text().splitlines():
+            for line in self.path.read_text(encoding="utf-8").splitlines():
                 try:
                     event = json.loads(line)
                 except ValueError:

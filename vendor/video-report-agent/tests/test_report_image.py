@@ -13,7 +13,8 @@ def test_desktop_full_page_and_cached_image(tmp_path):
     (tmp_path / "report.html").write_text('''<!doctype html><style>
       body {margin:0; height:3200px; background:#fff}
       @media(max-width:900px) {body {height:100px}}
-    </style><h1>桌面长图</h1><p style="position:absolute;top:3100px">页面底部</p>''')
+    </style><h1>桌面长图</h1><p style="position:absolute;top:3100px">页面底部</p>''',
+    encoding="utf-8")
     output = render_report_image(tmp_path)
     content = output.read_bytes()
     assert content[:8] == b"\x89PNG\r\n\x1a\n"
@@ -25,7 +26,7 @@ def test_desktop_full_page_and_cached_image(tmp_path):
 
 
 def test_old_wide_image_is_regenerated(tmp_path):
-    (tmp_path / "report.html").write_text("<html><body>报告</body></html>")
+    (tmp_path / "report.html").write_text("<html><body>报告</body></html>", encoding="utf-8")
     output = tmp_path / "report.png"
     output.write_bytes(
         b"\x89PNG\r\n\x1a\n" + b"\x00" * 8 + struct.pack(">II", 1440, 20)
@@ -36,7 +37,7 @@ def test_old_wide_image_is_regenerated(tmp_path):
 
 
 def test_long_image_hides_standard_desktop_navigation(tmp_path):
-    rendered = TEMPLATE.read_text()
+    rendered = TEMPLATE.read_text(encoding="utf-8")
     values = {
         "TITLE": "Fixture",
         "SUBTITLE": "",
@@ -54,7 +55,7 @@ def test_long_image_hides_standard_desktop_navigation(tmp_path):
     }
     for name, value in values.items():
         rendered = rendered.replace("{{" + name + "}}", value)
-    (tmp_path / "report.html").write_text(rendered)
+    (tmp_path / "report.html").write_text(rendered, encoding="utf-8")
 
     observed = {}
 

@@ -4,8 +4,8 @@ import json
 import math
 import os
 import tempfile
-from functools import lru_cache
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -17,7 +17,7 @@ USAGE_CACHE_VERSION = 2
 
 def read_object(path):
     try:
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding="utf-8"))
         return value if isinstance(value, dict) else {}
     except (OSError, ValueError):
         return {}

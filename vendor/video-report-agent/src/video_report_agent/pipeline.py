@@ -27,7 +27,7 @@ from .transcript_foundation import parse_roi
 
 def write_json(path: Path, data: dict) -> None:
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     temporary.replace(path)
 
 
@@ -90,8 +90,8 @@ def create_run(
 
 
 def generate(run: Path) -> dict:
-    metadata = json.loads((run / "input.json").read_text())
-    status = json.loads((run / "status.json").read_text())
+    metadata = json.loads((run / "input.json").read_text(encoding="utf-8"))
+    status = json.loads((run / "status.json").read_text(encoding="utf-8"))
     status.update(video_id=metadata["video_id"])
 
     def update(stage: str, **fields):
@@ -162,7 +162,8 @@ def generate(run: Path) -> dict:
                     write_json(run / "asr.json", asr.to_dict())
                     segments = len(asr.segments)
                 else:
-                    segments = len(json.loads((run / "asr.json").read_text())["segments"])
+                    asr_payload = json.loads((run / "asr.json").read_text(encoding="utf-8"))
+                    segments = len(asr_payload["segments"])
                 detail.update(
                     output={"artifact": "asr.json", "segments": segments},
                     reused_from=asr_source,
@@ -191,7 +192,7 @@ def generate(run: Path) -> dict:
                     f"{u.canonical_text}"
                     for u in build.canonical_units
                 )
-                (run / "transcript.md").write_text("\n".join(transcript))
+                (run / "transcript.md").write_text("\n".join(transcript), encoding="utf-8")
                 detail.update(output={
                     "artifact": "transcript.md", "units": len(build.canonical_units),
                 })
@@ -215,9 +216,9 @@ def generate(run: Path) -> dict:
     except Exception as exc:
         if isinstance(exc, CloudAsrError):
             write_json(run / "asr-error.json", exc.to_dict())
-            (run / "failure.log").write_text(str(exc))
+            (run / "failure.log").write_text(str(exc), encoding="utf-8")
         else:
-            (run / "failure.log").write_text(traceback.format_exc())
+            (run / "failure.log").write_text(traceback.format_exc(), encoding="utf-8")
         if isinstance(exc, CloudAsrError):
             category = "EXTERNAL_API_FAILURE"
         elif isinstance(exc, PiError):

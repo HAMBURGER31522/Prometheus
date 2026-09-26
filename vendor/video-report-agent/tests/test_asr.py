@@ -6,6 +6,31 @@ import pytest
 from video_report_agent.asr import AsrError, normalize_asr_segments
 
 
+def process_exists(pid: int) -> bool:
+    """os.kill(pid, 0) probing is POSIX-only; on Windows sig=0 kills the process.
+
+    A terminated Windows process object can linger until every handle is
+    closed, so liveness is the wait state, not OpenProcess succeeding.
+    """
+    if sys.platform == "win32":
+        import ctypes
+
+        synchronize = 0x00100000
+        wait_timeout = 0x00000102
+        handle = ctypes.windll.kernel32.OpenProcess(synchronize, False, pid)
+        if not handle:
+            return False
+        try:
+            return ctypes.windll.kernel32.WaitForSingleObject(handle, 0) == wait_timeout
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
 @pytest.mark.parametrize("fails", [False, True])
 def test_local_asr_worker_exits_after_success_or_failure(tmp_path, monkeypatch, fails):
     from video_report_agent.asr import MlxWhisperBackend
@@ -19,7 +44,7 @@ def test_local_asr_worker_exits_after_success_or_failure(tmp_path, monkeypatch, 
         "    assert kwargs == dict(path_or_hf_repo='test-model', language='zh', verbose=False)\n"
         "    if Path(audio).name == 'fail.wav':\n"
         "        raise RuntimeError('model failed')\n"
-        "    return {'segments': [{'start': 0, 'end': 1, 'text': '测试'}]}\n"
+        "    return {'segments': [{'start': 0, 'end': 1, 'text': '测试'}]}\n", encoding="utf-8"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     audio = tmp_path / ("fail.wav" if fails else "ok.wav")
@@ -35,10 +60,9 @@ def test_local_asr_worker_exits_after_success_or_failure(tmp_path, monkeypatch, 
             assert result.segments[0].text == "测试"
             assert result.raw_result["segments"][0]["end"] == 1
             assert result.model == "test-model"
-        pid = int(audio.with_suffix(".wav.pid").read_text())
+        pid = int(audio.with_suffix(".wav.pid").read_text(encoding="utf-8"))
         assert pid != os.getpid()
-        with pytest.raises(ProcessLookupError):
-            os.kill(pid, 0)
+        assert not process_exists(pid)
         assert ("mlx_whisper" in sys.modules) == imported_before
 
 

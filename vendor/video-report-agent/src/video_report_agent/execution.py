@@ -14,6 +14,36 @@ from .trace import RunTrace
 
 RUN_TIMEOUT_SECONDS = 30 * 60
 
+IS_WINDOWS = sys.platform == "win32"
+
+# Captured at import time: the kill path must run the real taskkill even when
+# tests patch subprocess.Popen to intercept worker spawns.
+_REAL_POPen = subprocess.Popen
+
+
+def spawn_worker(command: list[str], *, log, env: dict[str, str] | None) -> subprocess.Popen:
+    # The worker and yt-dlp/FFmpeg/Pi/browser children share one process group
+    # (POSIX) or console (Windows) so the tree can be stopped together.
+    if IS_WINDOWS:
+        return subprocess.Popen(
+            command, stdout=log, stderr=log,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, env=env,
+        )
+    return subprocess.Popen(command, stdout=log, stderr=log, start_new_session=True, env=env)
+
+
+def kill_process_tree(pid: int) -> None:
+    if IS_WINDOWS:
+        _REAL_POPen(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        ).wait()
+        return
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+
 
 def generate(run: Path, *, timeout=RUN_TIMEOUT_SECONDS, env: dict[str, str] | None = None) -> dict:
     run = run.resolve()
@@ -24,9 +54,8 @@ def generate(run: Path, *, timeout=RUN_TIMEOUT_SECONDS, env: dict[str, str] | No
         str(run),
     ]
     with (run / "worker.log").open("ab") as log:
-        process = subprocess.Popen(
-            command, stdout=log, stderr=log, start_new_session=True,
-            env={**os.environ, **env} if env is not None else None,
+        process = spawn_worker(
+            command, log=log, env={**os.environ, **env} if env is not None else None,
         )
         timed_out = False
         cancelled = False
@@ -45,15 +74,11 @@ def generate(run: Path, *, timeout=RUN_TIMEOUT_SECONDS, env: dict[str, str] | No
                 except subprocess.TimeoutExpired:
                     pass
         finally:
-            # The worker and yt-dlp/FFmpeg/Pi/browser children share this process group.
             # Kill before writing FAILED so a surviving worker cannot overwrite it.
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            kill_process_tree(process.pid)
             process.wait()
     path = run / "status.json"
-    status = json.loads(path.read_text())
+    status = json.loads(path.read_text(encoding="utf-8"))
     if cancelled:
         status.update(state="CANCELLED", stage="CANCELLED", finished_at=time.time())
         RunTrace(run).cancelled()

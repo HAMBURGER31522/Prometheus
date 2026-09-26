@@ -17,14 +17,14 @@ from .usage import call_costs
 
 
 def write_json(path, value):
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2))
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def review_trace(run: Path):
     attempts, images, errors = 0, 0, 0
     path = run / "pi.events.jsonl"
     if path.is_file():
-        for line in path.read_text().splitlines():
+        for line in path.read_text(encoding="utf-8").splitlines():
             try:
                 event = json.loads(line)
             except ValueError:
@@ -40,7 +40,7 @@ def review_trace(run: Path):
 
 
 def evaluate(manifest: Path, output: Path, *, timeout: float = 600, repeats: int = 1):
-    spec = json.loads(manifest.read_text())
+    spec = json.loads(manifest.read_text(encoding="utf-8"))
     output.mkdir(parents=True, exist_ok=False)
     shutil.copy2(manifest, output / "manifest.json")
     shutil.copytree(SKILL, output / "skill-snapshot")
@@ -83,7 +83,7 @@ def evaluate(manifest: Path, output: Path, *, timeout: float = 600, repeats: int
                 reviews = sorted((run / "inspection").glob("review-*/result.json"))
                 row["inspection_calls"] = len(reviews)
                 row["inspection_trace"] = review_trace(run)
-                row["review_checks"] = [json.loads(p.read_text()) for p in reviews]
+                row["review_checks"] = [json.loads(p.read_text(encoding="utf-8")) for p in reviews]
                 row["feedback_changed_report"] = None
                 row["final_matches_last_inspection"] = None
                 if reviews and (run / "report.html").is_file():
@@ -113,7 +113,7 @@ def evaluate(manifest: Path, output: Path, *, timeout: float = 600, repeats: int
         lines.append(f"| {row['case']} | {row['variant']} | {row['status']} | "
                      f"{row['generation_seconds']} | {row['inspection_calls']} | "
                      f"{json.dumps(row.get('findings'), ensure_ascii=False)} |")
-    (output / "summary.md").write_text("\n".join(lines) + "\n")
+    (output / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return rows
 
 

@@ -34,7 +34,8 @@ def main():
 
         output = compare_asr(args.manifest, args.runs)
         print(output)
-        return 0 if json.loads((output / "status.json").read_text())["state"] == "COMPLETE" else 1
+        status = json.loads((output / "status.json").read_text(encoding="utf-8"))
+        return 0 if status["state"] == "COMPLETE" else 1
     if args.command == "generate":
         status = generate(
             create_run(
