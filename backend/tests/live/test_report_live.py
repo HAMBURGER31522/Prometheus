@@ -16,11 +16,13 @@ from prometheus import paths
 from prometheus.library import categories as categories_store
 from prometheus.library import db
 from prometheus.library import items as items_store
-from prometheus.report import mindmap as mindmap_mod
-from prometheus.report import one_shot as one_shot_mod
+from prometheus.llm import one_shot as one_shot_mod
+from prometheus.llm import pi_models
+from prometheus.mindmap import markdown as mindmap_mod
 from prometheus.report import workspace as workspace_mod
 from prometheus.report.finalize import finalize_report
-from prometheus.settings import pi_models, store
+from prometheus.report.outline import extract_outline
+from prometheus.settings import store
 from prometheus.transcribe import components
 from prometheus.transcribe import local as local_mod
 from prometheus.transcribe.audio import to_wav
@@ -146,7 +148,7 @@ def test_report_generate_finalize_classify_mindmap():
     )
     items_store.update_item(data_dir, item_id, report_title=title)
 
-    outline = mindmap_mod.extract_outline(html)
+    outline = extract_outline(html)
     h2_titles = [section["title"] for section in outline["sections"]]
     existing = [c["name"] for c in categories_store.list_categories(data_dir)]
     llm = store.load(data_dir)["llm"]

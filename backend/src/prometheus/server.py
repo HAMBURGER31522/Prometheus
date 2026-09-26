@@ -19,7 +19,7 @@ from prometheus.api import items as items_api
 from prometheus.api import settings as settings_api
 from prometheus.fake.pipeline import build_impls as build_fake_impls
 from prometheus.library import db
-from prometheus.settings import pi_models
+from prometheus.llm import pi_models
 from prometheus.tasks.queue import TaskQueue
 from prometheus.tasks.stages import build_real_impls
 

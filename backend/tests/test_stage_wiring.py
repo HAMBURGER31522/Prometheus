@@ -122,7 +122,7 @@ def test_report_stage_asks_pi_whether_a_builtin_model_sees_images(data_dir, monk
     def fake_run(data_dir_arg, item_id, row, settings, **kwargs):
         seen.update(kwargs)
 
-    from prometheus.settings import capability
+    from prometheus.llm import capability
 
     # Default settings use the built-in deepseek provider (no custom checkbox involved).
     monkeypatch.setattr(capability, "query_supports_images", lambda *a, **k: True, raising=False)
