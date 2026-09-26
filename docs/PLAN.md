@@ -607,8 +607,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | 编号 | 内容 | 状态 |
 |---|---|---|
 | V1 | Windows 兼容：所有文本读写显式使用 UTF-8；`execution.py` 在 Windows 上使用 `CREATE_NEW_PROCESS_GROUP`，并用 `taskkill /T /F` 结束进程树（taskkill 经模块导入时捕获的真实 `Popen` 调用，避免被测试对 `subprocess.Popen` 的拦截劫持）；`pyproject.toml` 增加 `tzdata` 依赖；测试替身改成跨平台写法（fake-pi 在 Windows 上改为 `.cmd` 启动器 + UTF-8 stdio 的 Python 脚本；`test_asr.py` 的 `os.kill(pid, 0)` 探活改为 `OpenProcess` + `WaitForSingleObject` 的跨平台实现） | 完成（2026-09-25，M1） |
-| V2 | `PiRunner.__init__` 增加关键字参数：`tools`（默认 `"read,write,edit,bash"`，review 时追加 `inspect_report` 的逻辑不变）；`extra_prompt`（追加到用户提示末尾）；`extra_files`（复制进工作区）；`agent_dir`（覆盖模块导入时按当前工作目录算出的 `PI_AGENT_DIR`，包括 `auth.json` 的查找、`initialize_pi_config` 和传给子进程的 `PI_CODING_AGENT_DIR`）；`command_prefix`（例如 `[node.exe, cli.js]`，替代 `shutil.which("pi")`）。所有参数都取默认值时，行为与修改前完全一致 | 未开始 |
-| V3 | `pipeline.py` 把 `from .report_image import render_report_image` 从文件顶部移到 `generate()` 函数内部使用它的地方。原因：`paraformer.py` 在运行途中会导入 `pipeline`，顶部导入会连带加载 playwright，而打包版不带 playwright | 未开始 |
+| V2 | `PiRunner.__init__` 增加关键字参数：`tools`（默认 `"read,write,edit,bash"`，review 时追加 `inspect_report` 的逻辑不变）；`extra_prompt`（追加到用户提示末尾）；`extra_files`（复制进工作区）；`agent_dir`（覆盖模块导入时按当前工作目录算出的 `PI_AGENT_DIR`，包括 `auth.json` 的查找、`initialize_pi_config` 和传给子进程的 `PI_CODING_AGENT_DIR`）；`command_prefix`（例如 `[node.exe, cli.js]`，替代 `shutil.which("pi")`）。所有参数都取默认值时，行为与修改前完全一致 | 完成（2026-09-25，M4；基线夹具 tests/fixtures/pi-command-baseline.json 锁定默认命令） |
+| V3 | `pipeline.py` 把 `from .report_image import render_report_image` 从文件顶部移到 `generate()` 函数内部使用它的地方。原因：`paraformer.py` 在运行途中会导入 `pipeline`，顶部导入会连带加载 playwright，而打包版不带 playwright | 完成（2026-09-25，M4） |
 
 新增修改需要先征得用户同意并补进本表。V1、V2 可以整理成补丁提交给上游作者，但**向上游提 PR 之前要征得用户同意**。
 
