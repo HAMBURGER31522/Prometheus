@@ -66,6 +66,42 @@ def run_qwen3(wav: str, language: str) -> dict:
             "run_s": time.perf_counter() - loaded, "timestamp_unit": "word/char"}
 
 
+def run_qwen3_seq(wav: str, language: str) -> dict:
+    """What an 8GB card would run: ASR first, free it, then the aligner (never both on the GPU)."""
+    import soundfile
+    import torch
+    from qwen_asr import Qwen3ASRModel
+    from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
+    from qwen_asr.inference.utils import MAX_FORCE_ALIGN_INPUT_SECONDS, split_audio_into_chunks
+
+    audio, sr = soundfile.read(wav, dtype="float32")
+    chunks = split_audio_into_chunks(audio, sr, MAX_FORCE_ALIGN_INPUT_SECONDS)
+    started = time.perf_counter()
+    asr = Qwen3ASRModel.from_pretrained(str(MODELS / "Qwen3-ASR-1.7B"), dtype=torch.bfloat16,
+                                        device_map="cuda:0", max_inference_batch_size=8, max_new_tokens=4096)
+    asr_loaded = time.perf_counter()
+    results = asr.transcribe(audio=[(chunk, sr) for chunk, _offset in chunks])
+    asr_done = time.perf_counter()
+    del asr
+    torch.cuda.empty_cache()
+    aligner = Qwen3ForcedAligner.from_pretrained(str(MODELS / "Qwen3-ForcedAligner-0.6B"),
+                                                 dtype=torch.bfloat16, device_map="cuda:0")
+    aligner_loaded = time.perf_counter()
+    aligned = aligner.align(audio=[(chunk, sr) for chunk, _offset in chunks],
+                            text=[r.text for r in results], language=[r.language for r in results])
+    finished = time.perf_counter()
+    units = [(item.start_time + offset, item.end_time + offset, item.text)
+             for (_chunk, offset), result in zip(chunks, aligned) for item in result]
+    joiner = "" if language == "zh" else " "
+    return {"model": "Qwen3-ASR-1.7B, then Qwen3-ForcedAligner-0.6B (bf16, one at a time)",
+            "detected_language": results[0].language if results else "",
+            "text": joiner.join(r.text for r in results), "segments": _segments(units),
+            "load_s": (asr_loaded - started) + (aligner_loaded - asr_done),
+            "run_s": (asr_done - asr_loaded) + (finished - aligner_loaded),
+            "asr_s": asr_done - asr_loaded, "align_s": finished - aligner_loaded,
+            "timestamp_unit": "word/char"}
+
+
 def run_funasr(wav: str, language: str) -> dict:
     from funasr import AutoModel
 
@@ -138,7 +174,8 @@ def run_bcut(wav: str, language: str) -> dict:
             "timestamp_unit": "sentence", "note": "load_s = mp3 encode + upload"}
 
 
-ENGINES = {"whisper": run_whisper, "qwen3": run_qwen3, "funasr": run_funasr, "bcut": run_bcut}
+ENGINES = {"whisper": run_whisper, "qwen3": run_qwen3, "qwen3-seq": run_qwen3_seq, "funasr": run_funasr,
+           "bcut": run_bcut}
 
 
 def main(argv: list) -> int:

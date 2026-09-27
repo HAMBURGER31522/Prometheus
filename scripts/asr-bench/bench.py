@@ -55,7 +55,7 @@ class VramSampler:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--engines", default="whisper,qwen3,funasr,bcut")
+    parser.add_argument("--engines", default="whisper,qwen3,qwen3-seq,funasr,bcut")
     parser.add_argument("--samples", default="zh,en")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
