@@ -28,7 +28,8 @@ def build_prompt(outline: dict) -> str:
         "4. topic 只在某个 theme 下确实有两三类不同子议题时才出现，否则直接挂 leaf。",
         f"5. 最深 {tree_rules.MAX_DEPTH} 层：root → theme → topic → leaf。",
         f"6. 每个节点 label 不超过 {tree_rules.MAX_LABEL} 字，具体、一眼能懂，禁止「第一部分」「Part 1」这类占位。",
-        (f"7. 除 root 外每个节点都要有 summary，越往外越具体：theme 只点题（不超过 {tree_rules.MAX_THEME_SUMMARY} 字），"
+        (f"7. 除 root 外每个节点都要有 summary，越往外越具体：theme 只点题（不超过 {tree_rules.MAX_THEME_SUMMARY} 字）；"
+         "topic 要比所属 theme 写得更具体、更长，说清这组要点共同讲什么；"
          f"topic 和 leaf 不超过 {tree_rules.MAX_SUMMARY} 字，直接写信息本体：定义、数字、条件、结论。"
          "leaf 之后还会依据报告原文单独补充详解，这里不必写长。"),
         "8. 每个 leaf 必须有 time：一个秒数，落在它所依据章节的时间范围内（见下方章节列表）。",
