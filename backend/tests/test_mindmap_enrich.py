@@ -182,3 +182,12 @@ def test_the_prompt_asks_topics_to_be_richer_than_their_theme():
     from prometheus.report.outline import extract_outline
 
     assert "topic 要比所属 theme 写得更具体、更长" in build_prompt(extract_outline(HTML))
+
+
+def test_a_leaf_at_the_start_of_a_chapter_belongs_to_that_chapter():
+    # Chapters overlap by a second (s1 00:00–02:27, s2 02:26–06:45) and leaves usually sit at
+    # a chapter's start: second 147 is the opening of s2, not the tail of s1.
+    index = retrieve.Index(HTML)
+    assert index.section_for(147) == 1
+    assert index.section_for(0) == 0
+    assert index.section_for(10_000) == 8
