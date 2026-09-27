@@ -105,3 +105,16 @@ def test_a_short_row_is_skipped_not_fatal(data_dir, tmp_path):
         pytest.fail(f"a short row broke the install: {exc!r}")
     assert _view(ecdict.lookup(data_dir, "went")) == ("went", "go", "过去式")
     assert ecdict.lookup(data_dir, "zebra") is None
+
+
+def test_a_relative_data_dir_works(tmp_path, monkeypatch):
+    from prometheus import paths
+
+    monkeypatch.chdir(tmp_path)
+    paths.init_data_dir(Path("data"))
+    ecdict.install(Path("data"), source=str(SAMPLE))
+    try:
+        entry = ecdict.lookup(Path("data"), "went")
+    except ValueError as exc:
+        pytest.fail(f"lookup broke on a relative data dir: {exc!r}")
+    assert _view(entry) == ("went", "go", "过去式")
