@@ -27,8 +27,6 @@ async def put_settings(request: Request):
         return JSONResponse({"code": "INVALID_PROTOCOL"}, status_code=422)
     stored = store.load(state.data_dir)
     incoming = store.restore_secrets(body, stored)
-    if backend == "cloud" and not (incoming["asr"].get("dashscope_api_key") or "").strip():
-        return JSONResponse({"code": "DASHSCOPE_KEY_REQUIRED"}, status_code=422)
     store.save(state.data_dir, incoming)
     if incoming["llm"]["provider"] == "custom":
         pi_models.apply_custom_provider(state.data_dir, incoming["llm"].get("custom"))

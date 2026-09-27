@@ -4,7 +4,7 @@ import sqlite3
 
 from prometheus import paths
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 SCHEMA_V1 = """
@@ -39,11 +39,15 @@ CREATE TABLE IF NOT EXISTS items (
 """
 
 
-# Version 2: where the item lives in the readable library, plus AI metadata.
-_V2_COLUMNS = (
-    ("library_path", "TEXT"),   # "<分类>/<日期 标题>", relative to the data dir
-    ("tags", "TEXT"),           # JSON list of strings
-    ("description", "TEXT"),    # one-sentence summary
+# Columns added after version 1, applied in place by init_db.
+_ADDED_COLUMNS = (
+    # Version 2: where the item lives in the readable library, plus AI metadata.
+    ("library_path", "TEXT"),        # "<分类>/<日期 标题>", relative to the data dir
+    ("tags", "TEXT"),                # JSON list of strings
+    ("description", "TEXT"),         # one-sentence summary
+    # Version 3 (PLAN 15.4.4): which engine produced the transcript, and why if it changed.
+    ("transcript_source", "TEXT"),   # asr.json engine: bcut | funasr-onnx | faster-whisper | youtube-subtitles
+    ("notice", "TEXT"),              # e.g. 「必剪不可用，已改用本地转写」
 )
 
 
@@ -59,7 +63,7 @@ def init_db(data_dir) -> None:
     try:
         conn.executescript(SCHEMA_V1)
         existing = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
-        for name, kind in _V2_COLUMNS:
+        for name, kind in _ADDED_COLUMNS:
             if name not in existing:
                 conn.execute(f"ALTER TABLE items ADD COLUMN {name} {kind}")
         if conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]:

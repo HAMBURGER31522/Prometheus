@@ -2,7 +2,6 @@
 
 Credentials come from the environment; missing values skip with explicit reasons:
 - PROMETHEUS_TEST_BV: public bilibili video, 5-10 minutes (recorded in docs/acceptance.md)
-- DASHSCOPE_API_KEY: cloud transcription (paraformer)
 - PROMETHEUS_TEST_YT_COOKIES: YouTube cookies.txt path
 - PROMETHEUS_TEST_PROXY: optional proxy URL, e.g. http://127.0.0.1:7897
 """
@@ -16,7 +15,6 @@ import pytest
 from prometheus import paths
 from prometheus.ingest import download as download_mod
 from prometheus.ingest import resolve as resolve_mod
-from prometheus.transcribe import cloud as cloud_mod
 from prometheus.transcribe import components
 from prometheus.transcribe import local as local_mod
 from prometheus.transcribe.audio import to_wav
@@ -35,9 +33,6 @@ DATA_DIR = Path(
 ).resolve()
 
 requires_bv = pytest.mark.skipif(not BV, reason="PROMETHEUS_TEST_BV 未设置")
-requires_dashscope = pytest.mark.skipif(
-    not os.getenv("DASHSCOPE_API_KEY"), reason="DASHSCOPE_API_KEY 未设置",
-)
 requires_cookies = pytest.mark.skipif(
     not YT_COOKIES, reason="PROMETHEUS_TEST_YT_COOKIES 未设置",
 )
@@ -80,12 +75,15 @@ def _transcript_assertions(work: Path, asr_path: Path, row: dict) -> None:
 
 
 @requires_bv
-@requires_dashscope
-def test_bilibili_cloud_transcribe_to_transcript():
-    data_dir, item_id, work, row, wav = _pipeline(
+def test_bilibili_bcut_transcribe_to_transcript():
+    """必剪 needs no key (PLAN 15.4.4): a real upload to Bilibili's free ASR."""
+    from prometheus.tasks.stages import _transcribe_bcut
+
+    _data_dir, _item_id, work, row, wav = _pipeline(
         f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
     )
-    asr_path = cloud_mod.transcribe_cloud(data_dir, item_id, wav)
+    asr_path = _transcribe_bcut(work, wav)
+    assert json.loads(asr_path.read_text(encoding="utf-8"))["engine"] == "bcut"
     _transcript_assertions(work, asr_path, row)
 
 
@@ -96,15 +94,17 @@ def test_bilibili_local_transcribe_to_transcript():
     )
     components.install_components(data_dir, proxy=PROXY)
     asr_path = local_mod.transcribe_local(data_dir, item_id, wav)
+    # Mandarin goes to FunASR on the CPU (D-35, D-39).
+    assert json.loads(asr_path.read_text(encoding="utf-8"))["engine"] == "funasr-onnx"
     _transcript_assertions(work, asr_path, row)
 
 
 @requires_cookies
 def test_youtube_cookies_chain_local_transcribe():
-    """Cookie gate is the thing under test; transcription runs locally because the
-    DashScope cloud path is deferred (user decision 2026-09-25, see acceptance.md)."""
+    """Cookie gate and the English path: anything but Mandarin stays on whisper (D-35)."""
     data_dir, item_id, work, row, wav = _pipeline(YT_URL, "youtube", "jNQXAC9IVRw")
     assert row["platform"] == "youtube"
     components.install_components(data_dir, proxy=PROXY)
     asr_path = local_mod.transcribe_local(data_dir, item_id, wav)
+    assert json.loads(asr_path.read_text(encoding="utf-8"))["engine"] == "faster-whisper"
     _transcript_assertions(work, asr_path, row)

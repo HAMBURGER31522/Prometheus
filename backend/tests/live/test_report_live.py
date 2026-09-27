@@ -54,7 +54,7 @@ def _settings() -> dict:
             "provider": "custom", "model": MODEL, "api_key": KEY, "thinking": "low",
             "custom": {"base_url": BASE_URL, "supports_images": False},
         },
-        "asr": {"backend": "local", "dashscope_api_key": "", "cloud_model": "paraformer-v2"},
+        "asr": {"backend": "local"},
         "network": {"proxy": PROXY, "youtube_cookies_file": ""},
         "figures_default": False,
     }

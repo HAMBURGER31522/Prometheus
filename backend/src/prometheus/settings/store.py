@@ -10,12 +10,13 @@ DEFAULTS = {
         "thinking": "low",
         "custom": {"base_url": "", "supports_images": False, "protocol": "openai"},
     },
-    "asr": {"backend": "local", "dashscope_api_key": "", "cloud_model": "paraformer-v2"},
+    # 「云端」 is 必剪 and needs nothing else (PLAN 15.2-7); DashScope fields are gone.
+    "asr": {"backend": "local"},
     "network": {"proxy": "", "youtube_cookies_file": ""},
     "figures_default": True,
 }
 
-_SECRET_FIELDS = (("llm", "api_key"), ("asr", "dashscope_api_key"))
+_SECRET_FIELDS = (("llm", "api_key"),)
 
 
 def _merge(defaults: dict, overrides: dict) -> dict:
@@ -28,16 +29,22 @@ def _merge(defaults: dict, overrides: dict) -> dict:
     return merged
 
 
+def _known_asr(settings: dict) -> dict:
+    """Drop asr fields older versions stored (dashscope_api_key, cloud_model)."""
+    settings["asr"] = {key: settings["asr"][key] for key in DEFAULTS["asr"]}
+    return settings
+
+
 def load(data_dir) -> dict:
     file = paths.settings_file(data_dir)
     if not file.is_file():
         return json.loads(json.dumps(DEFAULTS))
     stored = json.loads(file.read_text(encoding="utf-8"))
-    return _merge(DEFAULTS, stored)
+    return _known_asr(_merge(DEFAULTS, stored))
 
 
 def save(data_dir, settings) -> None:
-    merged = _merge(DEFAULTS, settings)
+    merged = _known_asr(_merge(DEFAULTS, settings))
     paths.settings_file(data_dir).write_text(
         json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8",
     )
