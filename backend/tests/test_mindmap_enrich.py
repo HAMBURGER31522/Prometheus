@@ -223,3 +223,19 @@ def test_an_overview_chapter_does_not_take_the_moments_of_the_chapters_it_spans(
     assert index.section_for(160) == 1
     assert index.section_for(200) == 2
     assert index.section_for(400) == 0
+
+
+def test_text_in_cards_and_citations_is_evidence_too():
+    # Live report (罗素): the 1916–1918 facts sit in <div class="keyline"><cite>, outside any <p>,
+    # so the leaf about them got no evidence and its detail wandered off to 1961.
+    html = (
+        '<h2>反战底线<span class="section-time">00:20–03:00</span></h2>'
+        "<p>罗素的起点，是对为了未来必须牺牲的警惕。</p>"
+        '<div class="keyline"><p><strong>底线：</strong>没有高尚的借口透支今天的人命。</p>'
+        "<cite>1916—1918年，因反战传单和批评军方，罗素被罚款、失去教职，后来入狱。</cite></div>"
+        '<div class="comparison"><div class="side"><b>一战</b>拒绝一切战争的绝对和平主义立场</div></div>'
+    )
+    texts = [p["text"] for p in retrieve.passages(html)]
+    assert any("1916—1918年" in text for text in texts)
+    assert any("绝对和平主义" in text for text in texts)
+    assert any(text.startswith("底线：") for text in texts)
