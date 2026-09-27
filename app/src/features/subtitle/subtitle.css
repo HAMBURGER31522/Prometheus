@@ -18,3 +18,18 @@
   transition: font-size var(--dur-effects) var(--ease-effects); }
 /* The Chinese line under a foreign-language segment (PLAN 15.4.9). */
 .subtitle-zh { display: block; margin-top: 2px; font-size: calc(14px * var(--reader-zoom, 1)); line-height: 1.65; color: var(--ink-2); }
+/* 查词 (PLAN 15.4.9): English words answer to the pointer; the popup sits under the word. */
+.word { border-radius: 4px; transition: background-color var(--dur-hover) linear; }
+.word:hover { background: var(--accent-wash); }
+.lookup {
+  position: fixed; z-index: 40; width: 320px; display: grid; gap: 8px; justify-items: start;
+  padding: 12px 14px; border-radius: 14px; background: var(--raised); border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-pop); animation: pop-in var(--dur-spatial) var(--ease-spatial);
+}
+.lookup p { margin: 0; }
+.lookup-head { display: flex; align-items: baseline; gap: 10px; }
+.lookup-head strong { font-size: 18px; color: var(--ink); }
+.lookup-phonetic { font: 13px/1.4 var(--font-mono); color: var(--muted); }
+.lookup-form { font-size: 13px; color: var(--accent); }
+.lookup-senses { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+.lookup-links { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 4px; border-top: 1px solid var(--line); width: 100%; }

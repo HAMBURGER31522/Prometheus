@@ -55,6 +55,9 @@ export const api = {
   listModels: async (profile: ModelProfile) =>
     (await json<{ models: string[] }>("POST", "/api/settings/models", { profile })).models,
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
+  lookupWord: (word: string) => json<LookupEntry>("GET", `/api/dictionary/lookup?word=${encodeURIComponent(word)}`),
+  dictionaryStatus: () => json<ComponentStatus>("GET", "/api/dictionary"),
+  installDictionary: () => json<{ started: boolean }>("POST", "/api/dictionary/install"),
   asrStatus: () => json<{ state: string; detail: string }>("GET", "/api/asr-components"),
   dataDir: () => json<{ data_dir: string | null }>("GET", "/api/app/data-dir"),
   setDataDir: (dataDir: string) => json<{ data_dir: string }>("PUT", "/api/app/data-dir", { data_dir: dataDir }),
@@ -118,6 +121,21 @@ export interface CategoryRow {
   id: number;
   name: string;
   count: number;
+}
+
+/** An offline dictionary entry (PLAN 15.4.9): `headword` is the lemma when `query` is inflected. */
+export interface LookupEntry {
+  query: string;
+  headword: string;
+  phonetic: string;
+  translation: string[];
+  inflection: string | null;
+}
+
+export interface ComponentStatus {
+  state: "idle" | "installing" | "ready" | "failed";
+  detail: string;
+  progress: number | null;
 }
 
 export interface Segment {

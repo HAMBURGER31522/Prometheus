@@ -1,6 +1,7 @@
 // 字幕 (PLAN 15.4.5, 15.4.6, 15.4.9): every segment in order, `[时:分:秒] 原文`, virtualised for
 // long videos. The corrected text is the default; 「原始识别」 shows what the ASR produced. A
-// non-Chinese transcript shows its Chinese translation under each line; 「译文」 hides it.
+// non-Chinese transcript shows its Chinese translation under each line; 「译文」 hides it, and
+// resting the pointer on an English word looks it up (Lookup.tsx).
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 
@@ -10,6 +11,8 @@ import { clock, momentLink, sourceLabel } from "../../shared/format";
 import { downloadText, openExternal } from "../../shared/platform";
 import { ScrollArea } from "../../shared/ScrollArea";
 import { ReaderTools, ZoomControls, useZoom } from "../../shared/ReaderTools";
+import { useWordLookup } from "./Lookup";
+import { isForeign, tokenize } from "./words";
 
 const ROW_ESTIMATE = 44;
 
@@ -19,6 +22,7 @@ export function SubtitleView({ item }: ReaderProps) {
   const [showZh, setShowZh] = useState(true);
   const scroller = useRef<HTMLDivElement>(null);
   const { zoom } = useZoom();
+  const { wordProps, popup } = useWordLookup();
 
   useEffect(() => {
     let alive = true;
@@ -110,7 +114,17 @@ export function SubtitleView({ item }: ReaderProps) {
                   {clock(segment.start)}
                 </button>
                 <span className="subtitle-text">
-                  {segment.text}
+                  {isForeign(segment.text)
+                    ? tokenize(segment.text).map((token, index) =>
+                        token.word ? (
+                          <span key={index} className="word" {...wordProps(token.word)}>
+                            {token.text}
+                          </span>
+                        ) : (
+                          token.text
+                        ),
+                      )
+                    : segment.text}
                   {showZh && segment.zh && (
                     <span className="subtitle-zh" data-testid="subtitle-zh">
                       {segment.zh}
@@ -122,6 +136,7 @@ export function SubtitleView({ item }: ReaderProps) {
           })}
         </ul>
       </ScrollArea>
+      {popup}
     </div>
   );
 }
