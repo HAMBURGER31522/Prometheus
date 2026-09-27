@@ -72,7 +72,10 @@ def run_qwen3_seq(wav: str, language: str) -> dict:
     import torch
     from qwen_asr import Qwen3ASRModel
     from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForcedAligner
-    from qwen_asr.inference.utils import MAX_FORCE_ALIGN_INPUT_SECONDS, split_audio_into_chunks
+    from qwen_asr.inference.utils import (
+        MAX_FORCE_ALIGN_INPUT_SECONDS,
+        split_audio_into_chunks,
+    )
 
     audio, sr = soundfile.read(wav, dtype="float32")
     chunks = split_audio_into_chunks(audio, sr, MAX_FORCE_ALIGN_INPUT_SECONDS)

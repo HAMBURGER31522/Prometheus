@@ -72,7 +72,7 @@ def main() -> int:
             started = time.perf_counter()
             proc = subprocess.run([sys.executable, str(Path(__file__).with_name("engines.py")),
                                    engine, str(wav), sample, str(out)],
-                                  capture_output=True, text=True, encoding="utf-8", errors="replace")
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
             wall = time.perf_counter() - started
             vram = sampler.stop()
             if proc.returncode != 0:

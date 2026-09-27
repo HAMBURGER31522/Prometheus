@@ -11,8 +11,14 @@ from pathlib import Path
 
 import jiwer
 import soundfile
-
-from metrics import normalize_en, normalize_zh, punctuation_per_100, score_en, score_zh, subtitle_text
+from metrics import (
+    normalize_en,
+    normalize_zh,
+    punctuation_per_100,
+    score_en,
+    score_zh,
+    subtitle_text,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "acceptance-output" / "asr-bench"
