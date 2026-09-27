@@ -417,3 +417,4 @@ def test_generate_fills_the_leaves_after_the_skeleton(tmp_path, monkeypatch):
     assert leaves and all(leaf.get("detail") for leaf in leaves)
     assert saved["enrichment"]["coverage"] == 1.0
     assert leaves[0]["detail"] in paths.mindmap_file(data_dir, item_id).read_text(encoding="utf-8")
+    assert "summary" not in saved["root"], "the root is the title only (PLAN 15.4.9: root ≤ 20 字)"

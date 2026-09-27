@@ -157,3 +157,21 @@ def test_markdown_carries_the_details():
     rich = json.loads(json.dumps(TREE))
     rich["root"]["children"][0]["children"][0]["detail"] = GOOD
     assert GOOD in tree_to_markdown(rich, "bilibili", "BV1xJYT6EEYc")
+
+
+# --- the root stays the simplest node (PLAN 15.4.9: root ≤ 20 字) ------------------------------
+
+def test_the_root_label_is_at_most_twenty_characters():
+    long_tree = json.loads(json.dumps(TREE))
+    long_tree["root"]["label"] = "根" * 21
+    outline = {"sections": [{"start_s": 0, "end_s": 10_000}]}
+    assert any("20" in problem for problem in tree.validate_tree(long_tree, outline))
+
+
+def test_the_prompt_asks_for_a_root_without_summary():
+    from prometheus.mindmap.prompt import build_prompt
+    from prometheus.report.outline import extract_outline
+
+    text = build_prompt(extract_outline(HTML))
+    assert '"type": "root", "summary"' not in text
+    assert "root 只写 label" in text
