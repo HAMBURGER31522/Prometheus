@@ -207,3 +207,69 @@ def test_the_api_serves_the_raw_transcript_on_request(client):
     assert [s["text"] for s in raw] == ["原始识别"]
     shown = client.get(f"/api/items/{item_id}/subtitle").json()
     assert [s["text"] for s in shown] != ["原始识别"]
+
+
+# --- 中外对照 (PLAN 15.4.9) ---------------------------------------------------------------------
+
+def test_a_translation_must_be_chinese_and_about_the_same_size():
+    assert fix.accept_translation("Money moves between three pockets.", "钱在三个口袋之间流动。")
+    assert fix.accept_translation("Israel Regardie.", "以色列·雷加迪。")
+    assert not fix.accept_translation("Hello there.", "")
+    assert not fix.accept_translation("Hello there.", "Hello there.")
+    assert not fix.accept_translation("Yes.", "是的。我们接下来还会讲很多很多其他相关的内容。")
+
+
+def test_the_translating_prompt_asks_for_zh_in_the_same_reply():
+    prompt = fix.build_prompt({"0": "hello"}, "", human=False, translate=True)
+    assert "中文翻译" in prompt and '"zh"' in prompt
+    assert "中文翻译" not in fix.build_prompt({"0": "你好"}, "", human=False)
+
+
+def _translator(calls=None):
+    """A fake model that corrects (adds a full stop) and translates every segment."""
+    def ask(prompt):
+        if calls is not None:
+            calls.append(prompt)
+        batch = json.loads(prompt[prompt.index(fix.SEGMENTS_MARK) + len(fix.SEGMENTS_MARK):])
+        return json.dumps({key: {"text": text + ".", "zh": f"第{key}句的译文。"} for key, text in batch.items()},
+                          ensure_ascii=False)
+    return ask
+
+
+def test_translated_segments_carry_zh_under_the_corrected_text():
+    calls = []
+    segments = _segments([f"sentence number {i}" for i in range(70)])
+    fixed, stats = fix.fix_segments(segments, "", human=False, ask=_translator(calls), translate=True)
+    assert len(calls) == 2, "the reply carries two texts per segment, so batches are smaller"
+    assert fixed[0] == {"start": 0.0, "end": 2.0, "text": "sentence number 0.", "zh": "第0句的译文。"}
+    assert stats["translated"] == 70
+
+
+def test_a_bad_translation_is_dropped_and_the_text_still_corrected():
+    def ask(prompt):
+        return json.dumps({"0": {"text": "Hello there.", "zh": "Hello there."}, "1": "Goodbye."}, ensure_ascii=False)
+
+    fixed, stats = fix.fix_segments(_segments(["hello there", "goodbye"]), "", human=False, ask=ask, translate=True)
+    assert fixed[0]["text"] == "Hello there." and "zh" not in fixed[0]
+    assert fixed[1]["text"] == "Goodbye." and "zh" not in fixed[1]
+    assert stats["translated"] == 0
+
+
+def test_only_a_non_chinese_transcript_is_translated(item, monkeypatch):
+    from prometheus import paths
+
+    data_dir, item_id = item
+    asr = paths.work_dir(data_dir, item_id) / "asr.json"
+    asr.write_text(json.dumps({"language": "en", "segments": []}), encoding="utf-8")
+    seen = []
+    assert _run(data_dir, item_id, _translator(seen), monkeypatch) is True
+    assert "中文翻译" in seen[0]
+    shown = json.loads(paths.segments_file(data_dir, item_id).read_text(encoding="utf-8"))
+    assert [s.get("zh") for s in shown] == ["第0句的译文。", "第1句的译文。"]
+
+    asr.write_text(json.dumps({"language": "zh", "segments": []}), encoding="utf-8")
+    seen.clear()
+    assert _run(data_dir, item_id, _echo(calls=seen), monkeypatch) is True
+    assert seen and "中文翻译" not in seen[0]
+    shown = json.loads(paths.segments_file(data_dir, item_id).read_text(encoding="utf-8"))
+    assert not any("zh" in s for s in shown)

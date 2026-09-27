@@ -18,6 +18,7 @@ from prometheus.library import items as items_store
 
 MAX_REFERENCE = 12000
 BATCH = 120
+TRANSLATE_BATCH = 60  # the reply carries the text and its translation (PLAN 15.4.9)
 WORKERS = 3
 SEGMENTS_MARK = "字幕分段（JSON）：\n"
 
@@ -44,6 +45,10 @@ def accept(original: str, corrected: str) -> bool:
     return _distance(before, after) <= max(2, math.ceil(len(before) * 0.3))
 
 
+def accept_translation(original: str, zh: str) -> bool:
+    return False
+
+
 def parse_reply(text: str):
     """The first JSON object in the reply (models add prose and code fences), else None."""
     decoder = json.JSONDecoder()
@@ -61,7 +66,7 @@ def parse_reply(text: str):
     return None
 
 
-def build_prompt(batch: dict, reference: str, *, human: bool) -> str:
+def build_prompt(batch: dict, reference: str, *, human: bool, translate: bool = False) -> str:
     if human:
         rules = ["这是视频作者上传的人工字幕，文字已经正确：只补标点，不要改动任何字词。"]
     else:
@@ -81,7 +86,7 @@ def build_prompt(batch: dict, reference: str, *, human: bool) -> str:
     return "\n".join(lines) + "\n\n" + SEGMENTS_MARK + json.dumps(batch, ensure_ascii=False)
 
 
-def fix_segments(segments: list, reference: str, *, human: bool, ask) -> tuple:
+def fix_segments(segments: list, reference: str, *, human: bool, ask, translate: bool = False) -> tuple:
     """Corrected copies of the segments (times untouched) and what happened to them."""
     fixed = [dict(segment) for segment in segments]
     batches = [range(start, min(start + BATCH, len(segments))) for start in range(0, len(segments), BATCH)]
