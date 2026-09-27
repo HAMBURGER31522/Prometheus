@@ -82,3 +82,16 @@ def test_retry_failed_item(client):
     # the retried item runs again and finishes.
     assert client.get(f"/api/items/{item_id}").json()["status"] in ("queued", "running", "done")
     wait_for_status(client, item_id, "done")
+
+
+def test_regenerate_with_figures_requeues_a_failed_item(client):
+    from prometheus.library import items as items_store
+
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
+    items_store.update_item(client.app.state.data_dir, item_id, status="failed")
+    response = client.post(f"/api/items/{item_id}/regenerate", json={"figures": True})
+    assert response.status_code == 200
+    assert response.json() == {"queued": True}
+    assert items_store.get_item(client.app.state.data_dir, item_id)["figures"] == 1
+    wait_for_status(client, item_id, "done")
