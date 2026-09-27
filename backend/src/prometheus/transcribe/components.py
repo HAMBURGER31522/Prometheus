@@ -63,3 +63,15 @@ def install_components(data_dir, *, proxy: str = "") -> None:
         raise ComponentInstallError(
             "CUDA 运行库安装失败：" + result.stderr.decode("utf-8", "replace")[-500:]
         )
+
+
+# FunASR ONNX exports (PLAN 15.4.4, D-39). Stub (R6 red).
+FUNASR_MODELS = ()
+
+
+def funasr_models_installed(data_dir) -> bool:
+    return False
+
+
+def install_funasr_models(data_dir, *, proxy: str = "", fetch=None) -> None:
+    return None

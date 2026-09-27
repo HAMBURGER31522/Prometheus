@@ -64,6 +64,10 @@ def models_dir(data_dir: Path) -> Path:
     return internal_dir(data_dir) / "models"
 
 
+def funasr_dir(data_dir: Path) -> Path:
+    return models_dir(data_dir)  # stub (R6 red)
+
+
 def logs_dir(data_dir: Path) -> Path:
     return internal_dir(data_dir) / "logs"
 
