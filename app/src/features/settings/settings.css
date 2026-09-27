@@ -10,6 +10,8 @@
 .choice input { margin-top: 4px; accent-color: var(--accent); }
 .choice b { display: block; }
 .choice small { color: var(--muted); }
+/* 自定义转写 (PLAN 15.4.9): the endpoint's fields under the choices. */
+.custom-asr { display: grid; gap: 12px; margin-top: 14px; max-width: 640px; }
 .grow { flex: 1; min-width: 240px; }
 .path { font: 13px/1.5 var(--font-mono); color: var(--ink-2); background: var(--surface); padding: 6px 10px; border-radius: var(--radius-sm); }
 

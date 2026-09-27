@@ -34,6 +34,7 @@ const SOURCES: Record<string, string> = {
   bcut: "必剪",
   "funasr-onnx": "FunASR",
   "faster-whisper": "Whisper",
+  "openai-compatible": "自定义转写",
 };
 
 /** Where the transcript came from (items.transcript_source, PLAN 15.4.4). */

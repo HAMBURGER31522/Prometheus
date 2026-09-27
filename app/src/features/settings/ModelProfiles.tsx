@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { type ModelProfile, type Settings, api } from "../../shared/api";
 import { type Option, Select } from "../../shared/Select";
+import { SecretInput } from "./SecretInput";
 import { visionOf } from "./vision";
 
 type Profiles = Settings["llm_profiles"];
@@ -100,7 +101,6 @@ function ProfileEditor({ initial, onSave, onCancel }: {
   onCancel: () => void;
 }) {
   const [profile, setProfile] = useState(initial);
-  const [showKey, setShowKey] = useState(false);
   const update = (next: Partial<ModelProfile>) => setProfile((current) => ({ ...current, ...next }));
   const custom = profile.kind === "custom";
 
@@ -137,32 +137,7 @@ function ProfileEditor({ initial, onSave, onCancel }: {
           </div>
         </>
       )}
-      <label className="field">
-        <span>API Key</span>
-        <span className="secret">
-          <input
-            className="input"
-            type={showKey ? "text" : "password"}
-            autoComplete="off"
-            spellCheck={false}
-            value={profile.api_key}
-            onChange={(e) => update({ api_key: e.target.value })}
-          />
-          <button
-            type="button"
-            className="eye"
-            aria-label={showKey ? "隐藏 API Key" : "显示 API Key"}
-            aria-pressed={showKey}
-            onClick={() => setShowKey(!showKey)}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-              <circle cx="12" cy="12" r="2.8" />
-              {!showKey && <path d="M4 20 20 4" />}
-            </svg>
-          </button>
-        </span>
-      </label>
+      <SecretInput label="API Key" value={profile.api_key} onChange={(api_key) => update({ api_key })} />
       <div className="field">
         <span>模型</span>
         <ModelPicker

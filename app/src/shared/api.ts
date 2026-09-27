@@ -173,7 +173,8 @@ export interface Settings {
     thinking: string;
     custom: { base_url: string; supports_images: boolean; protocol: "openai" | "anthropic" };
   };
-  asr: { backend: "local" | "cloud" };
+  /** 本地 / 云端（必剪）/ 自定义（OpenAI 兼容，PLAN 15.4.9）. */
+  asr: { backend: "local" | "cloud" | "custom"; custom: { base_url: string; api_key: string; model: string } };
   network: { proxy: string; youtube_cookies_file: string };
   figures_default: boolean;
 }
