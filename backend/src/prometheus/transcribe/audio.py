@@ -23,3 +23,7 @@ def to_wav(audio_path: Path, wav_path: Path) -> Path:
             "ffmpeg 转 16kHz 单声道 wav 失败，请确认已安装 FFmpeg。"
         )
     return wav_path
+
+
+def build_mp3_cmd(audio_path: Path, mp3_path: Path) -> list:
+    return ["ffmpeg", "-y", "-i", str(audio_path), "-ac", "2", "-ar", "44100", "-b:a", "128k", str(mp3_path)]  # stub (R6 red)
