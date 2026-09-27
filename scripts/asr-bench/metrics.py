@@ -9,6 +9,7 @@ English: word error rate after lower-casing and dropping punctuation.
 import html
 import re
 import unicodedata
+import warnings
 
 import cn2an
 import jiwer
@@ -16,6 +17,8 @@ import zhconv
 
 _TIMING = re.compile(r"-->")
 _TAG = re.compile(r"<[^>]+>")
+# Sound annotations such as (Laughter), [Music], （笑）: not speech.
+_ANNOTATION = re.compile(r"\([^)]*\)|\[[^\]]*\]|（[^）]*）")
 
 
 def subtitle_text(vtt: str, language: str) -> str:
@@ -27,7 +30,9 @@ def subtitle_text(vtt: str, language: str) -> str:
             continue
         if line.startswith(("Kind:", "Language:", "NOTE")):
             continue
-        lines.append(html.unescape(_TAG.sub("", line)))
+        line = _ANNOTATION.sub("", html.unescape(_TAG.sub("", line))).strip()
+        if line:
+            lines.append(line)
     return ("" if language == "zh" else " ").join(lines)
 
 
@@ -38,10 +43,12 @@ def _is_content(char: str) -> bool:
 def normalize_zh(text: str, numbers: bool = False) -> str:
     text = zhconv.convert(text, "zh-cn").lower()
     if numbers:
-        try:
-            text = cn2an.transform(text, "cn2an")
-        except (ValueError, KeyError):  # cn2an rejects a few malformed numerals
-            pass
+        with warnings.catch_warnings():  # cn2an warns on idioms like 万一 and leaves them
+            warnings.simplefilter("ignore")
+            try:
+                text = cn2an.transform(text, "cn2an")
+            except (ValueError, KeyError):  # cn2an rejects a few malformed numerals
+                pass
     return "".join(char for char in text if _is_content(char))
 
 
