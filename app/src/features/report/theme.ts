@@ -4,6 +4,7 @@
 // runtime. The injected script also serves the reader (PLAN 15.4.7): table of contents,
 // zoom and click-to-zoom images, talking to the app through postMessage (the report runs
 // sandboxed in an opaque origin).
+import { chapterAt } from "./chapters";
 
 /** Report template variable -> app token that supplies its value. */
 export const REPORT_TOKENS: Record<string, string> = {
@@ -113,23 +114,21 @@ const SCRIPT = `
     frame = requestAnimationFrame(step);
   }
 
-  /* the chapter a moment belongs to (导图's 在精读中查看): the one that most recently started,
-     as chapters overlap by a second and a mind map leaf sits at its chapter's start; a moment
-     a little before the first chapter belongs to it (backend: mindmap/retrieve.py) */
+  /* the chapter a moment belongs to (导图's 在精读中查看): chapters.ts, tested there and
+     injected here from its source; the headings give it each chapter's time range */
   function toSeconds(label) {
     return label.split(":").reduce(function (total, part) { return total * 60 + Number(part); }, 0);
   }
+  var chapterIndex = ${chapterAt.toString()};
   function chapterAt(seconds) {
-    var best = null, bestStart = -1, first = null, firstStart = Infinity;
-    document.querySelectorAll("h2").forEach(function (heading) {
+    var headings = Array.prototype.slice.call(document.querySelectorAll("h2"));
+    var ranges = headings.map(function (heading) {
       var match = heading.textContent.match(/(\\d{1,2}:\\d{2}(?::\\d{2})?)\\s*[–—-]\\s*(\\d{1,2}:\\d{2}(?::\\d{2})?)/);
-      if (!match) return;
-      var start = toSeconds(match[1]);
-      var target = (heading.closest && heading.closest("section[id]")) || heading;
-      if (start <= seconds && start > bestStart) { best = target; bestStart = start; }
-      if (start < firstStart) { first = target; firstStart = start; }
+      return match ? [toSeconds(match[1]), toSeconds(match[2])] : null;
     });
-    return best || (first && firstStart - 5 <= seconds ? first : null);
+    var index = chapterIndex(ranges, seconds);
+    if (index === null) return null;
+    return (headings[index].closest && headings[index].closest("section[id]")) || headings[index];
   }
 
   addEventListener("message", function (event) {
