@@ -37,12 +37,12 @@ export const initialNav: NavState = { tab: "console", categoryId: null, itemId: 
 export function navReducer(state: NavState, action: NavAction): NavState {
   switch (action.type) {
     case "tab":
-      return { ...state, tab: action.tab };
+      return { ...state, tab: action.tab, at: action.at };
     case "category":
-      return { ...state, categoryId: action.categoryId, itemId: null };
+      return { ...state, categoryId: action.categoryId, itemId: null, at: undefined };
     case "item":
-      return { ...state, itemId: action.itemId };
+      return { ...state, itemId: action.itemId, at: undefined };
     case "close":
-      return { ...state, itemId: null };
+      return { ...state, itemId: null, at: undefined };
   }
 }
