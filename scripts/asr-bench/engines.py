@@ -121,6 +121,36 @@ def run_funasr(wav: str, language: str) -> dict:
             "timestamp_unit": "sentence"}
 
 
+def run_funasr_onnx(wav: str, language: str) -> dict:
+    """The same FunASR pipeline on onnxruntime (CPU, int8 exports from ModelScope): no torch."""
+    import soundfile
+    from funasr_onnx import CT_Transformer, Fsmn_vad, Paraformer
+
+    onnx = MODELS / "onnx"
+    threads = os.cpu_count() or 4
+    started = time.perf_counter()
+    vad = Fsmn_vad(str(onnx / "speech_fsmn_vad_zh-cn-16k-common-onnx"), quantize=True,
+                   intra_op_num_threads=threads)
+    asr = Paraformer(str(onnx / "speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx"),
+                     quantize=True, batch_size=8, intra_op_num_threads=threads)
+    punc = CT_Transformer(str(onnx / "punc_ct-transformer_cn-en-common-vocab471067-large-onnx"), quantize=True,
+                          intra_op_num_threads=threads)
+    loaded = time.perf_counter()
+    audio, sr = soundfile.read(wav, dtype="float32")
+    spans = vad(audio)[0]  # [[start_ms, end_ms], ...]
+    pieces = [audio[int(s * sr / 1000):int(e * sr / 1000)] for s, e in spans]
+    results = [asr(piece)[0] for piece in pieces]  # a list input means file paths here
+    segments = []
+    for (start, end), result in zip(spans, results):
+        text = result.get("preds", "") if isinstance(result, dict) else str(result)
+        if text.strip():
+            segments.append((start / 1000, end / 1000, punc(text)[0]))
+    return {"model": "FunASR paraformer-large + fsmn-vad + ct-punc (onnxruntime CPU, int8)",
+            "segments": _segments(segments), "load_s": loaded - started,
+            "run_s": time.perf_counter() - loaded, "timestamp_unit": "vad-segment",
+            "note": f"{threads} CPU threads"}
+
+
 BCUT = "https://member.bilibili.com/x/bcut/rubick-interface"
 BCUT_HEADERS = {"User-Agent": "Bilibili/1.0.0 (https://www.bilibili.com)"}
 
@@ -178,6 +208,7 @@ def run_bcut(wav: str, language: str) -> dict:
 
 
 ENGINES = {"whisper": run_whisper, "qwen3": run_qwen3, "qwen3-seq": run_qwen3_seq, "funasr": run_funasr,
+           "funasr-onnx": run_funasr_onnx,
            "bcut": run_bcut}
 
 
