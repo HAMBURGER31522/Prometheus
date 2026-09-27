@@ -273,3 +273,16 @@ def test_only_a_non_chinese_transcript_is_translated(item, monkeypatch):
     assert seen and "中文翻译" not in seen[0]
     shown = json.loads(paths.segments_file(data_dir, item_id).read_text(encoding="utf-8"))
     assert not any("zh" in s for s in shown)
+
+
+def test_a_translating_batch_without_any_translation_is_asked_again():
+    # Live run 2026-09-27: one batch of an English video came back corrected but untranslated.
+    answers = iter([
+        json.dumps({"0": "Hello there.", "1": "Goodbye."}),
+        json.dumps({"0": {"text": "Hello there.", "zh": "你好。"}, "1": {"text": "Goodbye.", "zh": "再见。"}},
+                   ensure_ascii=False),
+    ])
+    fixed, stats = fix.fix_segments(_segments(["hello there", "goodbye"]), "", human=False,
+                                    ask=lambda prompt: next(answers), translate=True)
+    assert [s.get("zh") for s in fixed] == ["你好。", "再见。"]
+    assert stats["translated"] == 2
