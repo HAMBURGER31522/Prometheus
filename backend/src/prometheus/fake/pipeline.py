@@ -18,6 +18,7 @@ from prometheus.mindmap.markdown import tree_to_markdown
 from prometheus.subtitle import fix as subtitle_fix_mod
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
+DICTIONARY_SAMPLE = FIXTURES / "ecdict.sample.csv"  # installed instead of the 23 MB ECDICT (PLAN 15.4.9)
 
 
 def _fixture(name: str) -> Path:
