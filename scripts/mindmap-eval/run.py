@@ -1,6 +1,6 @@
 """Evaluate the simple-to-rich mind map harness on real reports (PLAN 15.4.9, E12 ④).
 
-    python scripts/mindmap-eval/run.py <data dir> [docs/mindmap-eval.md]
+    python scripts/mindmap-eval/run.py <data dir> [docs/mindmap-eval.md] [item id ...]
 
 Regenerates the mind map of every finished item in the data dir with the model configured
 there (settings → 模型), then writes the richness numbers and sample leaves. Calls the
@@ -26,7 +26,7 @@ THRESHOLDS = {"coverage": 0.9, "grounding": 0.4}
 LEVELS = ("root", "theme", "topic", "leaf")
 
 
-def evaluate(data_dir: Path) -> list:
+def evaluate(data_dir: Path, only: tuple = ()) -> list:
     runtime = runtime_mod.resolve(None)
     llm = store.load(data_dir)["llm"]
     log = {"calls": 0, "problems": []}
@@ -62,6 +62,8 @@ def evaluate(data_dir: Path) -> list:
     results = []
     try:
         for row in items_store.list_items(data_dir, status="done"):
+            if only and row["id"] not in only:
+                continue
             log.update(calls=0, problems=[])
             started = time.perf_counter()
             ok = generate.generate_for_item(data_dir, row["id"], row, llm,
@@ -130,7 +132,7 @@ def main(argv: list) -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     data_dir = Path(argv[0]).resolve()  # pi's agent dir is read relative to the work dir
     out = Path(argv[1]) if len(argv) > 1 else Path("docs/mindmap-eval.md")
-    results = evaluate(data_dir)
+    results = evaluate(data_dir, tuple(argv[2:]))
     text = report(results, store.load(data_dir)["llm"]["model"])
     out.write_text(text, encoding="utf-8")
     print(text)
