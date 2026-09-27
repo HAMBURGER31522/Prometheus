@@ -193,7 +193,7 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 **D-35 / D-38 补记（2026-09-27，R6 实现后）**
 - 语言判断：本地转写的子进程先用 faster-whisper 的 `detect_language` 判断语言（有 CUDA 用 GPU，否则用 CPU）。`zh` 走 FunASR（释放 whisper 后在 CPU 上运行），其他语言继续用 whisper。粤语（`yue`）也走 whisper，因为 paraformer-zh 是普通话模型。
 - 组件：「安装本地转写组件」一次装好 CUDA 运行库（PyPI）和 FunASR 的 ONNX 模型（约 1.23GB，走 ModelScope 的文件接口，先写到 `.part`，下载完整后再改名，中断的下载不会被当成已安装）。转写前要求两者都已安装。
-- 顺带修复：R3 之后，CUDA 运行库一直装到数据目录根部的 `runtime\cuda`，而转写代码从 `.prometheusuntime\cuda` 查找，新装的机器会一直报「组件未安装」。
+- 顺带修复：R3 之后，CUDA 运行库一直装到数据目录根部的 `runtime\cuda`，而转写代码从 `.prometheus\runtime\cuda` 查找，新装的机器会一直报「组件未安装」。
 - numpy 2：funasr-onnx 0.4.3 的 VAD 把只有 1 个元素的数组当标量用，numpy 2 会报错。用子类把长度数组转成标量，没有改动它的代码。实测软件自身环境（numpy 2.5.3）下字错率与实测环境一致（7.97%）。
 - YouTube 人工字幕：yt-dlp 经常拿不到视频的原语言（2026-09-27 检查 4 个视频，3 个为空）。按规格，这种情况照常转写，不猜语言，所以这项功能目前只对标注了语言的视频（例如 TED）生效。
 
