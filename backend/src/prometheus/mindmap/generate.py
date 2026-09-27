@@ -37,6 +37,9 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
     parsed = None
     for _ in range(2):
         feedback = "\n\n上次输出的问题：" + "；".join(errors) if errors else ""
+        if errors and parsed is not None:  # edit the last tree: a fresh one slips elsewhere
+            feedback = ("\n\n上次输出的 JSON：\n" + json.dumps(parsed, ensure_ascii=False) + feedback
+                        + "\n请在上次输出的基础上只修改这些问题，其余保持不变，仍然只输出完整的 JSON。")
         try:
             text = ask(base + feedback)
         except Exception:  # noqa: BLE001 - PLAN 8.3: a mind map failure never fails the item
