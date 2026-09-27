@@ -21,7 +21,8 @@ TIME_SLACK_S = 5
 END_SLACK_S = 2    # a moment this close to a chapter's end belongs to the next one
 
 _H2 = re.compile(r"<h2[^>]*>(.*?)</h2>", re.DOTALL)
-_BLOCK = re.compile(r"<(p|li|td|th|blockquote|figcaption|h3|h4)\b[^>]*>(.*?)</\1>", re.DOTALL)
+_BREAK = re.compile(r"</?(?:p|li|ul|ol|div|dd|dt|dl|td|th|tr|table|blockquote|figure|figcaption|cite|"
+                    r"h[1-6]|section|article|aside|header|footer|details|summary|br)\b[^>]*>", re.IGNORECASE)
 _SKIP = re.compile(r"<(style|script|svg)\b[^>]*>.*?</\1>", re.DOTALL)
 _TAG = re.compile(r"<[^>]+>")
 
@@ -47,12 +48,14 @@ def _chapters(html: str) -> list:
 
 
 def passages(html: str) -> list:
-    """Every text block of every chapter: [{"section": index, "text": str}]."""
+    """Every text block of every chapter: [{"section": index, "text": str}]. All of the chapter's
+    text counts, split at block boundaries: reports also put facts in cards, citations and
+    comparison tables, not only in paragraphs."""
     out = []
     for index, (_heading, body) in enumerate(_chapters(html)):
         seen = set()
-        for _tag, inner in _BLOCK.findall(_SKIP.sub(" ", body)):
-            text = _clean(inner)
+        for piece in _BREAK.sub("\n", _SKIP.sub(" ", body)).split("\n"):
+            text = _clean(piece)
             if len(text) >= 8 and text not in seen:
                 seen.add(text)
                 out.append({"section": index, "text": text})
