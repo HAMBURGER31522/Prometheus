@@ -65,8 +65,16 @@ def _join(items: list) -> str:
     return text
 
 
+def _fit(times_ms: list, count: int) -> list:
+    """Paraformer can drop the timestamp of a filler (啊, "O K"): spread what there is over the tokens."""
+    if len(times_ms) == count or not times_ms:
+        return times_ms if times_ms else [[0, 0]] * count
+    return [times_ms[min(index * len(times_ms) // count, len(times_ms) - 1)] for index in range(count)]
+
+
 def build_segments(tokens: list, times_ms: list, punctuated: str, *, offset_s: float) -> list:
     """Sentences at 。！？；, long ones (> 30 characters or > 8 s) cut again at ，、."""
+    times_ms = _fit(times_ms, len(tokens))
     items = list(zip(tokens, attach_punctuation(tokens, punctuated), times_ms, strict=True))
     segments = []
     for sentence in _cut(items, _SENTENCE_END):
