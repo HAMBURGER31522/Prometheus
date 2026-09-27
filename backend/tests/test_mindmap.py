@@ -374,3 +374,45 @@ def test_cancelling_a_waiting_mindmap_rerun_drops_it(tmp_path):
     queue._drain_one()
     assert ran == []
     assert items_store.get_item(data_dir, item_id)["mindmap_status"] == "failed"
+
+
+def test_generate_fills_the_leaves_after_the_skeleton(tmp_path, monkeypatch):
+    # PLAN 15.4.9: skeleton first, then one grounded filling call per theme.
+    import re
+
+    from prometheus import paths
+    from prometheus.library import db
+    from prometheus.library import items as items_store
+    from prometheus.llm import one_shot
+    from prometheus.mindmap import generate
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    db.init_db(data_dir)
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
+                                      source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/",
+                                      status="running")
+    report = paths.report_file(data_dir, item_id)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+    skeleton = json.dumps(good_tree(load_example()), ensure_ascii=False)
+
+    def fake_one_shot(work_dir, *, prompt, **kwargs):
+        if "末端要点" not in prompt:
+            return skeleton
+        # A diligent model: every detail is taken from the evidence it was given.
+        details = {}
+        for chunk in prompt.split('要点（编号 "')[1:]:
+            leaf_id = chunk.split('"', 1)[0]
+            source = chunk.split("资料：\n", 1)[1]
+            details[leaf_id] = re.sub(r"\s+", "", source)[:150]
+        return json.dumps(details, ensure_ascii=False)
+
+    monkeypatch.setattr(one_shot, "run_one_shot", fake_one_shot)
+    assert generate.generate_for_item(data_dir, item_id, items_store.get_item(data_dir, item_id),
+                                      {"provider": "deepseek", "model": "m"}, node_exe="node", pi_cli="cli")
+    saved = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
+    leaves = [leaf for theme in saved["root"]["children"] for leaf in theme["children"]]
+    assert leaves and all(leaf.get("detail") for leaf in leaves)
+    assert saved["enrichment"]["coverage"] == 1.0
+    assert leaves[0]["detail"] in paths.mindmap_file(data_dir, item_id).read_text(encoding="utf-8")
