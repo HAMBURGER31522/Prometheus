@@ -1,0 +1,47 @@
+.mindmap { position: absolute; inset: 0; }
+.mindmap .react-flow { background: var(--window); }
+.mind-dots { --xy-background-pattern-color-props: var(--map-dots); }
+.mind-edge path, .mindmap .react-flow__edge-path { stroke: var(--map-edge); stroke-width: 1.4; }
+.mindmap .react-flow__handle { opacity: 0; pointer-events: none; }
+.mindmap .react-flow__controls { box-shadow: var(--shadow-soft); border-radius: var(--radius-sm); overflow: hidden; }
+.mindmap .react-flow__controls-button { background: var(--raised); border-color: var(--line); color: var(--ink-2); fill: var(--ink-2); }
+.mindmap .react-flow__controls-button:hover { background: var(--surface); }
+
+.mind-node {
+  position: relative; width: 100%; height: 100%;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 8px 14px; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--line); background: var(--map-leaf); color: var(--ink);
+  transition: border-color var(--dur-hover) linear, box-shadow var(--dur-effects) var(--ease-effects);
+}
+.mind-node:hover { border-color: var(--line-strong); }
+.mind-node[data-selected] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.mind-node.root { background: var(--map-root); color: var(--map-root-ink); border-color: transparent; }
+.mind-node.root .mind-label { font: 600 17px/1.35 var(--font-serif); }
+.mind-node.theme { background: var(--map-theme); border-color: var(--map-theme-rim); }
+.mind-node.theme .mind-label { font: 600 15px/1.35 var(--font-serif); }
+.mind-node.topic { background: var(--map-topic); border-color: var(--map-topic-rim); }
+.mind-label { font-size: 14px; line-height: 1.35; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 30px; }
+/* Root, themes and topics may take two lines instead of being cut off. */
+.mind-node:not(.leaf) .mind-label {
+  white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.mind-node.root .mind-label { padding-right: 0; }
+.mind-summary { font-size: 12px; line-height: 1.4; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mind-time { position: absolute; top: 8px; right: 10px; font: 11px/1 var(--font-mono); color: var(--accent); }
+.mind-fold {
+  all: unset; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; text-align: center;
+  font-size: 12px; line-height: 20px; color: var(--ink-2); background: var(--line); cursor: default;
+}
+.mind-fold:hover { background: var(--line-strong); color: var(--ink); }
+
+.mind-tools { position: absolute; top: 12px; right: 16px; display: flex; gap: 6px; align-items: center; }
+.mind-panel {
+  position: absolute; top: 56px; right: 16px; width: 300px;
+  display: grid; gap: 10px; justify-items: start;
+  padding: 16px 18px; border-radius: var(--radius);
+  background: var(--raised); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop);
+}
+.mind-panel h3 { font-size: 17px; line-height: 1.4; }
+.mind-panel p { margin: 0; color: var(--ink-2); }

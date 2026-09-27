@@ -1,17 +1,12 @@
-// Backend client (PLAN 8.2). All requests go to http://127.0.0.1:<port> with the
-// bearer token from platform.backendInfo(); content GETs also accept ?token=.
+// Backend client (PLAN 8.2): http://127.0.0.1:<port> with the bearer token from the shell.
 
 import { backendInfo } from "./platform";
 
-let cachedBase: string | null = null;
-let cachedToken: string | null = null;
+let endpointPromise: Promise<{ base: string; token: string }> | null = null;
 
-async function endpoint(): Promise<{ base: string; token: string }> {
-  if (cachedBase && cachedToken) return { base: cachedBase, token: cachedToken };
-  const info = await backendInfo();
-  cachedBase = `http://127.0.0.1:${info.port}`;
-  cachedToken = info.token;
-  return { base: cachedBase, token: cachedToken };
+function endpoint() {
+  endpointPromise ??= backendInfo().then((info) => ({ base: `http://127.0.0.1:${info.port}`, token: info.token }));
+  return endpointPromise;
 }
 
 export class ApiError extends Error {
@@ -24,7 +19,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function send(method: string, path: string, body?: unknown): Promise<Response> {
   const { base, token } = await endpoint();
   const response = await fetch(`${base}${path}`, {
     method,
@@ -39,41 +34,55 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     try {
       code = (await response.json()).code;
     } catch {
-      /* non-JSON error body */
+      /* not JSON */
     }
     throw new ApiError(response.status, code);
   }
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  return response;
 }
 
+async function json<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const response = await send(method, path, body);
+  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+}
+
+const text = async (path: string) => (await send("GET", path)).text();
+
 export const api = {
-  getSettings: () => request<Settings>("GET", "/api/settings"),
-  putSettings: (settings: Settings) => request<Settings>("PUT", "/api/settings", settings),
-  testModel: () => request<{ ok: boolean; detail: string }>("POST", "/api/settings/test-model"),
-  installAsr: () => request<{ started: boolean }>("POST", "/api/asr-components/install"),
-  asrStatus: () =>
-    request<{ state: string; detail: string }>("GET", "/api/asr-components"),
-  getDataDir: () => request<{ data_dir: string | null }>("GET", "/api/app/data-dir"),
-  setDataDir: (data_dir: string) =>
-    request<{ data_dir: string }>("PUT", "/api/app/data-dir", { data_dir }),
-  postItem: (url: string, figures: boolean) =>
-    request<{ id: string }>("POST", "/api/items", { url, figures }),
-  getItems: (status?: string) =>
-    request<ItemRow[]>("GET", `/api/items${status ? `?status=${status}` : ""}`),
-  getItem: (id: string) => request<ItemRow>("GET", `/api/items/${id}`),
-  deleteItem: (id: string) => request<void>("DELETE", `/api/items/${id}`),
-  cancelItem: (id: string) => request<{ cancelled: boolean }>("POST", `/api/items/${id}/cancel`),
-  retryItem: (id: string) => request<{ queued: boolean }>("POST", `/api/items/${id}/retry`),
+  settings: () => json<Settings>("GET", "/api/settings"),
+  saveSettings: (settings: Settings) => json<Settings>("PUT", "/api/settings", settings),
+  testModel: () => json<{ ok: boolean; detail: string }>("POST", "/api/settings/test-model"),
+  installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
+  asrStatus: () => json<{ state: string; detail: string }>("GET", "/api/asr-components"),
+  dataDir: () => json<{ data_dir: string | null }>("GET", "/api/app/data-dir"),
+  setDataDir: (dataDir: string) => json<{ data_dir: string }>("PUT", "/api/app/data-dir", { data_dir: dataDir }),
+
+  addItem: (url: string, figures: boolean) => json<{ id: string }>("POST", "/api/items", { url, figures }),
+  items: () => json<ItemRow[]>("GET", "/api/items"),
+  item: (id: string) => json<ItemRow>("GET", `/api/items/${id}`),
+  moveItem: (id: string, categoryId: number) => json<ItemRow>("PATCH", `/api/items/${id}`, { category_id: categoryId }),
+  deleteItem: (id: string) => json<void>("DELETE", `/api/items/${id}`),
+  cancelItem: (id: string) => json<{ cancelled: boolean }>("POST", `/api/items/${id}/cancel`),
+  retryItem: (id: string) => json<{ queued: boolean }>("POST", `/api/items/${id}/retry`),
   regenerate: (id: string, figures?: boolean) =>
-    request<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { figures }),
-  getQueue: () => request<ItemRow[]>("GET", "/api/queue"),
-  getCategories: () => request<CategoryRow[]>("GET", "/api/categories"),
-  renameCategory: (id: number, name: string) =>
-    request<{ renamed: boolean }>("PATCH", `/api/categories/${id}`, { name }),
-  deleteCategory: (id: number) => request<void>("DELETE", `/api/categories/${id}`),
-  mergeCategory: (id: number, into_id: number) =>
-    request<{ merged: boolean }>("POST", `/api/categories/${id}/merge`, { into_id }),
+    json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, figures === undefined ? {} : { figures }),
+  regenerateMindmap: (id: string) =>
+    json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "mindmap" }),
+  queue: () => json<ItemRow[]>("GET", "/api/queue"),
+
+  categories: () => json<CategoryRow[]>("GET", "/api/categories"),
+  renameCategory: (id: number, name: string) => json<unknown>("PATCH", `/api/categories/${id}`, { name }),
+  deleteCategory: (id: number) => json<void>("DELETE", `/api/categories/${id}`),
+  mergeCategory: (id: number, intoId: number) =>
+    json<unknown>("POST", `/api/categories/${id}/merge`, { into_id: intoId }),
+
+  reportHtml: (id: string) => text(`/api/items/${id}/report`),
+  mindmapTree: (id: string) => json<MindmapTree>("GET", `/api/items/${id}/mindmap?format=json`),
+  mindmapMarkdown: (id: string) => text(`/api/items/${id}/mindmap`),
+  subtitle: (id: string, variant: "fixed" | "raw") =>
+    json<Segment[]>("GET", `/api/items/${id}/subtitle?variant=${variant}`),
+  subtitleText: (id: string, format: "srt" | "txt", variant: "fixed" | "raw") =>
+    text(`/api/items/${id}/subtitle?format=${format}&variant=${variant}`),
 };
 
 export interface ItemRow {
@@ -86,11 +95,21 @@ export interface ItemRow {
   duration_s: number | null;
   report_title: string | null;
   category_id: number | null;
-  status: string;
+  figures: number;
+  status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted";
   stage: string | null;
-  mindmap_status: string | null;
+  mindmap_status: "ok" | "failed" | null;
+  subtitle_status: "ok" | "failed" | null;
   error_code: string | null;
   error_message: string | null;
+  created_at: string;
+  finished_at: string | null;
+  library_path: string | null;
+  tags: string | null;
+  description: string | null;
+  transcript_source: string | null;
+  notice: string | null;
+  files_missing: boolean;
 }
 
 export interface CategoryRow {
@@ -99,21 +118,36 @@ export interface CategoryRow {
   count: number;
 }
 
+export interface Segment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface MindmapTree {
+  title: string;
+  root: import("../features/mindmap/layout").TreeNode;
+}
+
 export interface Settings {
   llm: {
     provider: string;
     model: string;
     api_key: string;
     thinking: string;
-    custom: { base_url: string; supports_images: boolean };
+    custom: { base_url: string; supports_images: boolean; protocol: "openai" | "anthropic" };
   };
-  asr: { backend: string; dashscope_api_key: string; cloud_model: string };
+  asr: { backend: "local" | "cloud" };
   network: { proxy: string; youtube_cookies_file: string };
   figures_default: boolean;
 }
 
-export async function contentUrl(id: string, kind: "report" | "mindmap" | "subtitle", format?: string): Promise<string> {
-  const { base, token } = await endpoint();
-  const suffix = format ? `&format=${format}` : "";
-  return `${base}/api/items/${id}/${kind}?token=${token}${suffix}`;
-}
+export const itemTitle = (item: ItemRow) => item.report_title || item.source_title || item.video_id;
+
+export const itemTags = (item: ItemRow): string[] => {
+  try {
+    return item.tags ? (JSON.parse(item.tags) as string[]) : [];
+  } catch {
+    return [];
+  }
+};

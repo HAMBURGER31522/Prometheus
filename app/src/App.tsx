@@ -1,75 +1,75 @@
-import { useEffect, useState } from "react";
+// Shell (PLAN 15.4.5): the capsule in its own column, pages beside it, page changes
+// animated with React's <ViewTransition>.
+import { ViewTransition, useCallback, useEffect, useState } from "react";
 
-import ConsolePage from "./features/console/ConsolePage";
-import MindmapView from "./features/mindmap/MindmapView";
-import ReportView from "./features/report/ReportView";
-import SettingsPage from "./features/settings/SettingsPage";
-import SubtitleView from "./features/subtitle/SubtitleView";
-import { api } from "./shared/api";
-import { pickDirectory } from "./shared/platform";
-import Sidebar from "./shared/Sidebar";
-import type { Tab } from "./shared/Sidebar";
-import { TABS } from "./shared/Sidebar";
-import "./app.css";
-import "./shared/tokens.css";
+import { ConsolePage } from "./features/console/ConsolePage";
+import { MindmapView } from "./features/mindmap/MindmapView";
+import { ReportView } from "./features/report/ReportView";
+import { SettingsPage } from "./features/settings/SettingsPage";
+import { SubtitleView } from "./features/subtitle/SubtitleView";
+import { type ItemRow, api } from "./shared/api";
+import { LibraryPage } from "./shared/LibraryPage";
+import { NavProvider, useNav } from "./shared/NavContext";
+import { Sidebar } from "./shared/Sidebar";
+import { useLibrary } from "./shared/useLibrary";
 
-export interface Selection {
-  categoryId: number | null;
-  itemId: string | null;
+function Shell() {
+  const { nav } = useNav();
+  const library = useLibrary();
+  const [queue, setQueue] = useState<ItemRow[]>([]);
+
+  const reloadQueue = useCallback(async () => {
+    setQueue(await api.queue());
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = () => alive && reloadQueue().catch(() => undefined);
+    tick();
+    const timer = setInterval(tick, 1500);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [reloadQueue]);
+
+  const busy = queue.filter((row) => row.status === "queued" || row.status === "running").length;
+
+  let page;
+  switch (nav.tab) {
+    case "console":
+      page = <ConsolePage queue={queue} reload={reloadQueue} />;
+      break;
+    case "library":
+      page = <LibraryPage library={library} render={(props) => <ReportView {...props} />} />;
+      break;
+    case "mindmap":
+      page = <LibraryPage library={library} render={(props) => <MindmapView {...props} />} />;
+      break;
+    case "subtitle":
+      page = <LibraryPage library={library} render={(props) => <SubtitleView {...props} />} />;
+      break;
+    case "settings":
+      page = <SettingsPage />;
+      break;
+  }
+
+  return (
+    <div className="app">
+      <Sidebar busy={busy} />
+      <main className="stage">
+        <ViewTransition key={`${nav.tab}:${nav.itemId ?? ""}`}>
+          <div className="stage-page">{page}</div>
+        </ViewTransition>
+      </main>
+    </div>
+  );
 }
 
 export default function App() {
-  const [dataDir, setDataDir] = useState<string | null | "loading">("loading");
-  const [tab, setTab] = useState<Tab>(TABS[0]);
-  const [selection, setSelection] = useState<Selection>({ categoryId: null, itemId: null });
-
-  useEffect(() => {
-    api.getDataDir().then(
-      (result) => setDataDir(result.data_dir),
-      () => setDataDir(null),
-    );
-  }, []);
-
-  if (dataDir === "loading") {
-    return <main className="app-shell"><p>正在连接后端…</p></main>;
-  }
-
-  if (dataDir === null) {
-    return (
-      <main className="app-shell">
-        <h1>Prometheus</h1>
-        <p>选择一个数据目录，报告、导图与字幕都会存放在这里。</p>
-        <button
-          type="button"
-          className="primary"
-          onClick={async () => {
-            const dir = await pickDirectory();
-            if (!dir) return;
-            const result = await api.setDataDir(dir);
-            setDataDir(result.data_dir);
-          }}
-        >
-          选择数据目录
-        </button>
-      </main>
-    );
-  }
-
-  const sharedProps = {
-    selection,
-    onSelect: (next: Selection) => setSelection(next),
-  };
-
   return (
-    <div className="app-frame">
-      <Sidebar current={tab} onSelect={setTab} />
-      <main className="app-content">
-        {tab === "控制台" && <ConsolePage />}
-        {tab === "知识库" && <ReportView {...sharedProps} />}
-        {tab === "思维导图" && <MindmapView {...sharedProps} />}
-        {tab === "字幕" && <SubtitleView {...sharedProps} />}
-        {tab === "设置" && <SettingsPage onDataDirChanged={setDataDir} />}
-      </main>
-    </div>
+    <NavProvider>
+      <Shell />
+    </NavProvider>
   );
 }

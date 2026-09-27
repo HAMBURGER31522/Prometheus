@@ -1,0 +1,14 @@
+.settings .card > h2 { margin-bottom: 14px; }
+.settings .field { max-width: 560px; }
+.choices { display: grid; gap: 10px; max-width: 640px; }
+.choice {
+  display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); cursor: default;
+  transition: border-color var(--dur-hover) linear, background-color var(--dur-hover) linear;
+}
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-wash); }
+.choice input { margin-top: 4px; accent-color: var(--accent); }
+.choice b { display: block; }
+.choice small { color: var(--muted); }
+.grow { flex: 1; min-width: 240px; }
+.path { font: 13px/1.5 var(--font-mono); color: var(--ink-2); background: var(--surface); padding: 6px 10px; border-radius: var(--radius-sm); }

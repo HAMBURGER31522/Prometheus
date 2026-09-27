@@ -1,0 +1,36 @@
+/* The only file that may hold easing curves and durations (npm run lint:design).
+   Springs sampled from a damped oscillator into CSS linear(): spatial moves (position,
+   size) overshoot slightly; effects (colour, opacity) settle without overshoot. */
+:root {
+  --ease-spatial: linear(0.0000 0.0%, 0.0425 3.3%, 0.1435 6.6%, 0.2724 9.8%, 0.4081 13.1%, 0.5374 16.4%, 0.6526 19.7%, 0.7501 23.0%, 0.8292 26.2%, 0.8909 29.5%, 0.9371 32.8%, 0.9702 36.1%, 0.9928 39.3%, 1.0071 42.6%, 1.0153 45.9%, 1.0191 49.2%, 1.0199 52.5%, 1.0188 55.7%, 1.0167 59.0%, 1.0141 62.3%, 1.0114 65.6%, 1.0089 68.9%, 1.0066 72.1%, 1.0047 75.4%, 1.0032 78.7%, 1.0020 82.0%, 1.0011 85.2%, 1.0005 88.5%, 1.0001 91.8%, 0.9998 95.1%, 0.9997 98.4%, 0.9996 100.0%);
+  --dur-spatial: 508ms;
+  --ease-effects: linear(0.0000 0.0%, 0.0369 2.6%, 0.1219 5.1%, 0.2275 7.7%, 0.3374 10.3%, 0.4422 12.8%, 0.5372 15.4%, 0.6204 17.9%, 0.6916 20.5%, 0.7513 23.1%, 0.8009 25.6%, 0.8414 28.2%, 0.8743 30.8%, 0.9008 33.3%, 0.9220 35.9%, 0.9389 38.5%, 0.9523 41.0%, 0.9628 43.6%, 0.9711 46.2%, 0.9776 48.7%, 0.9826 51.3%, 0.9866 53.8%, 0.9897 56.4%, 0.9920 59.0%, 0.9939 61.5%, 0.9953 64.1%, 0.9964 66.7%, 0.9972 69.2%, 0.9979 71.8%, 0.9984 74.4%, 0.9988 76.9%, 0.9991 79.5%, 0.9993 82.1%, 0.9995 84.6%, 0.9996 87.2%, 0.9997 89.7%, 0.9998 92.3%, 0.9998 94.9%, 0.9999 97.4%, 0.9999 100.0%);
+  --dur-effects: 325ms;
+  --dur-hover: 120ms;
+  --dur-fade-out: 480ms;
+}
+
+/* Page and content changes use React's <ViewTransition>; the browser cross-fades them. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-effects);
+  animation-timing-function: var(--ease-effects);
+}
+::view-transition-group(page) {
+  animation-duration: var(--dur-spatial);
+  animation-timing-function: var(--ease-spatial);
+}
+::view-transition-old(page),
+::view-transition-new(page) {
+  animation-duration: var(--dur-effects);
+  animation-timing-function: var(--ease-effects);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-spatial: 0ms;
+    --dur-effects: 0ms;
+    --dur-hover: 0ms;
+    --dur-fade-out: 0ms;
+  }
+}

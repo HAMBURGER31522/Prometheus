@@ -1,86 +1,211 @@
-// Mindmap tab: markmap rendering + moment-link interception + .md export (PLAN 9.3).
+// 导图 (PLAN 15.4.2): the knowledge tree on a React Flow canvas, laid out as a horizontal
+// tidy tree; themes fold, nodes open a summary panel, times open the video at that moment.
+import "@xyflow/react/dist/style.css";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  Handle,
+  type Node,
+  type NodeProps,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
+} from "@xyflow/react";
+import { useEffect, useMemo, useState } from "react";
 
-import LibraryBrowser from "../../shared/LibraryBrowser";
-import type { ContentTabProps } from "../../shared/LibraryBrowser";
-import { contentUrl } from "../../shared/api";
-import { openExternal } from "../../shared/platform";
+import { type ReaderProps } from "../../shared/LibraryPage";
+import { type MindmapTree, api, itemTitle } from "../../shared/api";
+import { clock, momentLink } from "../../shared/format";
+import { downloadText, openExternal } from "../../shared/platform";
+import { type PlacedNode, initialFolds, layoutTree } from "./layout";
 
-export default function MindmapView(props: ContentTabProps) {
+type MindData = { placed: PlacedNode; folded: boolean; onToggle: (id: string) => void };
+
+function MindNode({ data, selected }: NodeProps<Node<MindData>>) {
+  const { placed, folded, onToggle } = data;
+  const { node } = placed;
+  const canFold = node.type !== "root" && node.children.length > 0;
   return (
-    <LibraryBrowser kind="思维导图" selection={props.selection} onSelect={props.onSelect}>
-      {(item) => <MindmapFrame itemId={item.id} key={item.id} />}
-    </LibraryBrowser>
+    <div className={`mind-node ${node.type}`} data-selected={selected || undefined}>
+      <Handle type="target" position={Position.Left} isConnectable={false} />
+      <span className="mind-label">{node.label}</span>
+      {node.type === "leaf" && node.summary && <span className="mind-summary">{node.summary}</span>}
+      {node.type === "leaf" && node.time != null && <span className="mind-time">{clock(node.time)}</span>}
+      {canFold && (
+        <button
+          type="button"
+          className="mind-fold nodrag"
+          aria-label={folded ? `展开 ${node.label}` : `折叠 ${node.label}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle(placed.id);
+          }}
+        >
+          {folded ? `+${placed.hiddenCount}` : "−"}
+        </button>
+      )}
+      <Handle type="source" position={Position.Right} isConnectable={false} />
+    </div>
   );
 }
 
-function MindmapFrame(props: { itemId: string }) {
-  const container = useRef<HTMLDivElement | null>(null);
-  const [markdown, setMarkdown] = useState<string | null>(null);
+const NODE_TYPES = { mind: MindNode };
+
+export function MindmapView(props: ReaderProps) {
+  return (
+    <ReactFlowProvider>
+      <Canvas {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function Canvas({ item, refresh }: ReaderProps) {
+  const [tree, setTree] = useState<MindmapTree | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<PlacedNode | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
+  const flow = useReactFlow();
 
   useEffect(() => {
-    let cancelled = false;
-    contentUrl(props.itemId, "mindmap")
-      .then((url) => fetch(url))
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
-      .then((text) => {
-        if (!cancelled) setMarkdown(text);
+    let alive = true;
+    setSelected(null);
+    api
+      .mindmapTree(item.id)
+      .then((value) => {
+        if (!alive) return;
+        setTree(value);
+        setFolded(initialFolds(value.root));
+        setMissing(false);
       })
-      .catch(() => {
-        if (!cancelled) setMarkdown(null);
-      });
+      .catch(() => alive && setMissing(true));
     return () => {
-      cancelled = true;
+      alive = false;
     };
-  }, [props.itemId]);
+  }, [item.id, item.mindmap_status]);
+
+  const toggle = (id: string) =>
+    setFolded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+        // Bring the branch that just opened into view once it is laid out.
+        setFocus(id);
+      } else next.add(id);
+      return next;
+    });
+
+  const { nodes, edges } = useMemo(() => {
+    if (!tree) return { nodes: [], edges: [] };
+    const layout = layoutTree(tree.root, folded);
+    return {
+      nodes: layout.nodes.map<Node<MindData>>((placed) => ({
+        id: placed.id,
+        type: "mind",
+        position: { x: placed.x, y: placed.y },
+        width: placed.width,
+        height: placed.height,
+        style: { width: placed.width, height: placed.height },
+        data: { placed, folded: folded.has(placed.id), onToggle: toggle },
+        draggable: false,
+        connectable: false,
+      })),
+      edges: layout.edges.map((edge) => ({ ...edge, type: "simplebezier", className: "mind-edge" })),
+    };
+  }, [tree, folded]);
 
   useEffect(() => {
-    if (!markdown || !container.current) return;
-    let cancelled = false;
-    (async () => {
-      const { Transformer } = await import("markmap-lib");
-      const { Markmap } = await import("markmap-view");
-      const transformer = new Transformer();
-      const { root } = transformer.transform(markdown);
-      if (cancelled || !container.current) return;
-      container.current.innerHTML = "<svg />";
-      const svg = container.current.querySelector("svg");
-      if (!svg) return;
-      Markmap.create(svg, { initialExpandLevel: 2 }, root);
-      svg.addEventListener("click", (event) => {
-        const target = event.target as HTMLElement;
-        const anchor = target.closest("a");
-        if (anchor) {
-          event.preventDefault();
-          event.stopPropagation();
-          openExternal(anchor.href);
-        }
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [markdown]);
+    if (tree) requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 300, maxZoom: 1 }));
+  }, [tree, flow]);
 
-  if (markdown === null) {
-    return <p className="empty">导图尚未生成</p>;
-  }
+  useEffect(() => {
+    if (!focus) return;
+    const branch = nodes.filter((node) => node.id === focus || node.id.startsWith(`${focus}.`));
+    requestAnimationFrame(() => void flow.fitView({ nodes: branch, padding: 0.2, duration: 400, maxZoom: 1, minZoom: 0.5 }));
+    setFocus(null);
+  }, [focus, nodes, flow]);
 
-  const download = () => {
-    const blob = new Blob([markdown], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "mindmap.md";
-    anchor.click();
-    URL.revokeObjectURL(url);
+  const regenerate = async () => {
+    await api.regenerateMindmap(item.id);
+    await refresh();
   };
 
+  if (!tree) {
+    const failed = item.mindmap_status === "failed";
+    // Items migrated from the first version only have the old Markdown outline.
+    const legacy = missing && item.mindmap_status === "ok";
+    const text = failed
+      ? "这个视频的导图没有生成成功。"
+      : legacy
+        ? "这是旧版的导图，重新生成后才能在画布上显示。"
+        : missing
+          ? "导图正在生成…"
+          : "正在打开导图…";
+    return (
+      <div className="page">
+        <p className={failed ? "notice danger" : "notice"}>{text}</p>
+        {(failed || legacy) && (
+          <button type="button" className="btn" style={{ marginTop: 14 }} onClick={regenerate}>
+            重新生成导图
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="mindmap-wrap">
-      <button type="button" onClick={download}>导出 .md</button>
-      <div className="markmap-container" ref={container} />
+    <div className="mindmap">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={NODE_TYPES}
+        onNodeClick={(_event, node) => setSelected((node.data as MindData).placed)}
+        onPaneClick={() => setSelected(null)}
+        minZoom={0.2}
+        maxZoom={1.6}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        proOptions={{ hideAttribution: true }}
+        colorMode="dark"
+      >
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} className="mind-dots" />
+        <Controls showInteractive={false} position="bottom-left" />
+      </ReactFlow>
+      <div className="mind-tools">
+        {item.mindmap_status === null && <span className="badge accent">重新生成中…</span>}
+        <button type="button" className="btn small" onClick={() => void flow.fitView({ padding: 0.12, duration: 400 })}>
+          适应画布
+        </button>
+        <button
+          type="button"
+          className="btn small"
+          onClick={async () => downloadText(`${itemTitle(item)} 思维导图.md`, await api.mindmapMarkdown(item.id), "text/markdown")}
+        >
+          导出 .md
+        </button>
+        <button type="button" className="btn small quiet" onClick={regenerate}>
+          重新生成
+        </button>
+      </div>
+      {selected && (
+        <aside className="mind-panel" aria-label="节点摘要">
+          <span className="badge accent">{{ root: "中心", theme: "主题", topic: "子题", leaf: "要点" }[selected.node.type]}</span>
+          <h3>{selected.node.label}</h3>
+          {selected.node.summary && <p>{selected.node.summary}</p>}
+          {selected.node.time != null && (
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => openExternal(momentLink(item.platform, item.video_id, selected.node.time!))}
+            >
+              在视频中打开 {clock(selected.node.time)}
+            </button>
+          )}
+        </aside>
+      )}
     </div>
   );
 }

@@ -1,114 +1,179 @@
-// Console: multi-line import + figures toggle + live queue (PLAN 9.3).
+// 控制台 (PLAN 9 / 15.4.5): paste a Bilibili or YouTube link, watch the queue.
+import { type CSSProperties, type FormEvent, useEffect, useState } from "react";
 
-import { useEffect, useRef, useState } from "react";
+import { ApiError, type ItemRow, api, itemTitle } from "../../shared/api";
+import { useNav } from "../../shared/NavContext";
+import { ScrollArea } from "../../shared/ScrollArea";
 
-import { ApiError, api } from "../../shared/api";
-import type { ItemRow } from "../../shared/api";
+const STAGES: [string, string][] = [
+  ["resolve", "解析链接"],
+  ["download", "下载"],
+  ["transcribe", "转写"],
+  ["transcript", "整理转写"],
+  ["frames", "抽帧"],
+  ["report", "写精读报告"],
+  ["finalize", "定稿"],
+  ["subtitle_fix", "字幕纠错"],
+  ["mindmap", "生成导图"],
+  ["classify", "分类"],
+  ["publish", "放入知识库"],
+];
 
-const STAGE_NAMES: Record<string, string> = {
-  resolve: "解析", download: "下载", transcribe: "转写", transcript: "整理转写",
-  frames: "抽帧", report: "写作", finalize: "定稿", mindmap: "导图", classify: "归类",
+const STATUS: Record<ItemRow["status"], string> = {
+  queued: "排队中",
+  running: "进行中",
+  done: "已完成",
+  failed: "失败",
+  cancelled: "已取消",
+  interrupted: "已中断",
 };
 
-export default function ConsolePage() {
-  const [text, setText] = useState("");
-  const [figures, setFigures] = useState(false);
-  const [queue, setQueue] = useState<ItemRow[]>([]);
-  const [notice, setNotice] = useState("");
-  const timer = useRef<number | null>(null);
+const ADD_ERRORS: Record<string, string> = {
+  URL_UNSUPPORTED: "只支持 B 站和 YouTube 的视频链接。",
+};
+
+export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () => Promise<void> }) {
+  const [url, setUrl] = useState("");
+  const [figures, setFigures] = useState(true);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    api.getSettings().then(
-      (settings) => setFigures(settings.figures_default),
-      () => undefined,
-    );
-    const poll = () => {
-      api.getQueue().then(setQueue, () => undefined);
-    };
-    poll();
-    timer.current = window.setInterval(poll, 1000);
-    return () => {
-      if (timer.current !== null) window.clearInterval(timer.current);
-    };
+    api.settings().then((s) => setFigures(s.figures_default)).catch(() => undefined);
   }, []);
 
-  const import_ = async () => {
-    setNotice("");
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    for (const line of lines) {
-      try {
-        await api.postItem(line, figures);
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 409) {
-          setNotice(`已存在：${line}`);
-        } else if (e instanceof ApiError && e.status === 422) {
-          setNotice(`链接不支持：${line}`);
-        } else {
-          setNotice(`导入失败：${line}`);
-        }
-        return;
-      }
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage("");
+    try {
+      await api.addItem(url.trim(), figures);
+      setUrl("");
+      await reload();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) setMessage("这个视频已经在库里了。");
+      else setMessage((error instanceof ApiError && error.code && ADD_ERRORS[error.code]) || "添加失败，请检查链接。");
     }
-    setText("");
   };
 
+  const active = queue.filter((row) => row.status !== "done");
+  const finished = queue.filter((row) => row.status === "done");
+
   return (
-    <section className="console">
-      <h2>控制台</h2>
-      <textarea
-        rows={4}
-        placeholder="粘贴 B 站或 YouTube 链接，每行一个"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <label className="figures-toggle">
-        <input
-          type="checkbox"
-          checked={figures}
-          onChange={(e) => setFigures(e.target.checked)}
-        />
-        配图
-      </label>
-      <button type="button" className="primary" onClick={import_}>导入</button>
-      {notice && <p className="notice">{notice}</p>}
-      <ul className="queue" aria-label="任务队列">
-        {queue.map((item) => (
-          <QueueRow key={item.id} item={item} />
-        ))}
-        {queue.length === 0 && <li className="empty">队列为空</li>}
-      </ul>
-    </section>
+    <ScrollArea>
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1>控制台</h1>
+            <p>粘贴视频链接，生成精读报告、思维导图和字幕，自动放进知识库。</p>
+          </div>
+        </div>
+        <form className="importer card" onSubmit={submit}>
+          <input
+            className="input"
+            aria-label="视频链接"
+            placeholder="https://www.bilibili.com/video/BV… 或 https://www.youtube.com/watch?v=…"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+          />
+          <label className="switch-label">
+            <button
+              type="button"
+              role="switch"
+              className="switch"
+              aria-checked={figures}
+              aria-label="配图"
+              onClick={() => setFigures(!figures)}
+            />
+            配图
+          </label>
+          <button type="submit" className="btn primary" disabled={!url.trim()}>
+            开始
+          </button>
+        </form>
+        {message && (
+          <p className="notice danger" role="alert" style={{ marginTop: 10 }}>
+            {message}
+          </p>
+        )}
+
+        <section className="section">
+          <h2>任务</h2>
+          {active.length === 0 && <p className="muted">没有进行中的任务。</p>}
+          <ul className="queue">
+            {active.map((row) => (
+              <QueueRow key={row.id} row={row} reload={reload} />
+            ))}
+          </ul>
+        </section>
+
+        {finished.length > 0 && (
+          <section className="section">
+            <h2>最近完成</h2>
+            <ul className="queue">
+              {finished.map((row) => (
+                <QueueRow key={row.id} row={row} reload={reload} />
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    </ScrollArea>
   );
 }
 
-function QueueRow(props: { item: ItemRow }) {
-  const item = props.item;
-  const stage = item.status === "running" && item.stage
-    ? STAGE_NAMES[item.stage] ?? item.stage
-    : "";
+function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }) {
+  const { go } = useNav();
+  const index = STAGES.findIndex(([id]) => id === row.stage);
+  const progress = row.status === "done" ? 1 : index < 0 ? 0 : index / STAGES.length;
+  const act = (action: () => Promise<unknown>) => async () => {
+    await action();
+    await reload();
+  };
   return (
-    <li>
-      <span className="row-main">
-        {item.report_title || item.source_title || item.source_url}
-        <span className="row-sub">
-          {item.status === "running" ? `正在${stage}` : STATUS_NAMES[item.status] ?? item.status}
-          {item.status === "failed" && item.error_message ? ` · ${item.error_message}` : ""}
+    <li className="queue-row card" data-status={row.status}>
+      <div className="queue-main">
+        <span className="queue-title">{itemTitle(row)}</span>
+        <span className="muted queue-url">{row.source_url}</span>
+        {row.status === "running" && (
+          <span className="queue-stage">
+            {STAGES[index]?.[1] ?? "准备中"}
+            <span className="muted">
+              {" "}
+              · {Math.max(index, 0) + 1}/{STAGES.length}
+            </span>
+          </span>
+        )}
+        {row.error_message && <span className="queue-error">{row.error_message}</span>}
+        {row.notice && <span className="muted">{row.notice}</span>}
+        <span className="progress" style={{ "--p": progress } as CSSProperties} aria-hidden="true" />
+      </div>
+      <div className="queue-side">
+        <span className={`badge ${row.status === "failed" ? "danger" : row.status === "done" ? "accent" : ""}`}>
+          {STATUS[row.status]}
         </span>
-      </span>
-      <span className="row-actions">
-        {(item.status === "queued" || item.status === "running") && (
-          <button type="button" onClick={() => api.cancelItem(item.id)}>取消</button>
+        {(row.status === "queued" || row.status === "running") && (
+          <button type="button" className="btn small quiet" onClick={act(() => api.cancelItem(row.id))}>
+            取消
+          </button>
         )}
-        {(item.status === "failed" || item.status === "cancelled" || item.status === "interrupted") && (
-          <button type="button" onClick={() => api.retryItem(item.id)}>重试</button>
+        {(row.status === "failed" || row.status === "cancelled" || row.status === "interrupted") && (
+          <button type="button" className="btn small" onClick={act(() => api.retryItem(row.id))}>
+            重试
+          </button>
         )}
-        {item.status === "done" && <span>完成</span>}
-      </span>
+        {row.status === "done" && (
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => {
+              go({ type: "tab", tab: "library" });
+              go({ type: "category", categoryId: row.category_id });
+              go({ type: "item", itemId: row.id });
+            }}
+          >
+            打开
+          </button>
+        )}
+      </div>
     </li>
   );
 }
-
-const STATUS_NAMES: Record<string, string> = {
-  queued: "排队中", running: "进行中", done: "完成", failed: "失败",
-  cancelled: "已取消", interrupted: "已中断",
-};
