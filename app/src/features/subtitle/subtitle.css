@@ -16,3 +16,5 @@
 .subtitle-time:hover { text-decoration: underline; }
 .subtitle-text { font-size: calc(15px * var(--reader-zoom, 1)); line-height: 1.7; color: var(--ink);
   transition: font-size var(--dur-effects) var(--ease-effects); }
+/* The Chinese line under a foreign-language segment (PLAN 15.4.9). */
+.subtitle-zh { display: block; margin-top: 2px; font-size: calc(14px * var(--reader-zoom, 1)); line-height: 1.65; color: var(--ink-2); }

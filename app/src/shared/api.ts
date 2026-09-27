@@ -124,6 +124,8 @@ export interface Segment {
   start: number;
   end: number;
   text: string;
+  /** Chinese translation of a non-Chinese transcript (PLAN 15.4.9). */
+  zh?: string;
 }
 
 export interface MindmapTree {
