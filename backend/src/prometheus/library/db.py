@@ -4,7 +4,7 @@ import sqlite3
 
 from prometheus import paths
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 SCHEMA_V1 = """
@@ -48,6 +48,8 @@ _ADDED_COLUMNS = (
     # Version 3 (PLAN 15.4.4): which engine produced the transcript, and why if it changed.
     ("transcript_source", "TEXT"),   # asr.json engine: bcut | funasr-onnx | faster-whisper | youtube-subtitles
     ("notice", "TEXT"),              # e.g. 「必剪不可用，已改用本地转写」
+    # Version 4 (PLAN 15.4.6): subtitle correction ok | failed (NULL until it ran).
+    ("subtitle_status", "TEXT"),
 )
 
 

@@ -79,7 +79,7 @@ def test_unexpected_failure_is_labelled_as_internal(client, monkeypatch):
 
 
 KEPT = ["asr.json", "canonical-transcript.jsonl", "input.json", "run.trace.jsonl",
-        "mindmap.json", "segments.json", "source.info.json", "transcript.md"]
+        "mindmap.json", "segments.json", "segments.raw.json", "source.info.json", "transcript.md"]
 SCRATCH = ["media.m4a", "media.info.json", "video.mp4", "audio.wav", "pi.events.jsonl",
            "SKILL.md", "report.html", "frames/f_000080.jpg", "sessions/a.jsonl"]
 

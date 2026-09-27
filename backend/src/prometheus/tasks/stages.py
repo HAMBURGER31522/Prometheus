@@ -22,6 +22,7 @@ from prometheus.report.finalize import finalize_report
 from prometheus.report.outline import extract_outline
 from prometheus.settings import store
 from prometheus.subtitle import convert as subtitle_convert
+from prometheus.subtitle import fix as subtitle_fix
 from prometheus.subtitle import format as subtitle_format
 from prometheus.subtitle import vtt
 from prometheus.transcribe import bcut
@@ -226,6 +227,10 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         "frames": frames,
         "report": report,
         "finalize": finalize,
+        "subtitle_fix": lambda ctx: subtitle_fix.fix_for_item(
+            data_dir, ctx.item_id, _row(data_dir, ctx), store.load(data_dir)["llm"],
+            node_exe=_node_exe(), pi_cli=_pi_cli(),
+        ),
         "classify": classify,
         "mindmap": mindmap,
         "publish": lambda ctx: publish_mod.publish(data_dir, ctx.item_id),
