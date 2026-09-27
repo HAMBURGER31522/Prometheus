@@ -38,6 +38,7 @@ def test_install_falls_back_to_uv_when_pip_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(
         components.shutil, "which", lambda name: "C:/tools/uv/uv.exe" if name == "uv" else None
     )
+    monkeypatch.setattr(components, "install_funasr_models", lambda data_dir, *, proxy="": None)
     monkeypatch.setenv("HTTP_PROXY", "")
     monkeypatch.delenv("HTTPS_PROXY", raising=False)
 

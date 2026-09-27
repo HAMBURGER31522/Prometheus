@@ -65,7 +65,8 @@ def models_dir(data_dir: Path) -> Path:
 
 
 def funasr_dir(data_dir: Path) -> Path:
-    return models_dir(data_dir)  # stub (R6 red)
+    """FunASR ONNX models, one folder per ModelScope repo (PLAN 15.4.4)."""
+    return models_dir(data_dir) / "funasr"
 
 
 def logs_dir(data_dir: Path) -> Path:
