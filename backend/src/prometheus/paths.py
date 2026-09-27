@@ -90,6 +90,10 @@ def segments_file(data_dir: Path, item_id: str) -> Path:
     return cache_dir(data_dir, item_id) / "segments.json"
 
 
+def raw_segments_file(data_dir: Path, item_id: str) -> Path:
+    return cache_dir(data_dir, item_id) / "segments.raw.stub.json"  # stub (R6b red)
+
+
 def out_dir(data_dir: Path, item_id: str) -> Path:
     """Finished artifacts waiting to be published into the library."""
     return cache_dir(data_dir, item_id) / "out"
