@@ -191,3 +191,18 @@ def test_a_leaf_at_the_start_of_a_chapter_belongs_to_that_chapter():
     assert index.section_for(147) == 1
     assert index.section_for(0) == 0
     assert index.section_for(10_000) == 8
+
+
+def test_stray_ascii_quotes_inside_a_detail_do_not_lose_the_theme(monkeypatch):
+    # Models quote Chinese phrases with bare "…" inside the JSON strings; the leaf ids are a
+    # reliable frame, so such a reply still yields every detail without a rewrite.
+    monkeypatch.setattr(retrieve.Index, "evidence", lambda self, leaf: EVIDENCE)
+    quoted = GOOD.replace("土地财政", '"土地财政"')
+
+    def ask(prompt):
+        ids = re.findall(r"编号 \"([0-9.]+)\"", prompt)
+        return "{" + ", ".join(f'"{i}": "{quoted}"' for i in ids) + "}"
+
+    filled, stats = enrich.enrich_tree(json.loads(json.dumps(TREE)), HTML, ask=ask)
+    assert all(leaf.get("detail") == quoted for leaf in _leaves(filled["root"]))
+    assert stats["rewrites"] == 0
