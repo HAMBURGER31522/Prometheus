@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from prometheus import paths
 
 CUDA_PACKAGES = (
     "nvidia-cublas-cu12==12.9.2.10",
@@ -17,7 +17,7 @@ class ComponentInstallError(RuntimeError):
 
 
 def build_pip_cmd(data_dir, *, proxy: str = "") -> list:
-    target = str(Path(data_dir) / "runtime" / "cuda")
+    target = str(paths.cuda_dir(data_dir))
     command = [
         sys.executable, "-m", "pip", "install", "--no-deps",
         "--target", target, *CUDA_PACKAGES,
@@ -35,7 +35,7 @@ def _has_pip() -> bool:
 
 
 def install_components(data_dir, *, proxy: str = "") -> None:
-    target = Path(data_dir) / "runtime" / "cuda"
+    target = paths.cuda_dir(data_dir)
     target.mkdir(parents=True, exist_ok=True)
     env = None
     if _has_pip():
