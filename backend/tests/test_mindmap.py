@@ -153,7 +153,8 @@ def test_generate_retries_once_then_saves_json_and_markdown(tmp_path, monkeypatc
     saved = generate.generate_for_item(data_dir, item_id, row, {"provider": "deepseek", "model": "m"},
                                        node_exe="node.exe", pi_cli="cli.js")
     assert saved is True
-    assert len(prompts) == 2 and "上次输出的问题" in prompts[1]
+    skeleton = [p for p in prompts if "末端要点" not in p]  # filling calls come after (PLAN 15.4.9)
+    assert len(skeleton) == 2 and "上次输出的问题" in skeleton[1]
     assert paths.mindmap_json(data_dir, item_id).is_file()
     tree = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
     assert len(tree["root"]["children"]) == 3

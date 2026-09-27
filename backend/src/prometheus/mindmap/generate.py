@@ -1,11 +1,12 @@
-"""Generate, validate (one retry) and save an item's knowledge-tree mind map (PLAN 15.4.2)."""
+"""Generate, validate (one retry), fill and save an item's knowledge-tree mind map
+(PLAN 15.4.2, 15.4.9): the skeleton first, then retrieval-grounded detail on the leaves."""
 
 import json
 
 from prometheus import paths
 from prometheus.library import items as items_store
 from prometheus.llm import one_shot
-from prometheus.mindmap import markdown, prompt, tree
+from prometheus.mindmap import enrich, markdown, prompt, tree
 from prometheus.report.outline import extract_outline
 
 
@@ -21,19 +22,23 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
                       node_exe: str, pi_cli: str) -> bool:
     """Write mindmap.json + mindmap.md and mark the item ok, or mark it failed."""
     work = paths.work_dir(data_dir, item_id)
-    outline = extract_outline(_report_html(data_dir, item_id, row))
+    html = _report_html(data_dir, item_id, row)
+    outline = extract_outline(html)
+
+    def ask(text: str) -> str:
+        return one_shot.run_one_shot(
+            work, prompt=text, provider=llm["provider"], model=llm["model"],
+            api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "medium",
+            node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+        )
+
     base = prompt.build_prompt(outline)
     errors: list = []
     parsed = None
     for _ in range(2):
         feedback = "\n\n上次输出的问题：" + "；".join(errors) if errors else ""
         try:
-            text = one_shot.run_one_shot(
-                work, prompt=base + feedback,
-                provider=llm["provider"], model=llm["model"],
-                api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
-                node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
-            )
+            text = ask(base + feedback)
         except Exception:  # noqa: BLE001 - PLAN 8.3: a mind map failure never fails the item
             items_store.update_item(data_dir, item_id, mindmap_status="failed")
             return False
@@ -44,6 +49,11 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
     if errors:
         items_store.update_item(data_dir, item_id, mindmap_status="failed")
         return False
+    try:
+        parsed, stats = enrich.enrich_tree(parsed, html, ask=ask)
+        parsed["enrichment"] = stats
+    except Exception as exc:  # noqa: BLE001 - the skeleton alone is still a good mind map
+        parsed["enrichment"] = {"error": f"{type(exc).__name__}: {exc}"[:200]}
     target = paths.mindmap_json(data_dir, item_id)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
