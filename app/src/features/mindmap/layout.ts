@@ -81,7 +81,14 @@ export function layoutTree(root: TreeNode, collapsed: Set<string>): { nodes: Pla
   return { nodes, edges };
 }
 
-/** Stub (R7 red). */
-export function initialFolds(_root: TreeNode): Set<string> {
-  return new Set();
+const OVERVIEW_LEAVES = 24;
+
+function leafCount(node: TreeNode): number {
+  return node.children.length ? node.children.reduce((sum, child) => sum + leafCount(child), 0) : 1;
+}
+
+/** A long video's tree first shows its themes only, readable at a glance; a small one shows whole. */
+export function initialFolds(root: TreeNode): Set<string> {
+  if (leafCount(root) <= OVERVIEW_LEAVES) return new Set();
+  return new Set(root.children.flatMap((child, index) => (child.children.length ? [`0.${index}`] : [])));
 }

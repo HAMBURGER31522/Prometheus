@@ -20,7 +20,7 @@ import { type ReaderProps } from "../../shared/LibraryPage";
 import { type MindmapTree, api, itemTitle } from "../../shared/api";
 import { clock, momentLink } from "../../shared/format";
 import { downloadText, openExternal } from "../../shared/platform";
-import { type PlacedNode, layoutTree } from "./layout";
+import { type PlacedNode, initialFolds, layoutTree } from "./layout";
 
 type MindData = { placed: PlacedNode; folded: boolean; onToggle: (id: string) => void };
 
@@ -67,6 +67,7 @@ function Canvas({ item, refresh }: ReaderProps) {
   const [missing, setMissing] = useState(false);
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<PlacedNode | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const flow = useReactFlow();
 
   useEffect(() => {
@@ -77,6 +78,7 @@ function Canvas({ item, refresh }: ReaderProps) {
       .then((value) => {
         if (!alive) return;
         setTree(value);
+        setFolded(initialFolds(value.root));
         setMissing(false);
       })
       .catch(() => alive && setMissing(true));
@@ -88,8 +90,11 @@ function Canvas({ item, refresh }: ReaderProps) {
   const toggle = (id: string) =>
     setFolded((current) => {
       const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        // Bring the branch that just opened into view once it is laid out.
+        setFocus(id);
+      } else next.add(id);
       return next;
     });
 
@@ -113,8 +118,15 @@ function Canvas({ item, refresh }: ReaderProps) {
   }, [tree, folded]);
 
   useEffect(() => {
-    if (nodes.length) requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 300 }));
-  }, [tree, flow, nodes.length]);
+    if (tree) requestAnimationFrame(() => void flow.fitView({ padding: 0.12, duration: 300, maxZoom: 1 }));
+  }, [tree, flow]);
+
+  useEffect(() => {
+    if (!focus) return;
+    const branch = nodes.filter((node) => node.id === focus || node.id.startsWith(`${focus}.`));
+    requestAnimationFrame(() => void flow.fitView({ nodes: branch, padding: 0.2, duration: 400, maxZoom: 1, minZoom: 0.5 }));
+    setFocus(null);
+  }, [focus, nodes, flow]);
 
   const regenerate = async () => {
     await api.regenerateMindmap(item.id);
