@@ -83,8 +83,11 @@ def transcribe(mp3, *, session=None, sleep=time.sleep, clock=time.monotonic,
 
 
 def asr_run(segments: list, *, elapsed_ms: int):
+    from prometheus.transcribe.language import guess_language
     from prometheus.transcribe.local_whisper import build_asr_run
 
-    run = build_asr_run({"segments": segments}, model=f"bcut model {MODEL_ID}", language="zh",
+    # 必剪 returns no language; an English video must still be told apart (PLAN 15.4.9).
+    language = guess_language(segment["text"] for segment in segments) or "zh"
+    run = build_asr_run({"segments": segments}, model=f"bcut model {MODEL_ID}", language=language,
                         elapsed_ms=elapsed_ms, engine="bcut")
     return dataclasses.replace(run, backend="cloud", provider="bilibili")

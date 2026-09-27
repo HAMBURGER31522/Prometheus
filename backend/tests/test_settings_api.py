@@ -20,7 +20,7 @@ def test_defaults_round_trip_and_masking(client):
 
     loaded = client.get("/api/settings", headers=AUTH).json()
     assert loaded["llm"]["api_key"] == "****1234"
-    assert loaded["asr"] == {"backend": "local"}
+    assert loaded["asr"]["backend"] == "local"
     assert loaded["llm"]["model"] == "deepseek-flash"
 
     on_disk = json.loads(

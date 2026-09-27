@@ -20,7 +20,7 @@ async def put_settings(request: Request):
     body = await request.json()
     state = request.app.state
     backend = (body.get("asr") or {}).get("backend")
-    if backend not in ("local", "cloud"):
+    if backend not in ("local", "cloud", "custom"):
         return JSONResponse({"code": "INVALID_ASR_BACKEND"}, status_code=422)
     protocols = [((body.get("llm") or {}).get("custom") or {}).get("protocol", "openai")]
     protocols += [p.get("protocol", "openai") for p in (body.get("llm_profiles") or {}).get("items", [])]

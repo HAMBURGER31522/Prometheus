@@ -2,6 +2,7 @@
 files cut at silences, and every failure falling back to local transcription. The HTTP
 endpoint and ffmpeg are faked."""
 
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -80,7 +81,7 @@ def test_duration_and_silences_are_read_from_ffmpeg():
 def _check_plan(chunks, duration, size, limit):
     rate = size / duration
     assert chunks[0][0] == 0 and chunks[-1][1] == duration
-    assert all(a[1] == b[0] for a, b in zip(chunks, chunks[1:], strict=False)), "chunks must be contiguous"
+    assert all(a[1] == b[0] for a, b in pairwise(chunks)), "chunks must be contiguous"
     assert all((end - start) * rate <= limit for start, end in chunks)
 
 
