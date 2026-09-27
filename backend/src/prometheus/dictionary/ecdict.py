@@ -146,7 +146,7 @@ def lookup(data_dir, word: str):
         raise NotInstalled
     query = word.strip()
     key = query.lower()
-    with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as db:
+    with closing(sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)) as db:
         def get(candidate):
             return db.execute("SELECT word, phonetic, translation, exchange FROM words WHERE key = ?",
                               (candidate,)).fetchone()
