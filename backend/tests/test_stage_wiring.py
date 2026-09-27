@@ -249,3 +249,21 @@ def test_a_downloaded_subtitle_replaces_transcription(data_dir, monkeypatch):
     segments = json.loads(paths.segments_file(data_dir, ctx.item_id).read_text(encoding="utf-8"))
     assert segments == [{"start": 1.0, "end": 2.5, "text": "这是字幕"}]
     assert items_store.get_item(data_dir, ctx.item_id).get("transcript_source") == "youtube-subtitles"
+
+
+def test_subtitle_fix_stage_hands_the_item_and_model_to_the_fixer(data_dir, monkeypatch):
+    from prometheus.subtitle import fix
+
+    ctx = _ctx(data_dir)
+    seen = {}
+
+    def fake_fix(data_dir_, item_id, row, llm, *, node_exe, pi_cli):
+        seen.update(item_id=item_id, row=row, llm=llm, node_exe=node_exe)
+        return True
+
+    monkeypatch.setattr(fix, "fix_for_item", fake_fix)
+    impls = stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)
+    assert "subtitle_fix" in impls
+    impls["subtitle_fix"](ctx)
+    assert seen["item_id"] == ctx.item_id and seen["row"]["id"] == ctx.item_id
+    assert seen["llm"]["provider"] and seen["node_exe"].endswith("node.exe")
