@@ -418,3 +418,39 @@ def test_generate_fills_the_leaves_after_the_skeleton(tmp_path, monkeypatch):
     assert saved["enrichment"]["coverage"] == 1.0
     assert leaves[0]["detail"] in paths.mindmap_file(data_dir, item_id).read_text(encoding="utf-8")
     assert "summary" not in saved["root"], "the root is the title only (PLAN 15.4.9: root ≤ 20 字)"
+
+
+def test_the_retry_fixes_the_previous_tree_instead_of_starting_over(tmp_path, monkeypatch):
+    # A 35-leaf tree regenerated from scratch trades one length slip for another; the one
+    # retry therefore hands back the previous JSON with its problems (PLAN 8.3 / 15.4.2).
+    from prometheus import paths
+    from prometheus.library import db
+    from prometheus.library import items as items_store
+    from prometheus.llm import one_shot
+    from prometheus.mindmap import generate
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    db.init_db(data_dir)
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
+                                      source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/",
+                                      status="running")
+    report = paths.report_file(data_dir, item_id)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+    slipped = good_tree(load_example())
+    slipped["root"]["children"][0]["label"] = "超" * 21
+    answers = [json.dumps(slipped, ensure_ascii=False), json.dumps(good_tree(load_example()), ensure_ascii=False)]
+    prompts = []
+
+    def fake_one_shot(work_dir, *, prompt, **kwargs):
+        if "末端要点" in prompt:
+            return "{}"
+        prompts.append(prompt)
+        return answers[len(prompts) - 1]
+
+    monkeypatch.setattr(one_shot, "run_one_shot", fake_one_shot)
+    assert generate.generate_for_item(data_dir, item_id, items_store.get_item(data_dir, item_id),
+                                      {"provider": "deepseek", "model": "m"}, node_exe="node", pi_cli="cli")
+    assert len(prompts) == 2
+    assert "超" * 21 in prompts[1] and "只修改这些问题" in prompts[1]
