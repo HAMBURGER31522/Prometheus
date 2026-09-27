@@ -14,7 +14,7 @@ _lock = threading.Lock()
 def _progress() -> dict:
     with _lock:
         if _state["thread"] is not None and _state["thread"].is_alive():
-            return {"state": "installing", "detail": "正在下载并安装 CUDA 运行库…"}
+            return {"state": "installing", "detail": "正在下载 CUDA 运行库和 FunASR 模型（约 3GB）…"}
         if _state["error"]:
             return {"state": "failed", "detail": _state["error"]}
         if _state["thread"] is not None:

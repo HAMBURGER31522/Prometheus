@@ -56,6 +56,12 @@ def _pipeline(source: str, platform: str, video_id: str):
     return data_dir, item_id, work, row, wav
 
 
+def _ensure_components(data_dir) -> None:
+    """Install the local components once; the data dir keeps them across runs."""
+    if not (local_mod.cuda_component_installed(data_dir) and components.funasr_models_installed(data_dir)):
+        components.install_components(data_dir, proxy=PROXY)
+
+
 def _transcript_assertions(work: Path, asr_path: Path, row: dict) -> None:
     payload = json.loads(asr_path.read_text(encoding="utf-8"))
     assert payload["segments"], "asr.json has no segments"
@@ -92,7 +98,7 @@ def test_bilibili_local_transcribe_to_transcript():
     data_dir, item_id, work, row, wav = _pipeline(
         f"https://www.bilibili.com/video/{BV}/", "bilibili", BV,
     )
-    components.install_components(data_dir, proxy=PROXY)
+    _ensure_components(data_dir)
     asr_path = local_mod.transcribe_local(data_dir, item_id, wav)
     # Mandarin goes to FunASR on the CPU (D-35, D-39).
     assert json.loads(asr_path.read_text(encoding="utf-8"))["engine"] == "funasr-onnx"
@@ -104,7 +110,40 @@ def test_youtube_cookies_chain_local_transcribe():
     """Cookie gate and the English path: anything but Mandarin stays on whisper (D-35)."""
     data_dir, item_id, work, row, wav = _pipeline(YT_URL, "youtube", "jNQXAC9IVRw")
     assert row["platform"] == "youtube"
-    components.install_components(data_dir, proxy=PROXY)
+    _ensure_components(data_dir)
     asr_path = local_mod.transcribe_local(data_dir, item_id, wav)
     assert json.loads(asr_path.read_text(encoding="utf-8"))["engine"] == "faster-whisper"
     _transcript_assertions(work, asr_path, row)
+
+
+@requires_cookies
+def test_youtube_manual_subtitles_skip_transcription():
+    """D-38: this TED talk reports language=en and has the uploader's en track."""
+    from prometheus import runtime as runtime_mod
+    from prometheus.library import db
+    from prometheus.library import items as items_store
+    from prometheus.settings import store
+    from prometheus.tasks import stages
+    from prometheus.tasks.runner import StageContext
+
+    data_dir = paths.init_data_dir(DATA_DIR)
+    db.init_db(data_dir)
+    settings = store.load(data_dir)
+    settings["network"] = {"proxy": PROXY, "youtube_cookies_file": YT_COOKIES}
+    store.save(data_dir, settings)
+    url = "https://www.youtube.com/watch?v=BHY0FxzoKZE"
+    existing = items_store.find_by_video(data_dir, "youtube", "BHY0FxzoKZE")
+    if existing is not None:
+        items_store.delete_item(data_dir, existing["id"])
+    item_id = items_store.create_item(data_dir, platform="youtube", video_id="BHY0FxzoKZE",
+                                      source_url=url, figures=0, status="running")
+    impls = stages.build_real_impls(data_dir, runtime=runtime_mod.resolve(None))
+    ctx = StageContext(data_dir, item_id)
+    for stage in ("resolve", "download", "transcribe"):
+        impls[stage](ctx)
+    work = paths.work_dir(data_dir, item_id)
+    assert download_mod.downloaded_file(work, "media") is None, "audio was downloaded anyway"
+    asr = json.loads((work / "asr.json").read_text(encoding="utf-8"))
+    assert asr["engine"] == "youtube-subtitles" and asr["language"] == "en"
+    assert len(asr["segments"]) > 200
+    assert items_store.get_item(data_dir, item_id)["transcript_source"] == "youtube-subtitles"
