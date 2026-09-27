@@ -94,3 +94,14 @@ def test_the_api_installs_on_request_then_looks_words_up(client):
     assert found.status_code == 200 and found.json()["headword"] == "go"
     unknown = client.get("/api/dictionary/lookup", params={"word": "xyzzy"})
     assert unknown.status_code == 404 and unknown.json()["code"] == "WORD_NOT_FOUND"
+
+
+def test_a_short_row_is_skipped_not_fatal(data_dir, tmp_path):
+    ragged = tmp_path / "ragged.csv"
+    ragged.write_text(SAMPLE.read_text(encoding="utf-8") + "zebra,'zi:brə\n", encoding="utf-8")
+    try:
+        ecdict.install(data_dir, source=str(ragged))
+    except Exception as exc:  # noqa: BLE001 - the point of the test
+        pytest.fail(f"a short row broke the install: {exc!r}")
+    assert _view(ecdict.lookup(data_dir, "went")) == ("went", "go", "过去式")
+    assert ecdict.lookup(data_dir, "zebra") is None
