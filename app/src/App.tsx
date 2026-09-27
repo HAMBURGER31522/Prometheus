@@ -10,8 +10,12 @@ import { SubtitleView } from "./features/subtitle/SubtitleView";
 import { type ItemRow, api } from "./shared/api";
 import { LibraryPage } from "./shared/LibraryPage";
 import { NavProvider, useNav } from "./shared/NavContext";
+import { ZoomProvider } from "./shared/ReaderTools";
 import { Sidebar } from "./shared/Sidebar";
 import { useLibrary } from "./shared/useLibrary";
+
+// The sidebar folds into an icon rail (PLAN 15.4.7); remembered across launches.
+const RAIL_KEY = "prometheus.rail";
 
 function Shell() {
   const { nav } = useNav();
@@ -34,6 +38,24 @@ function Shell() {
   }, [reloadQueue]);
 
   const busy = queue.filter((row) => row.status === "queued" || row.status === "running").length;
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(RAIL_KEY) === "collapsed");
+  const toggleRail = useCallback(() => {
+    setCollapsed((value) => {
+      localStorage.setItem(RAIL_KEY, value ? "expanded" : "collapsed");
+      return !value;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        toggleRail();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleRail]);
 
   let page;
   switch (nav.tab) {
@@ -55,8 +77,8 @@ function Shell() {
   }
 
   return (
-    <div className="app">
-      <Sidebar busy={busy} />
+    <div className="app" data-rail={collapsed ? "collapsed" : "expanded"}>
+      <Sidebar busy={busy} collapsed={collapsed} onToggle={toggleRail} />
       <main className="stage">
         <ViewTransition key={`${nav.tab}:${nav.itemId ?? ""}`}>
           <div className="stage-page">{page}</div>
@@ -69,7 +91,9 @@ function Shell() {
 export default function App() {
   return (
     <NavProvider>
-      <Shell />
+      <ZoomProvider>
+        <Shell />
+      </ZoomProvider>
     </NavProvider>
   );
 }

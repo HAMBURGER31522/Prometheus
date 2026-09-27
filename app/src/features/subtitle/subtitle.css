@@ -14,4 +14,5 @@
   font-variant-numeric: tabular-nums;
 }
 .subtitle-time:hover { text-decoration: underline; }
-.subtitle-text { font-size: 15px; line-height: 1.7; color: var(--ink); }
+.subtitle-text { font-size: calc(15px * var(--reader-zoom, 1)); line-height: 1.7; color: var(--ink);
+  transition: font-size var(--dur-effects) var(--ease-effects); }
