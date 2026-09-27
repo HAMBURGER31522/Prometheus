@@ -34,6 +34,12 @@ def test_subtitle_text_keeps_only_the_words():
     )
 
 
+def test_subtitle_text_drops_sound_annotations():
+    vtt = EN_VTT.replace("that would help.", "that would help. (Laughter) [Music]")
+    assert subtitle_text(vtt, "en").endswith("that would help.")
+    assert subtitle_text(ZH_VTT.replace("推荐视频", "推荐视频（笑）"), "zh").endswith("推荐视频")
+
+
 def test_chinese_ignores_script_punctuation_and_spaces():
     result = score_zh("這是你打開B站，每天！", "这是 你打开b站 每天")
     assert result["cer"] == 0
