@@ -73,7 +73,7 @@ def test_labels_and_summaries_have_length_limits():
     outline = load_example()
     tree = good_tree(outline)
     tree["root"]["children"][0]["label"] = "长" * 21
-    tree["root"]["children"][1]["summary"] = "长" * 61
+    tree["root"]["children"][1]["children"][0]["summary"] = "长" * 61  # leaves: 60; themes: 40 (PLAN 15.4.9)
     errors = validate_tree(tree, outline)
     assert any("20" in error for error in errors) and any("60" in error for error in errors)
 

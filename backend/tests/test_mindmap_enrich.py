@@ -108,7 +108,7 @@ def test_a_failing_leaf_is_rewritten_once_with_its_problems(monkeypatch):
             return _answer(prompt, fix={first_leaf: "分税制很重要。"})
         return _answer(prompt)
 
-    filled, stats = enrich.enrich_tree(json.loads(json.dumps(TREE)), HTML, ask=ask)
+    _filled, stats = enrich.enrich_tree(json.loads(json.dumps(TREE)), HTML, ask=ask)
     rewrite = [p for p in prompts if "上次写的" in p]
     assert len(rewrite) == 1 and "分税制很重要" in rewrite[0]
     assert stats["rewrites"] == 1 and stats["coverage"] == 1.0
@@ -135,7 +135,7 @@ def test_the_prompt_asks_for_grounded_concrete_detail_with_examples(monkeypatch)
 
 def test_metrics_show_richness_growing_outwards(monkeypatch):
     monkeypatch.setattr(retrieve.Index, "evidence", lambda self, leaf: EVIDENCE)
-    filled, stats = enrich.enrich_tree(json.loads(json.dumps(TREE)), HTML, ask=_answer)
+    _filled, stats = enrich.enrich_tree(json.loads(json.dumps(TREE)), HTML, ask=_answer)
     levels = stats["chars_by_level"]
     assert levels["root"] < levels["theme"] < levels["leaf"]
     assert stats["grounding"] >= 0.35
