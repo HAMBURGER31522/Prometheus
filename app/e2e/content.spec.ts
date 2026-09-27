@@ -73,3 +73,25 @@ test("③ 悬停英文单词出现查词浮窗：首次下载离线词典，显�
   await page.keyboard.press("Escape");
   await expect(popup).toHaveCount(0);
 });
+
+test("④ 设置里可选「自定义（OpenAI 兼容）」转写：填好接口地址、Key 和模型名后保存，Key 只以掩码返回", async ({ page, request }) => {
+  await page.goto("/");
+  await openTab(page, "设置");
+  const custom = page.getByRole("radio", { name: /自定义（OpenAI 兼容）/ });
+  await expect(custom).toBeVisible();
+  await custom.check();
+  const box = page.getByRole("group", { name: "自定义转写接口" });
+  await box.getByLabel("接口地址").fill("https://asr.example/v1");
+  await box.getByLabel("API Key", { exact: true }).fill("sk-asr-9876");
+  await box.getByLabel("模型名").fill("whisper-1");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("已保存");
+  const settings = await (await request.get(`${API}/api/settings`, { headers: AUTH })).json();
+  expect(settings.asr).toEqual({
+    backend: "custom",
+    custom: { base_url: "https://asr.example/v1", api_key: "****9876", model: "whisper-1" },
+  });
+  // Leave the shared backend on local transcription for the other tests.
+  await request.put(`${API}/api/settings`, { headers: AUTH, data: { ...settings, asr: { ...settings.asr, backend: "local" } } });
+});
+

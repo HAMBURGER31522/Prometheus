@@ -267,3 +267,58 @@ def test_subtitle_fix_stage_hands_the_item_and_model_to_the_fixer(data_dir, monk
     impls["subtitle_fix"](ctx)
     assert seen["item_id"] == ctx.item_id and seen["row"]["id"] == ctx.item_id
     assert seen["llm"]["provider"] and seen["node_exe"].endswith("node.exe")
+
+
+def _custom_ready(data_dir, ctx, monkeypatch):
+    from prometheus.settings import store
+
+    local_run = _audio_ready(data_dir, ctx, monkeypatch, "custom")
+    settings = store.load(data_dir)
+    settings["asr"] = {"backend": "custom", "custom": {
+        "base_url": "https://asr.example/v1", "api_key": "sk-test", "model": "whisper-1"}}
+    store.save(data_dir, settings)
+    return local_run
+
+
+def test_custom_transcription_goes_to_the_configured_endpoint(data_dir, monkeypatch):
+    # PLAN 15.4.9: 「自定义（OpenAI 兼容）」 transcribes through the user's endpoint.
+    import json
+
+    from prometheus.transcribe import openai_compat
+
+    ctx = _ctx(data_dir)
+    _custom_ready(data_dir, ctx, monkeypatch)
+    seen = {}
+
+    def transcribe(mp3, config, **kw):
+        seen.update(config)
+        return [{"start": 0.0, "end": 1.5, "text": "Hello there."}], "en"
+
+    def no_local(*args):
+        raise AssertionError("local transcription ran although the custom endpoint worked")
+
+    monkeypatch.setattr(openai_compat, "transcribe", transcribe)
+    monkeypatch.setattr(stages_mod.local_mod, "transcribe_local", no_local)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
+    asr = json.loads((paths.work_dir(data_dir, ctx.item_id) / "asr.json").read_text(encoding="utf-8"))
+    assert (asr["engine"], asr["language"]) == ("openai-compatible", "en")
+    assert seen.get("model") == "whisper-1"
+    row = items_store.get_item(data_dir, ctx.item_id)
+    assert (row.get("transcript_source"), row.get("notice")) == ("openai-compatible", None)
+
+
+def test_custom_unavailable_falls_back_to_local_with_a_notice(data_dir, monkeypatch):
+    from prometheus.transcribe import openai_compat
+
+    ctx = _ctx(data_dir)
+    local_run = _custom_ready(data_dir, ctx, monkeypatch)
+
+    def unavailable(mp3, config, **kw):
+        raise openai_compat.CustomAsrUnavailable("HTTP 502")
+
+    monkeypatch.setattr(openai_compat, "transcribe", unavailable)
+    monkeypatch.setattr(stages_mod.local_mod, "transcribe_local", local_run("funasr-onnx"))
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    assert row.get("notice") == "自定义转写不可用，已改用本地转写"
+    assert row.get("transcript_source") == "funasr-onnx"

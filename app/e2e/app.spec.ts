@@ -90,7 +90,7 @@ test("⑦ 设置里选「云端」无需任何 Key 即可保存", async ({ page,
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("已保存");
   const settings = await (await request.get(`${API}/api/settings`, { headers: AUTH })).json();
-  expect(settings.asr).toEqual({ backend: "cloud" });
+  expect(settings.asr.backend).toBe("cloud");
 });
 
 test("⑧ 自定义提供商可选 OpenAI / Anthropic 协议", async ({ page }) => {
