@@ -1,0 +1,15 @@
+.importer { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: center; }
+.queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.queue-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+.queue-main { display: grid; gap: 3px; min-width: 0; }
+.queue-title { font: 600 15px/1.45 var(--font-serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.queue-url { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.queue-stage { font-size: 13px; color: var(--ink-2); }
+.queue-error { font-size: 13px; color: var(--danger); }
+.queue-side { display: flex; gap: 8px; align-items: center; }
+.progress { position: relative; display: block; height: 3px; margin-top: 8px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.progress::after {
+  content: ""; position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--p, 0));
+  background: var(--accent); transition: transform var(--dur-spatial) var(--ease-spatial);
+}
+.queue-row[data-status="done"] .progress, .queue-row[data-status="failed"] .progress { display: none; }

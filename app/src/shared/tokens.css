@@ -1,0 +1,77 @@
+/* Direction C · 液态玻璃（墨夜）, chosen 2026-09-26 (D-29).
+   The only file that may hold colours and font families (npm run lint:design). */
+:root {
+  color-scheme: dark;
+
+  /* shell */
+  --desk: #121416;
+  --window: #1b1e22;            /* 墨夜 */
+  --surface: #202328;
+  --raised: #262a30;
+  --ink: #efe7d6;               /* 缟 */
+  --ink-2: #d4ccbb;
+  --muted: #958f84;
+  --line: rgba(239, 231, 214, .09);
+  --line-strong: rgba(239, 231, 214, .16);
+  --accent: #c79a62;            /* 金赭 */
+  --accent-ink: #1b1e22;
+  --accent-wash: rgba(199, 154, 98, .12);
+  --ok: #93a97d;
+  --warn: #d6b26b;
+  --danger: #d0835f;
+  --shadow-pop: 0 10px 30px rgba(0, 0, 0, .35);
+  --shadow-soft: 0 2px 10px rgba(0, 0, 0, .22);
+
+  /* ambient light behind the sidebar capsule */
+  --ambient-warm: rgba(199, 154, 98, .22);
+  --ambient-green: rgba(120, 146, 98, .18);
+  --ambient-top: #1a1d21;
+  --ambient-bottom: #0e1012;
+
+  /* liquid glass (sidebar capsule and reader toolbar only) */
+  --glass-fill: rgba(255, 248, 235, .055);
+  --glass-hi: rgba(255, 255, 255, .22);
+  --glass-lo: rgba(255, 255, 255, .05);
+  --glass-rim: rgba(255, 255, 255, .08);
+  --glass-shadow: rgba(0, 0, 0, .35);
+  --glass-indicator: rgba(255, 248, 235, .10);
+  --glass-indicator-hi: rgba(255, 255, 255, .14);
+
+  /* floating scrollbar */
+  --scroll-thumb: rgba(239, 231, 214, .42);
+  --scroll-thumb-idle: rgba(239, 231, 214, .08);
+
+  /* the report stays on light paper: agent charts are drawn for white paper (D-29) */
+  --report-paper: #f5efe2;
+  --report-ink: #3a4750;
+  --report-heading: #2a2f35;
+  --report-muted: #7d8b94;
+  --report-accent: #8a5a2e;
+  --report-orange: #a8703f;
+  --report-line: rgba(80, 97, 109, .15);
+  --report-blue: #425066;
+  --report-blue-wash: #ebe5d8;
+  --report-wash: #efe6d2;
+  --report-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+  --report-bar-from: #c79a62;
+  --report-bar-to: #8f9a84;
+
+  /* mind map node tones */
+  --map-root: #c79a62;
+  --map-root-ink: #1b1e22;
+  --map-theme: rgba(199, 154, 98, .16);
+  --map-theme-rim: rgba(199, 154, 98, .45);
+  --map-topic: rgba(147, 169, 125, .14);
+  --map-topic-rim: rgba(147, 169, 125, .40);
+  --map-leaf: #262a30;
+  --map-edge: rgba(239, 231, 214, .22);
+  --map-dots: rgba(239, 231, 214, .06);
+
+  /* type */
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+}
