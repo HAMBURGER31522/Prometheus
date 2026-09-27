@@ -1,12 +1,25 @@
 import { defineConfig } from "@playwright/test";
 
-// The backend (8765) and Vite dev server (1420) are started externally;
-// CI does not run E2E (PLAN 11).
+// `npm run e2e` starts both servers itself (PLAN 15.4.5 / E6): the fake-pipeline backend
+// on 8765 and Vite on 1420 in E2E mode. One worker: the tests share the backend.
 export default defineConfig({
   testDir: "./e2e",
-  use: {
-    baseURL: "http://localhost:1420",
-    trace: "off",
-  },
+  workers: 1,
   timeout: 60_000,
+  use: { baseURL: "http://localhost:1420", trace: "off", viewport: { width: 1280, height: 800 } },
+  webServer: [
+    {
+      command: "node scripts/e2e-backend.mjs",
+      url: "http://127.0.0.1:8765/api/health",
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    {
+      command: "npm run dev",
+      url: "http://localhost:1420",
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: { VITE_E2E: "1" },
+    },
+  ],
 });

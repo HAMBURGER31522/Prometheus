@@ -1,5 +1,11 @@
+import dns from "node:dns";
+
 import react from "@vitejs/plugin-react";
 import { configDefaults, defineConfig } from "vitest/config";
+
+// "localhost" resolved to ::1 only on this machine, where nothing could connect to it:
+// prefer IPv4 so Vite listens on 127.0.0.1 while the origin stays http://localhost:1420.
+dns.setDefaultResultOrder("ipv4first");
 
 // Port 1420 / strictPort must match tauri.conf.json devUrl and the backend CORS whitelist (PLAN 8.1).
 export default defineConfig({
