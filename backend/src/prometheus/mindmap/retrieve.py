@@ -86,18 +86,17 @@ class Index:
         self.idf = {gram: math.log(1 + (total - n + 0.5) / (n + 0.5)) for gram, n in frequency.items()}
 
     def section_for(self, seconds) -> int | None:
+        """The chapter that most recently started by `seconds` (chapters overlap by a second
+        or so, and a leaf usually sits at its chapter's start); a moment a little before the
+        first chapter belongs to it."""
         if seconds is None:
             return None
-        before = None
-        for index, span in enumerate(self.ranges):
-            if span is None:
-                continue
-            start, end = span
-            if start - TIME_SLACK_S <= seconds <= end + TIME_SLACK_S:
-                return index
-            if start <= seconds:
-                before = index
-        return before
+        timed = [(span[0], index) for index, span in enumerate(self.ranges) if span is not None]
+        started = [(start, index) for start, index in timed if start <= seconds]
+        if started:
+            return max(started)[1]
+        ahead = [(start, index) for start, index in timed if start - TIME_SLACK_S <= seconds]
+        return min(ahead)[1] if ahead else None
 
     def search(self, query: str, *, exclude: int | None = None, limit: int = RELATED) -> list:
         terms = set(_grams(query))
