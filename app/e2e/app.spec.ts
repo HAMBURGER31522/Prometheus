@@ -127,3 +127,13 @@ test("⑧ 自定义提供商可选 OpenAI / Anthropic 协议", async ({ page }) 
   const protocol = page.getByLabel("接口协议");
   await expect(protocol.locator("option")).toHaveText(["OpenAI 兼容", "Anthropic"]);
 });
+
+test("报告目录的章节链接在报告内跳转，不会变成白页", async ({ page }) => {
+  await page.goto("/");
+  await openTab(page, "知识库");
+  await openFirstItem(page);
+  const report = page.frameLocator('iframe[title="精读报告"]');
+  await report.locator('.report-nav a[href="#s3"]').click();
+  await expect(report.locator("#s3")).toBeInViewport();
+  await expect(report.locator(".report-nav")).toBeVisible();
+});

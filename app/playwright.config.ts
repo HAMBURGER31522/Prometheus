@@ -15,9 +15,11 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
+      // A dev server that is already up (a preview in use) is fine: without ?port=&token=
+      // the page talks to 8765 / e2e, the fake backend started above.
       command: "npm run dev",
       url: "http://localhost:1420",
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 60_000,
       env: { VITE_E2E: "1" },
     },
