@@ -126,6 +126,10 @@ def create_app(
     app.include_router(content_api.router)
     app.include_router(settings_api.router)
     app.include_router(asr_components_api.router)
+    if state.fake:
+        from prometheus.fake import llm as fake_llm
+
+        app.include_router(fake_llm.router)
     return app
 
 
