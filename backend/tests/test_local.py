@@ -40,6 +40,7 @@ def test_asr_backend_env_does_not_affect_local_path(monkeypatch, tmp_path):
     from prometheus import paths
 
     (paths.cuda_dir(data_dir) / "nvidia" / "cublas" / "bin").mkdir(parents=True)
+    monkeypatch.setattr(local.components, "funasr_models_installed", lambda data_dir: True)
 
     asr_payload = json.loads((FIXTURES / "asr.local.json").read_text(encoding="utf-8"))
 
@@ -81,3 +82,16 @@ def test_cuda_component_missing_fails_fast(monkeypatch, tmp_path):
     with pytest.raises(local.CudaUnavailable) as error:
         local.transcribe_local(tmp_path, "a" * 32, tmp_path / "audio.wav")
     assert error.value.code == "CUDA_UNAVAILABLE"
+
+
+def test_funasr_models_missing_fails_fast(monkeypatch, tmp_path):
+    # PLAN 15.4.4: the local components are the CUDA runtime and the FunASR models.
+    monkeypatch.setattr(local, "cuda_component_installed", lambda data_dir: True)
+    monkeypatch.setattr(local.components, "funasr_models_installed", lambda data_dir: False)
+
+    def no_worker(*args, **kwargs):
+        raise AssertionError("a worker was started although the FunASR models are missing")
+
+    monkeypatch.setattr(local, "spawn_worker", no_worker)
+    with pytest.raises(local.CudaUnavailable):
+        local.transcribe_local(tmp_path, "a" * 32, tmp_path / "audio.wav")

@@ -22,9 +22,10 @@ from metrics import (
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "acceptance-output" / "asr-bench"
-ENGINES = ["whisper", "qwen3", "qwen3-seq", "funasr", "bcut"]
+ENGINES = ["whisper", "qwen3", "qwen3-seq", "funasr", "funasr-onnx", "bcut"]
 NAMES = {"whisper": "faster-whisper turbo", "qwen3": "Qwen3-ASR-1.7B（同时加载）",
          "qwen3-seq": "Qwen3-ASR-1.7B（先后加载）", "funasr": "FunASR paraformer-zh",
+         "funasr-onnx": "FunASR ONNX（CPU）",
          "bcut": "必剪（云端）"}
 SUBTITLES = {"zh": "zh.zh-CN.vtt", "en": "en.en.vtt"}
 

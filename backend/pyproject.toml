@@ -13,6 +13,10 @@ dependencies = [
     "pydantic==2.13.5",
     "yt-dlp[default]==2026.8.19",
     "faster-whisper==1.2.1",
+    "funasr-onnx==0.4.3",
+    "kaldi-native-fbank",
+    "jieba",
+    "sentencepiece",
     "video-report-agent",
 ]
 

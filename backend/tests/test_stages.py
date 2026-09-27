@@ -1,4 +1,4 @@
-"""Real pipeline stage runners (PLAN 8.3): resolve, download, wav, cloud ASR."""
+"""Real pipeline stage runners (PLAN 8.3): resolve, download, wav."""
 
 import json
 from pathlib import Path
@@ -7,7 +7,6 @@ from typing import ClassVar
 import pytest
 from prometheus.ingest import download as download_mod
 from prometheus.ingest import resolve as resolve_mod
-from prometheus.transcribe import cloud as cloud_mod
 from prometheus.transcribe.audio import build_wav_cmd
 from yt_dlp.utils import DownloadError
 
@@ -89,71 +88,3 @@ def test_wav_command_matches_plan():
     assert "-ar" in command and "16000" in command
     assert "pcm_s16le" in command
     assert str(Path("audio.wav")) in command
-
-
-def test_cloud_transcribe_uses_paraformer(monkeypatch, tmp_path):
-    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
-    monkeypatch.setattr(
-        cloud_mod, "store",
-        type("S", (), {
-            "load": staticmethod(lambda data_dir: {
-                "asr": {"dashscope_api_key": "sk-dash", "cloud_model": "paraformer-v2"},
-            }),
-        }),
-    )
-    config = {
-        "asr_backend": "paraformer", "asr_model": "paraformer-v2",
-        "asr_language": "zh", "asr_base_url": "https://dashscope.aliyuncs.com/api/v1",
-        "asr_parameters": {"channel_id": [0]},
-    }
-    seen = {}
-
-    def fake_config(**kwargs):
-        seen["config_kwargs"] = kwargs
-        return config
-
-    class FakeRun:
-        def to_dict(self):
-            return {"backend": "paraformer", "segments": [
-                {"ordinal": 0, "start_ms": 0, "end_ms": 1500, "text": "你好"},
-            ]}
-
-    def fake_transcribe(audio_path, **kwargs):
-        seen["transcribe_kwargs"] = kwargs
-        return FakeRun()
-
-    monkeypatch.setattr(cloud_mod, "resolve_media_config", fake_config)
-    monkeypatch.setattr(cloud_mod, "vendor_transcribe_audio", fake_transcribe)
-
-    from prometheus import paths
-
-    work = paths.work_dir(tmp_path, "a" * 32)
-    work.mkdir(parents=True)
-    out = cloud_mod.transcribe_cloud(tmp_path, "a" * 32, work / "audio.wav")
-
-    assert seen["config_kwargs"]["asr_backend"] == "paraformer"
-    kwargs = seen["transcribe_kwargs"]
-    assert kwargs["backend"] == "paraformer"
-    assert kwargs["model"] == "paraformer-v2"
-    assert kwargs["language"] == "zh"
-    assert kwargs["base_url"] == config["asr_base_url"]
-    assert kwargs["parameters"] == config["asr_parameters"]
-    import os
-
-    assert os.environ["DASHSCOPE_API_KEY"] == "sk-dash"
-    payload = json.loads(out.read_text(encoding="utf-8"))
-    assert payload["segments"][0]["text"] == "你好"
-
-
-def test_cloud_requires_dashscope_key(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        cloud_mod, "store",
-        type("S", (), {
-            "load": staticmethod(lambda data_dir: {
-                "asr": {"dashscope_api_key": "", "cloud_model": "paraformer-v2"},
-            }),
-        }),
-    )
-    with pytest.raises(cloud_mod.CloudAsrError) as error:
-        cloud_mod.transcribe_cloud(tmp_path, "a" * 32, tmp_path / "audio.wav")
-    assert error.value.code == "EXTERNAL_API_FAILURE"

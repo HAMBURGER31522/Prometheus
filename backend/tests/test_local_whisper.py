@@ -56,3 +56,8 @@ def test_transcribe_kwargs_other_languages_have_no_prompt():
         assert kwargs["language"] == language
         assert "initial_prompt" not in kwargs
         assert kwargs["vad_filter"] is True
+
+
+def test_asr_run_records_which_engine_produced_it():
+    run = build_asr_run(RAW, model="paraformer-large", language="zh", elapsed_ms=250, engine="funasr-onnx")
+    assert run.engine == "funasr-onnx"

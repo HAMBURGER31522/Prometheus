@@ -98,3 +98,17 @@ B 站的 CC 字幕需要登录才能获取，所以两段样本都取自 YouTube
 
 - 默认本地引擎：**中文用 FunASR paraformer-zh，其他语言用 faster-whisper turbo**（方案 B，D-35）。
 - 必剪的结果不补标点，原样使用（D-36）。
+
+## 补测：FunASR ONNX 版（2026-09-27）
+
+用户选定 FunASR 之后补测：同一套模型的官方 int8 ONNX 导出版，在 onnxruntime CPU（32 线程）上运行，不需要 torch（D-39）。
+
+| 引擎 | 字错率 | 替换/删除/插入 | 数字写法差异 | 加载 | 识别 | 实时率 | 显存增量 | 分段数 | 中位段长 | 时间戳 | 标点/百字 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| FunASR paraformer-zh（PyTorch，GPU） | 7.46% | 119/116/101 | 66 | 18.3s | 7.3s | 0.009 | 3.6 GB | 365 | 1.7s | 句子 | 8.1 |
+| FunASR ONNX（CPU） | 7.97% | 78/169/112 | 69 | 13.5s | 23.5s | 0.030 | 0 | 44 | 20.0s | 逐字（按 VAD 段输出） | 8.3 |
+
+- 两个版本的长段删除几乎完全一样（都是字幕和语音不一致的地方）；ONNX 版多出来的删除是零散的一两个字。
+- 表中 ONNX 版的分段是 VAD 的语音段（中位 20 秒）；模型本身给出逐字时间戳，接入时按 15.4.4 的规则断成句子。
+- 体积：模型约 1.3GB（ct-punc 1.0GB、paraformer 247MB、vad 0.5MB），Python 依赖只需 funasr-onnx、kaldi-native-fbank、jieba、sentencepiece、PyYAML（onnxruntime 软件已经带了）。
+

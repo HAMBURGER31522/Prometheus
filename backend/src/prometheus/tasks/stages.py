@@ -1,12 +1,14 @@
 """Real stage implementations wired into the queue (PLAN 8.3)."""
 
 import json
+import time
 from pathlib import Path
 
 from prometheus import paths
 from prometheus import runtime as runtime_mod
 from prometheus.figures import frames as frames_mod
 from prometheus.ingest import download as download_mod
+from prometheus.ingest import platform_subtitles
 from prometheus.ingest import resolve as resolve_mod
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
@@ -21,9 +23,10 @@ from prometheus.report.outline import extract_outline
 from prometheus.settings import store
 from prometheus.subtitle import convert as subtitle_convert
 from prometheus.subtitle import format as subtitle_format
-from prometheus.transcribe import cloud as cloud_mod
+from prometheus.subtitle import vtt
+from prometheus.transcribe import bcut
 from prometheus.transcribe import local as local_mod
-from prometheus.transcribe.audio import to_wav
+from prometheus.transcribe.audio import to_mp3, to_wav
 from prometheus.transcribe.transcript import build_transcript_md
 
 
@@ -54,6 +57,32 @@ def _write_subtitle_files(data_dir, ctx, asr_path) -> None:
     )
 
 
+def _transcribe_bcut(work: Path, audio: Path) -> Path:
+    """Cloud = 必剪 (PLAN 15.4.4): mp3 up, segments back, written as asr.json."""
+    started = time.perf_counter()
+    segments = bcut.transcribe(to_mp3(audio, work / "audio.mp3"))
+    run = bcut.asr_run(segments, elapsed_ms=round((time.perf_counter() - started) * 1000))
+    asr_path = work / "asr.json"
+    asr_path.write_text(json.dumps(run.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+    return asr_path
+
+
+def _from_platform_subtitle(work: Path, subtitle: Path) -> Path:
+    """work/subtitle.<lang>.vtt as asr.json, so the transcript stage reads it like any ASR."""
+    import dataclasses
+
+    from prometheus.transcribe.local_whisper import build_asr_run
+
+    language = subtitle.suffixes[-2].lstrip(".") if len(subtitle.suffixes) >= 2 else ""
+    segments = vtt.parse_vtt(subtitle.read_text(encoding="utf-8"))
+    run = build_asr_run({"segments": segments}, model=f"YouTube manual subtitles ({language})",
+                        language=language.split("-")[0].lower(), elapsed_ms=0, engine="youtube-subtitles")
+    run = dataclasses.replace(run, backend="platform", provider="youtube")
+    asr_path = work / "asr.json"
+    asr_path.write_text(json.dumps(run.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+    return asr_path
+
+
 def build_real_impls(data_dir, runtime=None) -> dict:
     """``runtime``: a resolved Runtime, or a zero-argument callable returning one."""
 
@@ -78,21 +107,39 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         row = _row(data_dir, ctx)
         settings = store.load(data_dir)
         work = _work(data_dir, ctx)
-        media = ["audio"] + (["video"] if row["figures"] else [])
-        for kind in media:
+        info = json.loads((work / "source.info.json").read_text(encoding="utf-8"))
+        language = platform_subtitles.pick_manual_subtitle(row["platform"], info)
+        if language:
+            # The uploader's own subtitles beat any transcription (D-38): no audio needed.
+            platform_subtitles.download_subtitle(work, row, settings, _node_exe(), language)
+            media = []
+        else:
+            media = ["audio"]
+        for kind in media + (["video"] if row["figures"] else []):
             download_mod.download_stage(work, row, settings, _node_exe(), media=kind)
 
     def transcribe(ctx):
         work = _work(data_dir, ctx)
+        subtitle = platform_subtitles.downloaded_subtitle(work)
+        if subtitle is not None:
+            asr_path = _from_platform_subtitle(work, subtitle)
+            items_store.update_item(data_dir, ctx.item_id, transcript_source="youtube-subtitles", notice=None)
+            _write_subtitle_files(data_dir, ctx, asr_path)
+            return
         audio = download_mod.downloaded_file(work, "media")
         if audio is None:
             raise FileNotFoundError("work/media.* is missing after download")
         wav = to_wav(audio, work / "audio.wav")
-        backend = store.load(data_dir)["asr"]["backend"]
-        if backend == "cloud":
-            asr_path = cloud_mod.transcribe_cloud(data_dir, ctx.item_id, wav)
-        else:
+        asr_path, notice = None, None
+        if store.load(data_dir)["asr"]["backend"] == "cloud":
+            try:
+                asr_path = _transcribe_bcut(work, audio)
+            except bcut.BcutUnavailable:
+                notice = "必剪不可用，已改用本地转写"  # PLAN 15.4.4
+        if asr_path is None:
             asr_path = local_mod.transcribe_local(data_dir, ctx.item_id, wav)
+        engine = json.loads(asr_path.read_text(encoding="utf-8")).get("engine")
+        items_store.update_item(data_dir, ctx.item_id, transcript_source=engine, notice=notice)
         _write_subtitle_files(data_dir, ctx, asr_path)
 
     def transcript(ctx):

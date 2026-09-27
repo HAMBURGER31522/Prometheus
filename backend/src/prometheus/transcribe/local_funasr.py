@@ -1,0 +1,145 @@
+"""FunASR ONNX worker helpers (PLAN 15.4.4, D-39).
+
+Paraformer returns one timestamp per token (a Chinese character or an English
+word); the punctuation model returns the same tokens as one string with marks
+inserted. Walking that string puts each mark back on its token, and the marks
+then cut the tokens into subtitle-sized sentences.
+"""
+
+MODEL_ID = "paraformer-large + fsmn-vad + ct-punc (onnx int8)"
+_MARKS = frozenset("，。！？；：、,.!?;:…")
+_SENTENCE_END = frozenset("。！？；….!?;")
+_CLAUSE = frozenset("，、,")
+MAX_CHARS = 30
+MAX_SECONDS = 8.0
+
+
+def attach_punctuation(tokens: list, punctuated: str) -> list:
+    """The punctuation that follows each token in ``punctuated`` ("" when none)."""
+    marks = [""] * len(tokens)
+    text = punctuated.lower()
+    position = 0
+    for index, token in enumerate(tokens):
+        while position < len(text) and text[position].isspace():
+            position += 1
+        token = token.lower()
+        if text.startswith(token, position):
+            position += len(token)
+        else:
+            # The punctuated text drifted: look a little further, else leave this token bare.
+            found = text.find(token, position, position + len(token) + 4)
+            if found < 0:
+                continue
+            position = found + len(token)
+        end = position
+        while end < len(text) and text[end] in _MARKS:
+            end += 1
+        marks[index] = punctuated[position:end]
+        position = end
+    return marks
+
+
+def _cut(items: list, marks: frozenset) -> list:
+    """Split after every item whose punctuation contains one of ``marks``."""
+    groups, current = [], []
+    for item in items:
+        current.append(item)
+        if any(char in marks for char in item[1]):
+            groups.append(current)
+            current = []
+    if current:
+        groups.append(current)
+    return groups
+
+
+def _is_word(token: str) -> bool:
+    return token.isascii() and token[:1].isalnum()
+
+
+def _join(items: list) -> str:
+    text, previous_word = "", False
+    for token, mark, _times in items:
+        if text and previous_word and _is_word(token):
+            text += " "
+        text += token + mark
+        previous_word = _is_word(token)
+    return text
+
+
+def _fit(times_ms: list, count: int) -> list:
+    """Paraformer can drop the timestamp of a filler (啊, "O K"): spread what there is over the tokens."""
+    if len(times_ms) == count or not times_ms:
+        return times_ms if times_ms else [[0, 0]] * count
+    return [times_ms[min(index * len(times_ms) // count, len(times_ms) - 1)] for index in range(count)]
+
+
+def build_segments(tokens: list, times_ms: list, punctuated: str, *, offset_s: float) -> list:
+    """Sentences at 。！？；, long ones (> 30 characters or > 8 s) cut again at ，、."""
+    times_ms = _fit(times_ms, len(tokens))
+    items = list(zip(tokens, attach_punctuation(tokens, punctuated), times_ms, strict=True))
+    segments = []
+    for sentence in _cut(items, _SENTENCE_END):
+        characters = sum(len(token) for token, _mark, _times in sentence)
+        seconds = (sentence[-1][2][1] - sentence[0][2][0]) / 1000
+        parts = _cut(sentence, _CLAUSE) if characters > MAX_CHARS or seconds > MAX_SECONDS else [sentence]
+        for part in parts:
+            segments.append({
+                "start": round(offset_s + part[0][2][0] / 1000, 3),
+                "end": round(offset_s + part[-1][2][1] / 1000, 3),
+                "text": _join(part),
+            })
+    return segments
+
+
+def transcribe_array(audio, *, vad, asr, punc, sample_rate: int = 16000) -> list:
+    """VAD spans -> paraformer per span -> one punctuation pass over all tokens -> segments.
+
+    Punctuating once keeps a sentence the VAD happened to cut from getting a full stop at the cut.
+    """
+    tokens, times = [], []
+    for start_ms, end_ms in vad(audio)[0]:
+        results = asr(audio[start_ms * sample_rate // 1000:end_ms * sample_rate // 1000]) or [{}]
+        result = results[0] if isinstance(results[0], dict) else {}
+        span_tokens = (result.get("preds") or "").split()
+        if not span_tokens:
+            continue
+        tokens += span_tokens
+        times += [[start + start_ms, end + start_ms]
+                  for start, end in _fit(result.get("timestamp") or [], len(span_tokens))]
+    if not tokens:
+        return []
+    return build_segments(tokens, times, punc(" ".join(tokens))[0], offset_s=0)
+
+
+def choose_engine(language: str) -> str:
+    """Mandarin goes to FunASR (D-35); everything else, Cantonese included, stays on whisper."""
+    return "funasr" if language == "zh" else "whisper"
+
+
+def load_models(data_dir) -> dict:
+    """The three ONNX models on CPU, ready for ``transcribe_array``."""
+    import os
+    import sys
+    import types
+
+    # funasr-onnx imports librosa at module level but only calls it to read audio files by
+    # path; Prometheus always passes arrays, so librosa is not shipped (D-39).
+    sys.modules.setdefault("librosa", types.ModuleType("librosa"))
+    from funasr_onnx import CT_Transformer, Fsmn_vad, Paraformer
+    from prometheus.transcribe import components
+
+    class Vad(Fsmn_vad):
+        # funasr-onnx 0.4.3 uses its 1-element length array as a scalar, which numpy 2
+        # rejects; one waveform per call, so hand back the scalar.
+        def extract_feat(self, waveform_list):
+            feats, feats_len = super().extract_feat(waveform_list)
+            return feats, feats_len[0]
+
+    vad_dir, asr_dir, punc_dir = (str(components.funasr_model_dir(data_dir, model))
+                                  for model, _files in components.FUNASR_MODELS)
+    threads = os.cpu_count() or 4
+    return {
+        "vad": Vad(vad_dir, quantize=True, intra_op_num_threads=threads),
+        "asr": Paraformer(asr_dir, quantize=True, intra_op_num_threads=threads),
+        "punc": CT_Transformer(punc_dir, quantize=True, intra_op_num_threads=threads),
+    }

@@ -638,6 +638,9 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
    - 删除 DashScope 相关的设置项和界面（vendor 的 paraformer 代码保持不动）。
 8. **前端从零重写**（见 15.4.5），不在旧界面代码上修补，后端接口契约保持兼容。
 9. **README**：写明技术栈、特色、使用与部署步骤，以及从 VRA 和 BiliSum 各取了什么。
+10. **本地转写 = 中文 FunASR + 其他语言 faster-whisper**（用户 2026-09-27 看过 R5 实测后选定，D-35；FunASR 用 ONNX 版在 CPU 上运行，D-39，见 15.4.4）。
+11. **平台人工字幕优先**（用户 2026-09-27 同意，借鉴 BiliSum）：YouTube 视频带有作者上传的原语言人工字幕时，直接使用，跳过转写（见 15.4.4）。B 站字幕需要登录 cookie，本阶段不做。
+12. **字幕纠错**（用户 2026-09-27 同意，见 15.4.6）：精读完成后，用用户配置的同一个模型，按上下文并参考报告，改正字幕里的识别错字，同时补全标点；字幕页默认显示纠错版，可以切换回原始识别。
 
 **明确不做：** 浅色/深色主题切换（全局只有 C 的墨夜外壳，报告保持浅色纸页）、问答 / RAG、阿里云与 Groq 云端、说话人区分、在资源管理器里手动挪动文件夹后的自动同步（软件只提示「文件缺失」，提供「删除记录」和「重新生成」两个操作）。
 
@@ -652,10 +655,11 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | **E3** | 真实跑完 `BV1yPb46xExH`（开启配图、本地转写，模型用用户提供的 API）：<br>① 知识库文件夹里有精读.html、精读.md（带 title/date/category/tags/description 的开头）、思维导图.md、字幕.srt、字幕.txt、来源.url；<br>② `index.json` 和 `llms.txt` 包含该条目；<br>③ `mindmap.json` 通过校验（3–6 个主题，叶子都有时间）；<br>④ `run.trace.jsonl` 覆盖全部阶段；<br>⑤ 清理后，该条目的知识库文件夹 + 缓存 ≤ 5MB | `scripts/acceptance/live.ps1 -Url https://www.bilibili.com/video/BV1yPb46xExH/`（会产生 API 费用，手动触发） |
 | **E4** | 报告阶段进行中取消任务，5 秒内不再有该任务的 Pi / ffmpeg / 转写进程，状态为 `cancelled` | live 测试 `test_cancel_live.py` |
 | **E5** | 转写实测表（4 个引擎 × 中英两段样本：字错率/词错率、速度、峰值显存、时间戳、标点） | `docs/asr-bench.md`；**由用户看表后决定默认引擎** |
-| **E6** | 前端单测 + E2E 一条命令跑完，E2E 自动拉起假流水线后端和 Vite。断言：<br>① 侧栏五项顺序；<br>② 在某个页签里打开条目后，侧栏高亮**停留在该页签**；<br>③ 知识库、思维导图、字幕三个页签的分类和条目标题完全一致；<br>④ 导图画布渲染出节点，点节点出现摘要面板；<br>⑤ 字幕页按时间顺序列出**全部**分段；<br>⑥ 外链交给 `openExternal`；<br>⑦ 设置里选「云端」无需填写任何 Key 即可保存；<br>⑧ 自定义提供商可选 OpenAI / Anthropic 协议 | `npm --prefix app run test`；`npm --prefix app run e2e`；`npm --prefix app run lint:design` |
+| **E6** | 前端单测 + E2E 一条命令跑完，E2E 自动拉起假流水线后端和 Vite。断言：<br>① 侧栏五项顺序；<br>② 在某个页签里打开条目后，侧栏高亮**停留在该页签**；<br>③ 知识库、思维导图、字幕三个页签的分类和条目标题完全一致；<br>④ 导图画布渲染出节点，点节点出现摘要面板；<br>⑤ 字幕页按时间顺序列出**全部**分段，默认显示纠错版，可切换原始识别；<br>⑥ 外链交给 `openExternal`；<br>⑦ 设置里选「云端」无需填写任何 Key 即可保存；<br>⑧ 自定义提供商可选 OpenAI / Anthropic 协议 | `npm --prefix app run test`；`npm --prefix app run e2e`；`npm --prefix app run lint:design` |
 | **E7** | 界面观感与动效：侧栏不遮挡内容，滚动条滚动时显现、静止时淡出，页面切换顺滑，报告阅读舒适 | **用户看截图并实际试用安装版后判定**，记入 `docs/acceptance.md` |
 | **E8** | 安装包 ≤ 300MB；安装版在**禁止使用开发机工具路径**的条件下（设 `PROMETHEUS_FORBID_DEV_PATHS=1`，后端只要解析到安装目录以外的 node / pi / ffmpeg / python 就立即报错）完整处理一个短视频 | `scripts/acceptance/installed-live.ps1` |
 | **E9** | README 按 15.2 第 9 条更新；远程 `main` 与本地一致；CI 为绿 | `git fetch origin; git rev-parse main origin/main`；CI 状态 |
+| **E10** | 字幕纠错实测：对 R5 中文样本的 faster-whisper 结果和必剪结果分别纠错，以作者的人工字幕为参考：<br>① 纠错后的字错率**低于**纠错前；<br>② 分段数和每段的起止时间不变；<br>③ 必剪结果纠错后，标点 ≥ 每 100 字 5 个 | live 测试 `test_subtitle_fix_live.py`（会产生 API 费用，手动触发） |
 
 ### 15.4 设计细节
 
@@ -729,7 +733,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
   - 另记：处理时间 / 音频时长、峰值显存（nvidia-smi 采样）、时间戳粒度、有无标点、安装体积。
 - **产物**：`docs/asr-bench.md`（汇总表 + 典型错误摘录）；原始输出放 `acceptance-output/asr-bench/`（不提交）。
 
-#### 15.4.4 云端转写（必剪）
+#### 15.4.4 转写：云端必剪、本地 FunASR / whisper、平台人工字幕
 
 - `transcribe/bcut.py`：
   - 流程：上传授权 → 分片上传 → 提交 → 建任务 → 轮询；请求头参照 VideoCaptioner 的维护版实现（2026-09-26 实测：原版 bcut-asr 返回 412，改用维护版请求头后可用）；
@@ -737,6 +741,21 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
   - 输出：转成 vendor 的 `AsrRun` 结构（utterance 级时间戳）。
 - 遇到 412 / 429、超时，或任务状态为错误时，**自动改用本地转写**，并在条目上记一条提示「必剪不可用，已改用本地转写」。
 - 设置项 `asr.backend`：`local` | `cloud`；选 `cloud` 时不需要任何配置。
+- 必剪的代码按接口流程自行编写，不复制 VideoCaptioner 的代码（它是 GPL，本仓库是 MIT）。
+
+**本地转写（D-35、D-39，2026-09-27 补充）**
+
+- **语言判断**：用 faster-whisper 的 `detect_language` 检测音频语言（有 CUDA 用 GPU，否则用 CPU int8）。`zh` 走 FunASR，其他语言走 faster-whisper（和现在一样：有 CUDA 用 GPU，否则用 CPU）。
+- **FunASR**：fsmn-vad → paraformer-large（带逐字时间戳）→ ct-punc，全部用 onnxruntime 在 CPU 上运行（`funasr-onnx` 0.4.3，int8 模型），在单独的子进程里执行，取消时结束进程树。
+  - 模型（ModelScope）：`iic/speech_fsmn_vad_zh-cn-16k-common-onnx`、`iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx`、`iic/punc_ct-transformer_cn-en-common-vocab471067-large-onnx`，共约 1.3GB，放在 `.prometheus\models\funasr\`，由「安装本地转写组件」一并下载（直接用 ModelScope 的文件接口，不引入 modelscope 包）。
+  - **分段**：先按 。！？；… 断句；超过 30 个字或 8 秒的句子，再在 ，、 处拆开。每段的起止时间取首字和末字的时间戳。
+- **组件安装位置**：CUDA 运行库装到 `paths.cuda_dir`（即 `.prometheus\runtime\cuda`）。修复 R3 遗留的问题：安装代码仍写到数据目录根部的 `runtime\cuda`，而转写代码从 `.prometheus` 下查找。
+
+**平台人工字幕（2026-09-27 补充）**
+
+- 仅限 YouTube：解析阶段读取 yt-dlp 的 `language`（视频原语言）和 `subtitles`（作者上传的人工字幕，不含 `automatic_captions`）。有与原语言匹配的人工字幕时（主语言代码相同，例如 `zh` 对 `zh-Hans` / `zh-CN`），只下载这份字幕，转成分段，跳过音频转写。没有 `language` 或没有匹配的字幕时，照常转写。
+- 繁体字幕按现有规则转成简体。
+- 使用了平台字幕的条目，在条目上记录来源「YouTube 人工字幕」。
 
 #### 15.4.5 前端（C · 液态玻璃，用户于 2026-09-26 选定）
 
@@ -745,12 +764,28 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 - **滚动条**：悬浮细滚动条，静止时几乎透明（约 20% 不透明），滚动或悬停时显现并变宽，停止 800ms 后淡出。报告 iframe 在注入的覆盖样式里做同样处理。
 - **导航**：侧栏高亮始终等于当前页签；阅读页的「精读 / 导图 / 字幕」切换同时切换当前页签，保持同一条目。
 - **三个内容页签**共用「分类 → 条目 → 内容」版式：分类列、条目列表，以及内容区的顶部玻璃工具栏（面包屑 + 三件套切换）。
-- **字幕页**：按时间顺序完整列出全部分段（`[时:分:秒] 原文`），长列表用虚拟滚动；点时间戳在浏览器打开视频对应时刻；可以导出 SRT / TXT。
+- **字幕页**：按时间顺序完整列出全部分段（`[时:分:秒] 原文`），长列表用虚拟滚动；点时间戳在浏览器打开视频对应时刻；可以导出 SRT / TXT。默认显示纠错版（15.4.6），工具栏上有开关，可切换为原始识别；字幕来自 YouTube 人工字幕时显示来源。
 - **报告页**：显示时临时注入覆盖样式（配色、字体、渐变条、滚动条），磁盘上的文件不改。
 - **字体**：标题用思源宋体（Noto Serif SC，OFL）的按字切分 woff2，随安装包分发；界面文字用系统字体。
 - **动效**：弹簧曲线（由阻尼振子采样生成 CSS `linear()`；空间类约 500ms、带轻微回弹，效果类约 320ms、无回弹），页面与内容切换用 React 19.3 的 `<ViewTransition>`；遵循 `prefers-reduced-motion`。
 - **测试**：Vitest 覆盖布局与交互逻辑；Playwright 的 `webServer` 自动拉起假流水线后端和 Vite（`npm run e2e` 一条命令）。
 - **设计检查**：颜色只在 `tokens.css` 定义；动效曲线只在 `motion.css` 定义。
+
+#### 15.4.6 字幕纠错（用户 2026-09-27 同意）
+
+- **位置**：新阶段 `subtitle_fix`，放在 `finalize` 之后、`mindmap` 之前。报告已经写好，可以当术语参考；报告的生成流程不变。
+- **输入**：分段字幕（转写结果或平台人工字幕）；参考材料是报告转成的 Markdown（最多 12000 字）。
+- **做法**：
+  - 每次最多 120 段（约 2500 字），最多 3 个请求并发；
+  - 提示词要求：只改语音识别造成的错字（同音字、近音词、专有名词），补全标点；不增删内容，不改说法，不合并或拆分分段，不改时间；平台人工字幕只补标点。输出为 `{"段号": "文本"}` 形式的 JSON。
+- **逐段校验**（确定性）：
+  - 每个段号都要有；
+  - 去掉标点和空白后，与原文的编辑距离 ≤ max(2, ⌈原长 × 0.3⌉)；
+  - 不满足的分段保留原文。一批的输出无法解析时重试一次，仍失败则整批保留原文。
+- **存储**：原始识别存为缓存里的 `segments.raw.json`（长期保留）；纠错后的写入 `segments.json`，字幕页、`字幕.srt` 和 `字幕.txt` 都用它。条目记录 `subtitle_status`（`ok` / `failed`）。
+- **失败处理**：纠错失败时只把 `subtitle_status` 记为 `failed`，字幕保持原样，条目照常完成。
+- **接口**：`GET /items/{id}/subtitle?variant=raw` 返回原始识别。
+- **费用**：输入和输出都约等于字幕字数的 token 数（13 分钟约 1 万 token，3 小时约 10 万 token）。
 
 ### 15.5 里程碑
 
@@ -763,7 +798,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R3 | `r3-library` | 15.4.1：可读文件夹、精读.md、标签与摘要、索引、改名与移动同步、旧版迁移 | E1；迁移、命名、索引的单测 |
 | R4 | `r4-mindmap` | 15.4.2 后端：JSON 知识树生成、校验、导出 .md | E1；校验规则的单测 |
 | R5 | `r5-asr-bench` | 15.4.3 实测 | E5，**停下来等用户选定** |
-| R6 | `r6-asr` | 15.4.4 必剪 + 接入用户选定的本地引擎 | E1；live：两个后端各转写一段样本 |
+| R6 | `r6-asr` | 15.4.4 必剪 + 本地 FunASR / whisper 按语言切换 + YouTube 人工字幕 + 组件安装位置修复 | E1；live：必剪、FunASR、whisper 各转写一段样本；YouTube 人工字幕样本不经转写 |
+| R6b | `r6b-subtitle-fix` | 15.4.6 字幕纠错 | E1；E10 |
 | R7 | `r7-frontend` | 15.4.5 前端重写（含导图画布） | E6；**停下来请用户看截图**（E7） |
 | R8 | `r8-release` | 打包、README、完整验收 | E3、E4、E8、E9 |
 
@@ -776,7 +812,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R3 知识库存储 | 完成 | 2026-09-26 | 63e74a8 | E1：`uv run pytest backend/tests -q -m "not live"` = 0（175 passed，连跑 3 遍稳定）、`ruff` = 0；红 32e1604、605e0cd → 绿 a944c07；真实数据验证：acceptance-output/live-data 的旧版布局副本迁移成功（两个条目分入「战争伦理」「神秘学」，6 个文件齐全，旧 items/ 与根目录 db 清除）；Tauri 外壳与安装冒烟脚本的端口文件改到 .prometheus/logs（cargo check = 0） |
 | R4 思维导图 | 完成 | 2026-09-26 | b1d79fe | E1：`uv run pytest backend/tests -q -m "not live"` = 0（192 passed，连跑 5 遍稳定）、`ruff` = 0；红 9d565e4、542fc25、b146d2d → 绿 244b395、fd60091；校验规则单测覆盖主题数、字数、叶子时间、深度、章节覆盖率、容错解析；按 PLAN 8.8 补上「重新生成导图」（`regenerate` 带 `{"only": "mindmap"}`，D-34），顺带修复 `regenerate` 读取 dict 的 `.status_code` 导致 500 的问题；导图阶段的模型错误不再让条目失败（PLAN 8.3）；修复两处测试竞态（test_links、test_items_api）；live 测试改用 `generate_for_item`（4 个可正常收集，本里程碑未调用真实 API） |
 | R5 转写实测 | 完成 | 2026-09-27 | 28da7c7 | 用户选定：中文 FunASR paraformer-zh + 其他语言 faster-whisper turbo（D-35），必剪原样使用（D-36）。E5：`docs/asr-bench.md` 已产出（4 个引擎 × 中英两段样本，另测 Qwen3 的两种加载方式；字错率/词错率、速度、显存、时间戳、标点、体积）；评分规则单测 `scripts/asr-bench/test_metrics.py` 8 passed（红 8b6a46d、b48c856 → 绿 a3b63af、f692324）；`ruff check scripts/asr-bench` = 0；Fun-ASR-Nano 未测 |
-| R6 转写接入 | 未开始 | | | |
+| R6 转写接入 | 完成 | 2026-09-27 | （合并后补） | E1：`uv run pytest backend/tests -q -m "not live"` = 0（229 passed，连跑 3 遍稳定）、`ruff` = 0；E2 复查 = 0（249 passed，依赖锁变更后）。live（无模型费用）：必剪转写 B 站样本、本地中文走 funasr-onnx、YouTube 英文走 faster-whisper、TED 人工字幕跳过下载音频和转写，4/4 通过。真实 worker 在 R5 样本上：中文 funasr-onnx 字错率 7.97%（306 段），英文 whisper 词错率 2.78%。组件安装实测：FunASR 模型 1.23GB 用时 5 分 51 秒。红 af72e6c、9d4082c、2424951、13caa04、ed92d73、a6e254b、0957b16、ee92a3f → 绿 d23d5cf、1d3ecad、d9ffbc1、dc7171a、9d28f79、312d069、0ed1c44、b5b0984 |
+| R6b 字幕纠错 | 未开始 | | | |
 | R7 前端 | 未开始 | | | |
 | R8 发布 | 未开始 | | | |
 

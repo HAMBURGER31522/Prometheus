@@ -14,6 +14,11 @@ members = [
     "prometheus-backend",
     "video-report-agent",
 ]
+overrides = [
+    { name = "librosa", marker = "sys_platform == 'never'" },
+    { name = "numpy", specifier = ">=2" },
+    { name = "scipy", marker = "sys_platform == 'never'" },
+]
 
 [[package]]
 name = "annotated-doc"
@@ -233,6 +238,23 @@ wheels = [
 ]
 
 [[package]]
+name = "funasr-onnx"
+version = "0.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jieba" },
+    { name = "kaldi-native-fbank" },
+    { name = "numpy" },
+    { name = "onnxruntime" },
+    { name = "pyyaml" },
+    { name = "sentencepiece" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/97/d046525a73930640aa27c64409f50614304676d4c571a1621450a9d91c77/funasr_onnx-0.4.3.tar.gz", hash = "sha256:9b12fb6fc44ef6e14e3c0ad1addb97c9e2d90c8ba3fbc94eaa07d7d911df055d", size = 35318, upload-time = "2026-09-09T23:21:16.033Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/17/e19a180c97e916e058b5fc5eecfa431d46cd8673c995699dcba6d978b728/funasr_onnx-0.4.3-py3-none-any.whl", hash = "sha256:7dd65d6a506dc171a53e87eb55faf0a3e478f2531f90671246f43c2c56023fe6", size = 41230, upload-time = "2026-09-09T23:21:14.421Z" },
+]
+
+[[package]]
 name = "greenlet"
 version = "3.5.6"
 source = { registry = "https://pypi.org/simple" }
@@ -328,6 +350,12 @@ wheels = [
 ]
 
 [[package]]
+name = "jieba"
+version = "0.42.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/cb/18eeb235f833b726522d7ebed54f2278ce28ba9438e3135ab0278d9792a2/jieba-0.42.1.tar.gz", hash = "sha256:055ca12f62674fafed09427f176506079bc135638a14e23e25be909131928db2", size = 19214172, upload-time = "2020-01-20T14:27:23.5Z" }
+
+[[package]]
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -337,6 +365,16 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
+]
+
+[[package]]
+name = "kaldi-native-fbank"
+version = "1.22.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/2c/84076b352107ce12d56f28c313f1aca1be332d953dd96aec7b84976e6d53/kaldi-native-fbank-1.22.3.tar.gz", hash = "sha256:387bf87225c6b83c93ae652eeaef1b4d531994b6e398e7a77189de340674f9af", size = 71013, upload-time = "2025-10-09T02:31:21.487Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/66/1c/fce142bd3aeadb1292360a90ceb91f923c8e12081c21576fe69917243c5f/kaldi_native_fbank-1.22.3-cp312-cp312-win32.whl", hash = "sha256:a90f51377569575fc0d1a66ef7e89a36102bfb6dcd1d15d6c4afb930ce726672", size = 273308, upload-time = "2025-10-09T02:29:59.931Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/8d/c0b0b6280edabad85d7e15093fad612c027e175fe4e0b960ce2f36485143/kaldi_native_fbank-1.22.3-cp312-cp312-win_amd64.whl", hash = "sha256:cbbeea19fe6d584c54e93fe6615a7185b10e0d78fdb6471f9e44596018437c38", size = 308023, upload-time = "2025-10-09T02:28:43.909Z" },
 ]
 
 [[package]]
@@ -378,7 +416,6 @@ dependencies = [
     { name = "more-itertools" },
     { name = "numba" },
     { name = "numpy" },
-    { name = "scipy" },
     { name = "tiktoken" },
     { name = "torch" },
     { name = "tqdm" },
@@ -572,7 +609,11 @@ source = { editable = "backend" }
 dependencies = [
     { name = "fastapi" },
     { name = "faster-whisper" },
+    { name = "funasr-onnx" },
+    { name = "jieba" },
+    { name = "kaldi-native-fbank" },
     { name = "pydantic" },
+    { name = "sentencepiece" },
     { name = "uvicorn" },
     { name = "video-report-agent" },
     { name = "yt-dlp", extra = ["default"] },
@@ -582,7 +623,11 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = "==0.141.1" },
     { name = "faster-whisper", specifier = "==1.2.1" },
+    { name = "funasr-onnx", specifier = "==0.4.3" },
+    { name = "jieba" },
+    { name = "kaldi-native-fbank" },
     { name = "pydantic", specifier = "==2.13.5" },
+    { name = "sentencepiece" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "video-report-agent", editable = "vendor/video-report-agent" },
     { name = "yt-dlp", extras = ["default"], specifier = "==2026.8.19" },
@@ -783,16 +828,13 @@ wheels = [
 ]
 
 [[package]]
-name = "scipy"
-version = "1.18.1"
+name = "sentencepiece"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/74/66de6258867beb2ef08f35f9f2ac017a52cacd5081714d239ff1a442d458/scipy-1.18.1.tar.gz", hash = "sha256:52c4b7422442aba924d03ad4019852b08a92e64ea187b933135687bfe2747307", size = 30781235, upload-time = "2026-08-21T23:28:50.599Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/33/ea3cb3839607eb175da835244a798f797f478c5ddf0e8ecdf57ea85a4c70/sentencepiece-0.2.2.tar.gz", hash = "sha256:3d2b5e824b5622038dc7b490897efe05ebbbb9e7350fc142f3ecc8789ef9bdf6", size = 8218435, upload-time = "2026-07-12T08:39:34.701Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/e7/979fd14e75008623df31ba70d6bb144700f68feadcea042021c06a05bf82/scipy-1.18.1-cp312-cp312-win_amd64.whl", hash = "sha256:5e4d44984abc0020154ea81b247adeddcc3ac5527b975ff798bd1ba0adc513c2", size = 36658278, upload-time = "2026-08-21T23:24:25.463Z" },
-    { url = "https://files.pythonhosted.org/packages/c7/0b/e1525354ff9d7d5feb6d1b31af6d14072e5c91e9607b421fa1ec889660b3/scipy-1.18.1-cp312-cp312-win_arm64.whl", hash = "sha256:d65d448389b8436493abcf629cc94ad0cf32aecaf06e1acca1de53cc795f2f12", size = 24400588, upload-time = "2026-08-21T23:24:30.579Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/11/753fca2e6b109be3ab7867abf357dfe48677fe726ae5a5363d0b54ca9450/sentencepiece-0.2.2-cp312-cp312-win_amd64.whl", hash = "sha256:7c6e7bf684dc12145bfa685d3060beaea55139134ba848289bee514ed42e7383", size = 1248030, upload-time = "2026-07-12T08:38:37.604Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/0a/70efbe861ca182d7d4b6e1a20f58e043400848fa9f2915229f082e221648/sentencepiece-0.2.2-cp312-cp312-win_arm64.whl", hash = "sha256:76ff5814db72e7462dece042d7593cdf102b8ec82c2b1cc201a2add34ee3050d", size = 1187325, upload-time = "2026-07-12T08:38:39.348Z" },
 ]
 
 [[package]]

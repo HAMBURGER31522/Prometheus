@@ -61,7 +61,7 @@ def test_legacy_layout_moves_into_the_library(tmp_path):
     conn = db.connect(root)
     done = dict(conn.execute("SELECT * FROM items WHERE id = ?", (DONE_ID,)).fetchone())
     failed = dict(conn.execute("SELECT * FROM items WHERE id = ?", (FAILED_ID,)).fetchone())
-    assert db.get_schema_version(conn) == 2
+    assert db.get_schema_version(conn) == db.SCHEMA_VERSION
     assert done["library_path"] == "神秘学/2026-09-26 魔法卡巴拉导论：生命树"
     folder = root / done["library_path"]
     assert "正文" in (folder / "精读.html").read_text(encoding="utf-8")
