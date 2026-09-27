@@ -96,3 +96,19 @@ def test_regenerate_with_figures_requeues_a_failed_item(client):
     assert response.json() == {"queued": True}
     assert items_store.get_item(client.app.state.data_dir, item_id)["figures"] == 1
     wait_for_status(client, item_id, "done")
+
+
+def test_a_finished_item_can_be_regenerated(client):
+    # PLAN 15.2: an item whose library folder went missing offers 「重新生成」.
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
+    response = client.post(f"/api/items/{item_id}/regenerate", json={})
+    assert response.status_code == 200
+    assert response.json() == {"queued": True}
+    wait_for_status(client, item_id, "done")
+
+
+def test_retry_is_still_only_for_items_that_did_not_finish(client):
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
+    assert client.post(f"/api/items/{item_id}/retry").status_code == 409
