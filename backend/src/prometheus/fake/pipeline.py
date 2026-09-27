@@ -15,6 +15,7 @@ from prometheus.library import items as items_store
 from prometheus.library import publish as publish_mod
 from prometheus.mindmap import enrich
 from prometheus.mindmap.markdown import tree_to_markdown
+from prometheus.subtitle import fix as subtitle_fix_mod
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 
@@ -34,11 +35,31 @@ def _fake_fill(prompt: str) -> str:
     return json.dumps(details, ensure_ascii=False)
 
 
+def _fake_fix(prompt: str) -> str:
+    """A careful model for subtitle correction: keeps every text as it is and, when asked to
+    translate (the English sample), answers from fixtures/segments.en.json."""
+    mark = subtitle_fix_mod.SEGMENTS_MARK
+    batch = json.loads(prompt[prompt.index(mark) + len(mark):])
+    if "中文翻译" not in prompt:
+        return json.dumps(batch, ensure_ascii=False)
+    english = json.loads(_fixture("segments.en.json").read_text(encoding="utf-8"))
+    zh = {segment["text"]: segment["zh"] for segment in english}
+    return json.dumps({key: {"text": text, "zh": zh.get(text, "")} for key, text in batch.items()},
+                      ensure_ascii=False)
+
+
+def _english(data_dir, item_id: str) -> bool:
+    """In fake mode a YouTube link stands for an English video (PLAN 15.4.9 / E12 ②)."""
+    return items_store.get_item(data_dir, item_id)["platform"] == "youtube"
+
+
 def build_impls(data_dir):
     """Stage implementations that copy committed fixtures into the item layout."""
 
     def resolve(ctx):
         info = json.loads(_fixture("source.info.json").read_text(encoding="utf-8"))
+        if _english(data_dir, ctx.item_id):
+            info = {**info, "source_title": "An English sample", "uploader": "English Sample Channel"}
         (paths.work_dir(data_dir, ctx.item_id) / "source.info.json").write_text(
             json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8",
         )
@@ -53,6 +74,11 @@ def build_impls(data_dir):
 
     def transcribe(ctx):
         segments = json.loads(_fixture("segments.json").read_text(encoding="utf-8"))
+        if _english(data_dir, ctx.item_id):
+            english = json.loads(_fixture("segments.en.json").read_text(encoding="utf-8"))
+            segments = [{key: segment[key] for key in ("start", "end", "text")} for segment in english]
+            (paths.work_dir(data_dir, ctx.item_id) / "asr.json").write_text(
+                json.dumps({"language": "en", "segments": []}), encoding="utf-8")
         segments_file = paths.segments_file(data_dir, ctx.item_id)
         segments_file.write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
         from prometheus.subtitle import format as subtitle_format
@@ -83,11 +109,12 @@ def build_impls(data_dir):
         items_store.update_item(data_dir, ctx.item_id, report_title=title)
 
     def subtitle_fix(ctx):
-        # The fixture segments stand in for both the raw and the corrected transcript.
-        segments = paths.segments_file(data_dir, ctx.item_id)
-        if segments.is_file():  # tests may swap out the stages that write it
-            shutil.copy2(segments, paths.raw_segments_file(data_dir, ctx.item_id))
-        items_store.update_item(data_dir, ctx.item_id, subtitle_status="ok")
+        # The real stage with a fake model: texts stay as they are, the English sample is translated.
+        if not paths.segments_file(data_dir, ctx.item_id).is_file():  # tests may swap out its writer
+            items_store.update_item(data_dir, ctx.item_id, subtitle_status="ok")
+            return
+        subtitle_fix_mod.fix_for_item(data_dir, ctx.item_id, items_store.get_item(data_dir, ctx.item_id), {},
+                                      node_exe="", pi_cli="", ask=_fake_fix)
 
     def mindmap(ctx):
         tree = json.loads(_fixture("mindmap.json").read_text(encoding="utf-8"))

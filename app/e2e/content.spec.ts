@@ -1,7 +1,10 @@
 // E12 ② (PLAN 15.4.9): the content additions, end to end.
 import { expect, test } from "@playwright/test";
 
-import { openFirstItem, openTab, report, seed, sidebar } from "./helpers";
+import { API, AUTH, openFirstItem, openTab, report, seed, sidebar } from "./helpers";
+
+/** In fake mode a YouTube link becomes an English item from fixtures/segments.en.json. */
+const ENGLISH = "https://www.youtube.com/watch?v=M7lc1UVf-VE";
 
 test.beforeAll(async ({ request }) => {
   await seed(request);
@@ -22,4 +25,23 @@ test("① 导图要点卡片显示详解，面板有全文，「在精读中查�
   await expect(sidebar(page).getByRole("button", { name: "知识库", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(report(page).locator("#s5 h2")).toBeInViewport();
   await expect(report(page).locator("#s4 h2")).not.toBeInViewport();
+});
+
+test("② 英文条目的字幕每段下方显示中文，工具栏可以关掉译文", async ({ page, request }) => {
+  const created = await request.post(`${API}/api/items`, { headers: AUTH, data: { url: ENGLISH, figures: false } });
+  const id = (await created.json()).id;
+  await expect
+    .poll(async () => (await (await request.get(`${API}/api/items/${id}`, { headers: AUTH })).json()).status, {
+      timeout: 20_000,
+    })
+    .toBe("done");
+  await page.goto("/");
+  await openTab(page, "字幕");
+  await page.getByRole("list", { name: "分类" }).getByRole("button").first().click();
+  await page.getByRole("list", { name: "条目" }).getByRole("button", { name: /English Sample Channel/ }).click();
+  const first = page.getByRole("list", { name: "字幕" }).getByRole("listitem").first();
+  await expect(first).toContainText("Imagine the money a country earns");
+  await expect(first.getByTestId("subtitle-zh")).toHaveText("想象一个国家挣到的钱放在三个口袋里");
+  await page.getByRole("switch", { name: "译文" }).click();
+  await expect(first.getByTestId("subtitle-zh")).toHaveCount(0);
 });

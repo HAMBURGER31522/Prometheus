@@ -170,8 +170,10 @@ def _language(data_dir, item_id: str) -> str:
     return str(asr.get("language") or "").lower()
 
 
-def fix_for_item(data_dir, item_id: str, row: dict, llm: dict, *, node_exe: str, pi_cli: str) -> bool:
-    """Correct segments.json from segments.raw.json; any failure leaves the subtitles as they are."""
+def fix_for_item(data_dir, item_id: str, row: dict, llm: dict, *, node_exe: str, pi_cli: str,
+                 ask=None) -> bool:
+    """Correct segments.json from segments.raw.json; any failure leaves the subtitles as they are.
+    `ask` replaces the model (the fake pipeline)."""
     shown = paths.segments_file(data_dir, item_id)
     raw = paths.raw_segments_file(data_dir, item_id)
     try:
@@ -181,7 +183,7 @@ def fix_for_item(data_dir, item_id: str, row: dict, llm: dict, *, node_exe: str,
         fixed, stats = fix_segments(
             segments, _reference(data_dir, item_id, row),
             human=row.get("transcript_source") == "youtube-subtitles",
-            ask=_ask_model(data_dir, llm, node_exe=node_exe, pi_cli=pi_cli),
+            ask=ask or _ask_model(data_dir, llm, node_exe=node_exe, pi_cli=pi_cli),
             translate=_language(data_dir, item_id) not in {"", *CHINESE},
         )
     except Exception:  # noqa: BLE001 - PLAN 15.4.6: a correction failure never fails the item
