@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
+
 from prometheus import paths
 
 CUDA_PACKAGES = (

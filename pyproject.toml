@@ -13,6 +13,13 @@ members = ["backend", "vendor/video-report-agent"]
 [tool.uv]
 # Windows-only project: keep macOS-only packages (e.g. VRA's mlx extra) out of the lockfile.
 environments = ["sys_platform == 'win32'"]
+# funasr-onnx 0.4.3 (D-39) pins numpy<=1.26.4 and pulls librosa/scipy, which it only needs
+# to read audio files by path; Prometheus always passes arrays. Lift the pin, drop the two.
+override-dependencies = [
+    "numpy>=2",
+    "librosa; sys_platform == 'never'",
+    "scipy; sys_platform == 'never'",
+]
 
 [tool.uv.sources]
 prometheus-backend = { workspace = true }
