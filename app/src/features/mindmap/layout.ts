@@ -80,3 +80,8 @@ export function layoutTree(root: TreeNode, collapsed: Set<string>): { nodes: Pla
   if (top < 0) for (const n of nodes) n.y -= top;
   return { nodes, edges };
 }
+
+/** Stub (R7 red). */
+export function initialFolds(_root: TreeNode): Set<string> {
+  return new Set();
+}

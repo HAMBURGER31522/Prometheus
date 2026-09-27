@@ -123,12 +123,19 @@ function Canvas({ item, refresh }: ReaderProps) {
 
   if (!tree) {
     const failed = item.mindmap_status === "failed";
+    // Items migrated from the first version only have the old Markdown outline.
+    const legacy = missing && item.mindmap_status === "ok";
+    const text = failed
+      ? "这个视频的导图没有生成成功。"
+      : legacy
+        ? "这是旧版的导图，重新生成后才能在画布上显示。"
+        : missing
+          ? "导图正在生成…"
+          : "正在打开导图…";
     return (
       <div className="page">
-        <p className={failed ? "notice danger" : "notice"}>
-          {failed ? "这个视频的导图没有生成成功。" : missing ? "导图正在生成…" : "正在打开导图…"}
-        </p>
-        {failed && (
+        <p className={failed ? "notice danger" : "notice"}>{text}</p>
+        {(failed || legacy) && (
           <button type="button" className="btn" style={{ marginTop: 14 }} onClick={regenerate}>
             重新生成导图
           </button>
