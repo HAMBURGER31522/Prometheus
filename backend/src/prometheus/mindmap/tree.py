@@ -10,7 +10,7 @@ import json
 THEMES = (3, 6)
 MAX_DEPTH = 4                 # root -> theme -> topic -> leaf
 MAX_LABEL = 20
-MAX_ROOT_LABEL = 40
+MAX_ROOT_LABEL = 20           # the root is the simplest node (PLAN 15.4.9)
 MAX_SUMMARY = 60
 MAX_THEME_SUMMARY = 40  # themes stay short; leaves grow (PLAN 15.4.9)
 TIME_SLACK_S = 5              # section ranges are rounded to whole seconds

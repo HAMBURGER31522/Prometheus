@@ -49,6 +49,7 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
     if errors:
         items_store.update_item(data_dir, item_id, mindmap_status="failed")
         return False
+    parsed["root"].pop("summary", None)  # the root is the title only; not worth a retry
     try:
         parsed, stats = enrich.enrich_tree(parsed, html, ask=ask)
         parsed["enrichment"] = stats

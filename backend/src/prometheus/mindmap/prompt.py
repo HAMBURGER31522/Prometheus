@@ -22,7 +22,7 @@ def build_prompt(outline: dict) -> str:
         "写作规则：",
         ("1. 先做语义归纳，再组织层级：以概念、方法、例子、条件、结论之间的关系为骨架，"
          "不要把章节标题原样平移成节点；讲同一概念或同一类例子的多个章节要合并。"),
-        f"2. 根节点 root 是整支视频真正的主题，label 不超过 {tree_rules.MAX_ROOT_LABEL} 字。",
+        f"2. 根节点 root 只写 label：整支视频真正的主题，不超过 {tree_rules.MAX_ROOT_LABEL} 字，不写 summary。",
         (f"3. 一级主题 theme 给 {tree_rules.THEMES[0]}-{tree_rules.THEMES[1]} 个，彼此区分明显，覆盖主要内容；"
          "不要用「其他」「更多」这类空泛名字凑数。"),
         "4. topic 只在某个 theme 下确实有两三类不同子议题时才出现，否则直接挂 leaf。",
@@ -36,7 +36,7 @@ def build_prompt(outline: dict) -> str:
         "10. 教程和知识讲解提炼知识结构；评论和资讯提炼观点结构与因果关系。不写报告里没有的内容。",
         "",
         "只输出 JSON，不要输出任何说明文字。格式：",
-        ('{"title": "导图标题", "root": {"label": "根主题", "type": "root", "summary": "一句话", "time": null, '
+        ('{"title": "导图标题", "root": {"label": "根主题", "type": "root", "time": null, '
          '"children": [{"label": "主题", "type": "theme", "summary": "…", "time": null, "children": ['
          '{"label": "要点", "type": "leaf", "summary": "…", "time": 125, "children": []}]}]}}'),
         "",
