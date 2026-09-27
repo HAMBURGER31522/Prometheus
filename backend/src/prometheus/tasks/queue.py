@@ -38,6 +38,10 @@ class TaskQueue:
             return
         self._wake.set()
 
+    def enqueue_mindmap(self, item_id) -> None:
+        """Stub (R4 red): rerun only the mind map of a finished item."""
+        return None
+
     def cancel(self, item_id) -> bool:
         with self._lock:
             current = self._current

@@ -322,7 +322,8 @@ def test_cancelling_a_mindmap_rerun_leaves_the_item_done(client, monkeypatch):
 
     def slow_mindmap(ctx):
         started.set()
-        while not ctx.cancel_requested:
+        deadline = time.time() + 10
+        while not ctx.cancel_requested and time.time() < deadline:
             time.sleep(0.02)
         raise RuntimeError("Pi was killed")
 
@@ -332,3 +333,43 @@ def test_cancelling_a_mindmap_rerun_leaves_the_item_done(client, monkeypatch):
     assert client.post(f"/api/items/{item_id}/cancel").status_code == 200
     row = _wait_for_mindmap(client, item_id, "failed")
     assert row["status"] == "done"
+
+
+def test_deleting_during_a_mindmap_rerun_stops_it_first(client, monkeypatch):
+    import threading
+    import time
+
+    from prometheus import paths
+
+    item_id, _ = _finished_item_without_mindmap(client)
+    started = threading.Event()
+
+    def slow_mindmap(ctx):
+        started.set()
+        deadline = time.time() + 10
+        while not ctx.cancel_requested and time.time() < deadline:
+            time.sleep(0.02)
+        raise RuntimeError("Pi was killed")
+
+    monkeypatch.setitem(client.app.state.queue.impls, "mindmap", slow_mindmap)
+    assert client.post(f"/api/items/{item_id}/regenerate", json={"only": "mindmap"}).status_code == 200
+    assert started.wait(timeout=15)
+    assert client.delete(f"/api/items/{item_id}").status_code == 204
+    assert not client.app.state.queue.is_running(item_id)
+    assert not paths.cache_dir(client.app.state.data_dir, item_id).exists()
+
+
+def test_cancelling_a_waiting_mindmap_rerun_drops_it(tmp_path):
+    from prometheus.library import items as items_store
+    from prometheus.tasks import runner
+    from prometheus.tasks.queue import TaskQueue
+
+    data_dir, item_id = _item(tmp_path, status="done")
+    items_store.update_item(data_dir, item_id, mindmap_status="ok")
+    ran = []
+    queue = TaskQueue(data_dir, {stage: (lambda ctx, s=stage: ran.append(s)) for stage in runner.STAGES})
+    queue.enqueue_mindmap(item_id)  # the worker thread is not started: nothing runs yet
+    assert queue.cancel(item_id) is True
+    queue._drain_one()
+    assert ran == []
+    assert items_store.get_item(data_dir, item_id)["mindmap_status"] == "failed"
