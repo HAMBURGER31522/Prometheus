@@ -201,3 +201,51 @@ def test_local_transcription_records_the_engine_it_used(data_dir, monkeypatch):
     monkeypatch.setattr(stages_mod.local_mod, "transcribe_local", local_run("faster-whisper"))
     stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
     assert items_store.get_item(data_dir, ctx.item_id).get("transcript_source") == "faster-whisper"
+
+
+def _youtube_ctx(data_dir, *, language, subtitles, figures=0):
+    import json
+
+    item_id = items_store.create_item(
+        data_dir, platform="youtube", video_id="BHY0FxzoKZE",
+        source_url="https://www.youtube.com/watch?v=BHY0FxzoKZE", figures=figures,
+    )
+    work = paths.work_dir(data_dir, item_id)
+    work.mkdir(parents=True, exist_ok=True)
+    (work / "source.info.json").write_text(json.dumps({
+        "language": language, "subtitles": {key: [{"ext": "vtt"}] for key in subtitles},
+    }), encoding="utf-8")
+    return StageContext(data_dir, item_id)
+
+
+def test_a_manual_subtitle_is_downloaded_instead_of_the_audio(data_dir, monkeypatch):
+    from prometheus.ingest import platform_subtitles
+
+    ctx = _youtube_ctx(data_dir, language="en", subtitles=["en", "de"], figures=1)
+    fetched = []
+    monkeypatch.setattr(stages_mod.download_mod, "download_stage",
+                        lambda work, row, settings, node, *, media: fetched.append(media))
+    monkeypatch.setattr(platform_subtitles, "download_subtitle",
+                        lambda work, row, settings, node, language: fetched.append(("subtitle", language)))
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["download"](ctx)
+    assert fetched == [("subtitle", "en"), "video"]
+
+
+def test_a_downloaded_subtitle_replaces_transcription(data_dir, monkeypatch):
+    import json
+
+    ctx = _youtube_ctx(data_dir, language="zh", subtitles=["zh-TW"])
+    work = paths.work_dir(data_dir, ctx.item_id)
+    (work / "subtitle.zh-TW.vtt").write_text(
+        "WEBVTT\n\n00:00:01.000 --> 00:00:02.500\n這是字幕\n", encoding="utf-8")
+
+    def no_audio(*args):
+        raise AssertionError("audio was converted although a manual subtitle exists")
+
+    monkeypatch.setattr(stages_mod, "to_wav", no_audio)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
+    asr = json.loads((work / "asr.json").read_text(encoding="utf-8"))
+    assert asr["engine"] == "youtube-subtitles" and asr["language"] == "zh"
+    segments = json.loads(paths.segments_file(data_dir, ctx.item_id).read_text(encoding="utf-8"))
+    assert segments == [{"start": 1.0, "end": 2.5, "text": "这是字幕"}]
+    assert items_store.get_item(data_dir, ctx.item_id).get("transcript_source") == "youtube-subtitles"
