@@ -77,8 +77,12 @@ async def mindmap(request: Request, item_id: str, format: str = "md"):
 
 
 @router.get("/api/items/{item_id}/subtitle")
-async def subtitle(request: Request, item_id: str, format: str = "json"):
-    file = paths.segments_file(request.app.state.data_dir, item_id)
+async def subtitle(request: Request, item_id: str, format: str = "json", variant: str = "fixed"):
+    data_dir = request.app.state.data_dir
+    file = paths.segments_file(data_dir, item_id)
+    raw = paths.raw_segments_file(data_dir, item_id)
+    if variant == "raw" and raw.is_file():  # 「原始识别」 (PLAN 15.4.6)
+        file = raw
     if not file.is_file():
         return JSONResponse({"code": "SUBTITLE_NOT_READY"}, status_code=404)
     segments = json.loads(file.read_text(encoding="utf-8"))

@@ -70,6 +70,13 @@ def build_impls(data_dir):
         title = re.sub(r"<[^>]+>", "", match.group(1)).strip() if match else ""
         items_store.update_item(data_dir, ctx.item_id, report_title=title)
 
+    def subtitle_fix(ctx):
+        # The fixture segments stand in for both the raw and the corrected transcript.
+        segments = paths.segments_file(data_dir, ctx.item_id)
+        if segments.is_file():  # tests may swap out the stages that write it
+            shutil.copy2(segments, paths.raw_segments_file(data_dir, ctx.item_id))
+        items_store.update_item(data_dir, ctx.item_id, subtitle_status="ok")
+
     def mindmap(ctx):
         tree = json.loads(_fixture("mindmap.json").read_text(encoding="utf-8"))
         paths.mindmap_json(data_dir, ctx.item_id).write_text(
@@ -96,6 +103,7 @@ def build_impls(data_dir):
         "frames": frames,
         "report": report,
         "finalize": finalize,
+        "subtitle_fix": subtitle_fix,
         "mindmap": mindmap,
         "classify": classify,
         "publish": lambda ctx: publish_mod.publish(data_dir, ctx.item_id),
