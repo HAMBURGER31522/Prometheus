@@ -31,7 +31,7 @@ def evaluate(data_dir: Path) -> list:
     llm = store.load(data_dir)["llm"]
     log = {"calls": 0, "problems": []}
     real_call, real_validate, real_check = one_shot.run_one_shot, tree_rules.validate_tree, enrich.check_detail
-    real_parse = enrich.first_json_object
+    real_details = enrich._details
 
     def counted(*args, **kwargs):
         log["calls"] += 1
@@ -51,14 +51,14 @@ def evaluate(data_dir: Path) -> list:
         log["problems"] += [f"详解：{problem}" for problem in problems]
         return problems
 
-    def parse(text, accept):
-        value = real_parse(text, accept)
-        if value is None:
-            log["problems"].append("详解：回复里没有可解析的 JSON（开头：" + text[:60].replace("|", "/") + "）")
+    def details(text, ids):
+        value = real_details(text, ids)
+        if enrich.first_json_object(text, enrich._accept) is None:
+            log["problems"].append(f"详解：回复不是合法 JSON，按要点编号读出 {len(value)}/{len(ids)} 条")
         return value
 
     one_shot.run_one_shot, tree_rules.validate_tree, enrich.check_detail = counted, validate, check
-    enrich.first_json_object = parse
+    enrich._details = details
     results = []
     try:
         for row in items_store.list_items(data_dir, status="done"):
@@ -72,7 +72,7 @@ def evaluate(data_dir: Path) -> list:
                             "problems": list(log["problems"])})
     finally:
         one_shot.run_one_shot, tree_rules.validate_tree, enrich.check_detail = real_call, real_validate, real_check
-        enrich.first_json_object = real_parse
+        enrich._details = real_details
     return results
 
 
