@@ -54,3 +54,11 @@ def sys_executable():
     import sys
 
     return sys.executable
+
+
+def test_cuda_libraries_install_under_the_hidden_internal_folder(tmp_path):
+    # R3 moved runtime files into .prometheus; the installer must follow (PLAN 15.4.4).
+    from prometheus import paths
+
+    command = build_pip_cmd(tmp_path, proxy="")
+    assert command[command.index("--target") + 1] == str(paths.cuda_dir(tmp_path))
