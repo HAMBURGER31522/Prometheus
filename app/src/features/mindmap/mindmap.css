@@ -28,6 +28,15 @@
 }
 .mind-node.root .mind-label { padding-right: 0; }
 .mind-summary { font-size: 12px; line-height: 1.4; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A leaf with detail (PLAN 15.4.9): two lines of summary, then the detail's first four lines. */
+.mind-node[data-rich] { justify-content: flex-start; gap: 4px; padding: 10px 14px; }
+.mind-node[data-rich] .mind-summary {
+  white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.mind-detail {
+  margin-top: 2px; font-size: 13px; line-height: 1.55; color: var(--ink-2);
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
 .mind-time { position: absolute; top: 8px; right: 10px; font: 11px/1 var(--font-mono); color: var(--accent); }
 .mind-fold {
   all: unset; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
@@ -38,10 +47,12 @@
 
 .mind-tools { position: absolute; top: 12px; right: 16px; display: flex; gap: 6px; align-items: center; }
 .mind-panel {
-  position: absolute; top: 56px; right: 16px; width: 300px;
+  position: absolute; top: 56px; right: 16px; width: 380px; max-height: calc(100% - 72px); overflow-y: auto;
   display: grid; gap: 10px; justify-items: start;
   padding: 16px 18px; border-radius: var(--radius);
   background: var(--raised); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop);
 }
 .mind-panel h3 { font-size: 17px; line-height: 1.4; }
 .mind-panel p { margin: 0; color: var(--ink-2); }
+.mind-panel .mind-panel-detail { color: var(--ink); line-height: 1.7; }
+.mind-panel-actions { display: flex; flex-wrap: wrap; gap: 6px; }

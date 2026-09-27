@@ -113,11 +113,33 @@ const SCRIPT = `
     frame = requestAnimationFrame(step);
   }
 
+  /* the chapter a moment belongs to (导图's 在精读中查看): the one that most recently started,
+     as chapters overlap by a second and a mind map leaf sits at its chapter's start; a moment
+     a little before the first chapter belongs to it (backend: mindmap/retrieve.py) */
+  function toSeconds(label) {
+    return label.split(":").reduce(function (total, part) { return total * 60 + Number(part); }, 0);
+  }
+  function chapterAt(seconds) {
+    var best = null, bestStart = -1, first = null, firstStart = Infinity;
+    document.querySelectorAll("h2").forEach(function (heading) {
+      var match = heading.textContent.match(/(\\d{1,2}:\\d{2}(?::\\d{2})?)\\s*[–—-]\\s*(\\d{1,2}:\\d{2}(?::\\d{2})?)/);
+      if (!match) return;
+      var start = toSeconds(match[1]);
+      var target = (heading.closest && heading.closest("section[id]")) || heading;
+      if (start <= seconds && start > bestStart) { best = target; bestStart = start; }
+      if (start < firstStart) { first = target; firstStart = start; }
+    });
+    return best || (first && firstStart - 5 <= seconds ? first : null);
+  }
+
   addEventListener("message", function (event) {
     var data = event.data || {};
     if (data.type === "goto") {
       var target = document.getElementById(data.id);
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (data.type === "goto-time" && typeof data.seconds === "number") {
+      var chapter = chapterAt(data.seconds);
+      if (chapter) chapter.scrollIntoView({ behavior: "smooth", block: "start" });
     } else if (data.type === "zoom" && typeof data.value === "number") {
       zoomTo(data.value);
     }

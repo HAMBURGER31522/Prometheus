@@ -1,5 +1,6 @@
-// 导图 (PLAN 15.4.2): the knowledge tree on a React Flow canvas, laid out as a horizontal
-// tidy tree; themes fold, nodes open a summary panel, times open the video at that moment.
+// 导图 (PLAN 15.4.2, 15.4.9): the knowledge tree on a React Flow canvas, laid out as a
+// horizontal tidy tree; themes fold, leaves show their detail, nodes open a panel, times open
+// the video at that moment or the report at that chapter.
 import "@xyflow/react/dist/style.css";
 
 import {
@@ -17,6 +18,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { type ReaderProps } from "../../shared/LibraryPage";
+import { useNav } from "../../shared/NavContext";
 import { type MindmapTree, api, itemTitle } from "../../shared/api";
 import { clock, momentLink } from "../../shared/format";
 import { downloadText, openExternal } from "../../shared/platform";
@@ -29,10 +31,11 @@ function MindNode({ data, selected }: NodeProps<Node<MindData>>) {
   const { node } = placed;
   const canFold = node.type !== "root" && node.children.length > 0;
   return (
-    <div className={`mind-node ${node.type}`} data-selected={selected || undefined}>
+    <div className={`mind-node ${node.type}`} data-rich={(node.type === "leaf" && !!node.detail) || undefined} data-selected={selected || undefined}>
       <Handle type="target" position={Position.Left} isConnectable={false} />
       <span className="mind-label">{node.label}</span>
       {node.type === "leaf" && node.summary && <span className="mind-summary">{node.summary}</span>}
+      {node.type === "leaf" && node.detail && <span className="mind-detail">{node.detail}</span>}
       {node.type === "leaf" && node.time != null && <span className="mind-time">{clock(node.time)}</span>}
       {canFold && (
         <button
@@ -69,6 +72,7 @@ function Canvas({ item, refresh }: ReaderProps) {
   const [selected, setSelected] = useState<PlacedNode | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const flow = useReactFlow();
+  const { go } = useNav();
 
   useEffect(() => {
     let alive = true;
@@ -195,14 +199,24 @@ function Canvas({ item, refresh }: ReaderProps) {
           <span className="badge accent">{{ root: "中心", theme: "主题", topic: "子题", leaf: "要点" }[selected.node.type]}</span>
           <h3>{selected.node.label}</h3>
           {selected.node.summary && <p>{selected.node.summary}</p>}
+          {selected.node.detail && (
+            <p className="mind-panel-detail" data-testid="mind-detail">
+              {selected.node.detail}
+            </p>
+          )}
           {selected.node.time != null && (
-            <button
-              type="button"
-              className="btn small"
-              onClick={() => openExternal(momentLink(item.platform, item.video_id, selected.node.time!))}
-            >
-              在视频中打开 {clock(selected.node.time)}
-            </button>
+            <div className="mind-panel-actions">
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => openExternal(momentLink(item.platform, item.video_id, selected.node.time!))}
+              >
+                在视频中打开 {clock(selected.node.time)}
+              </button>
+              <button type="button" className="btn small quiet" onClick={() => go({ type: "tab", tab: "library", at: selected.node.time! })}>
+                在精读中查看
+              </button>
+            </div>
           )}
         </aside>
       )}

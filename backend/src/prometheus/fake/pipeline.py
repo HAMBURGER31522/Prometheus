@@ -13,6 +13,7 @@ from prometheus import paths
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
 from prometheus.library import publish as publish_mod
+from prometheus.mindmap import enrich
 from prometheus.mindmap.markdown import tree_to_markdown
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
@@ -20,6 +21,17 @@ FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 
 def _fixture(name: str) -> Path:
     return FIXTURES / name
+
+
+def _fake_fill(prompt: str) -> str:
+    """A diligent model for the leaf-filling step (PLAN 15.4.9): each detail is the opening
+    of the evidence it was given, so the real retrieval and checks run in fake mode too."""
+    details = {}
+    for chunk in prompt.split('要点（编号 "')[1:]:
+        leaf_id = chunk.split('"', 1)[0]
+        evidence = chunk.split("资料：", 1)[1]
+        details[leaf_id] = re.sub(r"\s+", "", evidence)[:150]
+    return json.dumps(details, ensure_ascii=False)
 
 
 def build_impls(data_dir):
@@ -79,6 +91,9 @@ def build_impls(data_dir):
 
     def mindmap(ctx):
         tree = json.loads(_fixture("mindmap.json").read_text(encoding="utf-8"))
+        html = _fixture("report.html").read_text(encoding="utf-8")
+        tree, stats = enrich.enrich_tree(tree, html, ask=_fake_fill)
+        tree["enrichment"] = stats
         paths.mindmap_json(data_dir, ctx.item_id).write_text(
             json.dumps(tree, ensure_ascii=False, indent=2), encoding="utf-8",
         )
