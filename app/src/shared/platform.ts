@@ -50,6 +50,8 @@ export async function openExternal(url: string): Promise<void> {
   if (inTauri()) {
     const { openUrl } = await import("@tauri-apps/plugin-opener");
     await openUrl(url);
+  } else if (!E2E) {
+    window.open(url, "_blank", "noopener"); // plain-browser preview during development
   }
 }
 
