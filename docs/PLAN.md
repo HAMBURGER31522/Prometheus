@@ -812,7 +812,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R3 知识库存储 | 完成 | 2026-09-26 | 63e74a8 | E1：`uv run pytest backend/tests -q -m "not live"` = 0（175 passed，连跑 3 遍稳定）、`ruff` = 0；红 32e1604、605e0cd → 绿 a944c07；真实数据验证：acceptance-output/live-data 的旧版布局副本迁移成功（两个条目分入「战争伦理」「神秘学」，6 个文件齐全，旧 items/ 与根目录 db 清除）；Tauri 外壳与安装冒烟脚本的端口文件改到 .prometheus/logs（cargo check = 0） |
 | R4 思维导图 | 完成 | 2026-09-26 | b1d79fe | E1：`uv run pytest backend/tests -q -m "not live"` = 0（192 passed，连跑 5 遍稳定）、`ruff` = 0；红 9d565e4、542fc25、b146d2d → 绿 244b395、fd60091；校验规则单测覆盖主题数、字数、叶子时间、深度、章节覆盖率、容错解析；按 PLAN 8.8 补上「重新生成导图」（`regenerate` 带 `{"only": "mindmap"}`，D-34），顺带修复 `regenerate` 读取 dict 的 `.status_code` 导致 500 的问题；导图阶段的模型错误不再让条目失败（PLAN 8.3）；修复两处测试竞态（test_links、test_items_api）；live 测试改用 `generate_for_item`（4 个可正常收集，本里程碑未调用真实 API） |
 | R5 转写实测 | 完成 | 2026-09-27 | 28da7c7 | 用户选定：中文 FunASR paraformer-zh + 其他语言 faster-whisper turbo（D-35），必剪原样使用（D-36）。E5：`docs/asr-bench.md` 已产出（4 个引擎 × 中英两段样本，另测 Qwen3 的两种加载方式；字错率/词错率、速度、显存、时间戳、标点、体积）；评分规则单测 `scripts/asr-bench/test_metrics.py` 8 passed（红 8b6a46d、b48c856 → 绿 a3b63af、f692324）；`ruff check scripts/asr-bench` = 0；Fun-ASR-Nano 未测 |
-| R6 转写接入 | 未开始 | | | |
+| R6 转写接入 | 完成 | 2026-09-27 | （合并后补） | E1：`uv run pytest backend/tests -q -m "not live"` = 0（229 passed，连跑 3 遍稳定）、`ruff` = 0；E2 复查 = 0（249 passed，依赖锁变更后）。live（无模型费用）：必剪转写 B 站样本、本地中文走 funasr-onnx、YouTube 英文走 faster-whisper、TED 人工字幕跳过下载音频和转写，4/4 通过。真实 worker 在 R5 样本上：中文 funasr-onnx 字错率 7.97%（306 段），英文 whisper 词错率 2.78%。组件安装实测：FunASR 模型 1.23GB 用时 5 分 51 秒。红 af72e6c、9d4082c、2424951、13caa04、ed92d73、a6e254b、0957b16、ee92a3f → 绿 d23d5cf、1d3ecad、d9ffbc1、dc7171a、9d28f79、312d069、0ed1c44、b5b0984 |
 | R6b 字幕纠错 | 未开始 | | | |
 | R7 前端 | 未开始 | | | |
 | R8 发布 | 未开始 | | | |

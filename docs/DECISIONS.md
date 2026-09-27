@@ -189,3 +189,11 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 实测（R5 中文样本，同一套 paraformer-large + fsmn-vad + ct-punc，官方 int8 ONNX 版，onnxruntime CPU 32 线程）：字错率 7.97%（PyTorch 版 7.46%，whisper 7.86%）；替换错误 78 个，是本地引擎里最少的（PyTorch 版 119，whisper 87）；多出来的主要是零散的一两个字的删除。识别 13 分钟音频用 23.5 秒，不占显存。
 决定：发布 ONNX 版。只需下载约 1.3GB 的模型（全部来自 ModelScope，国内速度快），不需要 torch，也不需要 NVIDIA 显卡。`funasr-onnx` 声明了 `numpy<=1.26.4`，需要验证它在 numpy 2 下能正常工作，并用 uv 的 override 解除这一限制。
 代价：字错率比 PyTorch 版高约 0.5 个百分点（在单个样本的误差范围内）；在较慢的 CPU 上识别会慢一些。
+
+**D-35 / D-38 补记（2026-09-27，R6 实现后）**
+- 语言判断：本地转写的子进程先用 faster-whisper 的 `detect_language` 判断语言（有 CUDA 用 GPU，否则用 CPU）。`zh` 走 FunASR（释放 whisper 后在 CPU 上运行），其他语言继续用 whisper。粤语（`yue`）也走 whisper，因为 paraformer-zh 是普通话模型。
+- 组件：「安装本地转写组件」一次装好 CUDA 运行库（PyPI）和 FunASR 的 ONNX 模型（约 1.23GB，走 ModelScope 的文件接口，先写到 `.part`，下载完整后再改名，中断的下载不会被当成已安装）。转写前要求两者都已安装。
+- 顺带修复：R3 之后，CUDA 运行库一直装到数据目录根部的 `runtime\cuda`，而转写代码从 `.prometheusuntime\cuda` 查找，新装的机器会一直报「组件未安装」。
+- numpy 2：funasr-onnx 0.4.3 的 VAD 把只有 1 个元素的数组当标量用，numpy 2 会报错。用子类把长度数组转成标量，没有改动它的代码。实测软件自身环境（numpy 2.5.3）下字错率与实测环境一致（7.97%）。
+- YouTube 人工字幕：yt-dlp 经常拿不到视频的原语言（2026-09-27 检查 4 个视频，3 个为空）。按规格，这种情况照常转写，不猜语言，所以这项功能目前只对标注了语言的视频（例如 TED）生效。
+
