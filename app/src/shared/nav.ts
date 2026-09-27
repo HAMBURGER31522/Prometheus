@@ -22,10 +22,12 @@ export interface NavState {
   tab: Tab;
   categoryId: number | null;
   itemId: string | null;
+  /** A moment (seconds) the next view should show once: 导图's 「在精读中查看」 (PLAN 15.4.9). */
+  at?: number;
 }
 
 export type NavAction =
-  | { type: "tab"; tab: Tab }
+  | { type: "tab"; tab: Tab; at?: number }
   | { type: "category"; categoryId: number | null }
   | { type: "item"; itemId: string }
   | { type: "close" };

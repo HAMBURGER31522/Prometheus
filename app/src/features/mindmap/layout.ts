@@ -6,6 +6,8 @@ export interface TreeNode {
   label: string;
   type: "root" | "theme" | "topic" | "leaf";
   summary?: string;
+  /** Leaves only: 2-4 grounded sentences (PLAN 15.4.9). */
+  detail?: string;
   time?: number | null;
   children: TreeNode[];
 }
