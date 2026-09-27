@@ -78,4 +78,7 @@ def test_retry_failed_item(client):
     items_store.update_item(client.app.state.data_dir, item_id, status="failed",
                             error_code="EXTERNAL_API_FAILURE")
     assert client.post(f"/api/items/{item_id}/retry").status_code == 200
-    assert client.get(f"/api/items/{item_id}").json()["status"] == "queued"
+    # The queue may pick the item up before we look, so assert the outcome:
+    # the retried item runs again and finishes.
+    assert client.get(f"/api/items/{item_id}").json()["status"] in ("queued", "running", "done")
+    wait_for_status(client, item_id, "done")

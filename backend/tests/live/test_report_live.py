@@ -18,7 +18,8 @@ from prometheus.library import db
 from prometheus.library import items as items_store
 from prometheus.llm import one_shot as one_shot_mod
 from prometheus.llm import pi_models
-from prometheus.mindmap import markdown as mindmap_mod
+from prometheus.mindmap import generate as mindmap_generate
+from prometheus.mindmap import tree as mindmap_tree
 from prometheus.report import workspace as workspace_mod
 from prometheus.report.finalize import finalize_report
 from prometheus.report.outline import extract_outline
@@ -170,13 +171,10 @@ def test_report_generate_finalize_classify_mindmap():
     row = items_store.get_item(data_dir, item_id)
     assert row["category_id"] is not None
 
-    prompt = mindmap_mod.build_mindmap_prompt(outline, "bilibili", BV)
-    mindmap_text = one_shot(work, prompt=prompt)
-    errors = mindmap_mod.validate_mindmap(
-        mindmap_text, expect_title=title, branch_count=(3, 7),
+    # Knowledge-tree mind map (PLAN 15.4.2): generate, validate, retry once, save.
+    saved = mindmap_generate.generate_for_item(
+        data_dir, item_id, row, llm, node_exe=NODE, pi_cli=PI_CLI,
     )
-    assert not errors, f"mindmap validation failed: {errors}"
-    target = paths.mindmap_file(data_dir, item_id)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(mindmap_text + "\n", encoding="utf-8")
-    items_store.update_item(data_dir, item_id, mindmap_status="ok")
+    assert saved, "mind map failed validation twice"
+    tree = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
+    assert mindmap_tree.validate_tree(tree, outline) == []
