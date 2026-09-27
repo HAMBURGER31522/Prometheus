@@ -1,12 +1,13 @@
 // 知识库, 思维导图 and 字幕 share one layout (PLAN 15.4.5): 分类 → 条目 → 内容. Only the
 // content differs, and 精读 / 导图 / 字幕 in the reader switch tabs on the same item.
-import { type CSSProperties, type ReactNode, useRef } from "react";
+import { type CSSProperties, type ReactNode, useRef, useState } from "react";
 
 import { type ItemRow, api, itemTags, itemTitle } from "./api";
 import { duration, sourceLabel } from "./format";
 import { Lens } from "./GlassLens";
 import { READER_VIEWS, type Tab } from "./nav";
 import { useNav } from "./NavContext";
+import { ToolsSlot } from "./ReaderTools";
 import { ScrollArea } from "./ScrollArea";
 import type { Library } from "./useLibrary";
 
@@ -110,6 +111,7 @@ function Browse({ library }: { library: Library }) {
 function Reader({ item, library, children }: { item: ItemRow; library: Library; children: ReactNode }) {
   const { nav, go } = useNav();
   const bar = useRef<HTMLDivElement>(null);
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const heading = HEADINGS[nav.tab]!;
   const category = library.categories.find((cat) => cat.id === item.category_id);
   const index = READER_VIEWS.findIndex((view) => view.id === nav.tab);
@@ -129,6 +131,7 @@ function Reader({ item, library, children }: { item: ItemRow; library: Library; 
           <span aria-hidden="true">/</span>
           <span data-testid="reader-title">{itemTitle(item)}</span>
         </div>
+        <div className="reader-tools" ref={setSlot} />
         <div className="segmented" role="tablist" aria-label="视图" style={{ "--i": index } as CSSProperties}>
           <span className="thumb" aria-hidden="true" />
           {READER_VIEWS.map((view) => (
@@ -146,7 +149,9 @@ function Reader({ item, library, children }: { item: ItemRow; library: Library; 
         <ItemMenu item={item} library={library} />
       </div>
       <div className="reader-body">
-        {item.files_missing ? <FilesMissing item={item} refresh={library.refresh} /> : children}
+        <ToolsSlot value={slot}>
+          {item.files_missing ? <FilesMissing item={item} refresh={library.refresh} /> : children}
+        </ToolsSlot>
       </div>
     </div>
   );

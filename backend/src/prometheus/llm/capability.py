@@ -20,10 +20,13 @@ def model_supports_images(output: str, model: str) -> bool:
 
 
 def query_supports_images(node_exe, pi_cli, data_dir, llm: dict) -> bool:
-    """Ask Pi whether the configured model accepts images (PLAN 8.7, 15.2-1).
+    """Ask Pi whether the configured model accepts images (PLAN 8.7, 15.2-1)."""
+    return model_supports_images(pi_model_listing(node_exe, pi_cli, data_dir, llm), llm.get("model", ""))
 
-    Pi hides every model that has no key, and only sees custom providers through
-    the data dir's models.json, so both have to be in the environment.
+
+def pi_model_listing(node_exe, pi_cli, data_dir, llm: dict) -> str:
+    """`pi --offline --list-models`. Pi hides every model that has no key, and only sees
+    custom providers through the data dir's models.json, so both go into the environment.
     """
     key = llm.get("api_key") or ""
     provider = str(llm.get("provider") or "")
@@ -37,4 +40,4 @@ def query_supports_images(node_exe, pi_cli, data_dir, llm: dict) -> bool:
         [str(node_exe), str(pi_cli), "--offline", "--list-models"],
         capture_output=True, env=env, timeout=60, check=False,
     )
-    return model_supports_images(listing.stdout.decode("utf-8", "replace"), llm.get("model", ""))
+    return listing.stdout.decode("utf-8", "replace")

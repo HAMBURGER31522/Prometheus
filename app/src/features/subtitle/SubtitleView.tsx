@@ -1,13 +1,14 @@
 // 字幕 (PLAN 15.4.5, 15.4.6): every segment in order, `[时:分:秒] 原文`, virtualised for long
 // videos. The corrected text is the default; 「原始识别」 shows what the ASR produced.
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 
 import { type ReaderProps } from "../../shared/LibraryPage";
 import { type Segment, api, itemTitle } from "../../shared/api";
 import { clock, momentLink, sourceLabel } from "../../shared/format";
 import { downloadText, openExternal } from "../../shared/platform";
 import { ScrollArea } from "../../shared/ScrollArea";
+import { ReaderTools, ZoomControls, useZoom } from "../../shared/ReaderTools";
 
 const ROW_ESTIMATE = 44;
 
@@ -15,6 +16,7 @@ export function SubtitleView({ item }: ReaderProps) {
   const [variant, setVariant] = useState<"fixed" | "raw">("fixed");
   const [segments, setSegments] = useState<Segment[] | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const { zoom } = useZoom();
 
   useEffect(() => {
     let alive = true;
@@ -42,7 +44,10 @@ export function SubtitleView({ item }: ReaderProps) {
     downloadText(`${itemTitle(item)} 字幕.${format}`, await api.subtitleText(item.id, format, variant));
 
   return (
-    <div className="subtitles">
+    <div className="subtitles" style={{ "--reader-zoom": zoom } as CSSProperties}>
+      <ReaderTools>
+        <ZoomControls />
+      </ReaderTools>
       <div className="subtitle-bar">
         {item.transcript_source && <span className="badge">来源：{sourceLabel(item.transcript_source)}</span>}
         {item.subtitle_status === "ok" && variant === "fixed" && <span className="badge accent">已纠错</span>}

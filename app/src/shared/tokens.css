@@ -53,6 +53,7 @@
   --report-blue-wash: #ebe5d8;
   --report-wash: #efe6d2;
   --report-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+  --report-backdrop: rgba(10, 11, 13, .82);
   --report-bar-from: #c79a62;
   --report-bar-to: #8f9a84;
 

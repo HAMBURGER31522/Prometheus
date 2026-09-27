@@ -63,3 +63,16 @@ def test_fake_item_appears_in_category_counts(client):
     wait_for_status(client, item_id, "done")
     rows = client.get("/api/categories").json()
     assert sum(row["count"] for row in rows) == 1
+
+
+def test_fake_mode_offers_a_model_list_for_the_settings_e2e(client):
+    # E11 ⑤: 「获取模型列表」 is exercised against the fake backend itself, never a real relay.
+    response = client.get("/fake-llm/v1/models")
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()["data"]] == ["fake-model-a", "fake-model-b"]
+
+
+def test_the_fake_model_list_is_absent_in_real_mode(client_factory, tmp_path):
+    real = client_factory(data_dir=tmp_path / "data", fake=False)
+    real.headers["Authorization"] = "Bearer test-token"
+    assert real.get("/fake-llm/v1/models").status_code == 404

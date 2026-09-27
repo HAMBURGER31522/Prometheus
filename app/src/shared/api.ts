@@ -52,6 +52,8 @@ export const api = {
   settings: () => json<Settings>("GET", "/api/settings"),
   saveSettings: (settings: Settings) => json<Settings>("PUT", "/api/settings", settings),
   testModel: () => json<{ ok: boolean; detail: string }>("POST", "/api/settings/test-model"),
+  listModels: async (profile: ModelProfile) =>
+    (await json<{ models: string[] }>("POST", "/api/settings/models", { profile })).models,
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
   asrStatus: () => json<{ state: string; detail: string }>("GET", "/api/asr-components"),
   dataDir: () => json<{ data_dir: string | null }>("GET", "/api/app/data-dir"),
@@ -129,7 +131,21 @@ export interface MindmapTree {
   root: import("../features/mindmap/layout").TreeNode;
 }
 
+export interface ModelProfile {
+  id: string;
+  name: string;
+  kind: "deepseek" | "zhipu" | "custom";
+  base_url: string;
+  protocol: "openai" | "anthropic";
+  api_key: string;
+  model: string;
+  supports_images: boolean;
+  thinking: string;
+}
+
 export interface Settings {
+  /** The saved model profiles (PLAN 15.4.8); `llm` is the active one, derived by the backend. */
+  llm_profiles: { active: string; items: ModelProfile[] };
   llm: {
     provider: string;
     model: string;

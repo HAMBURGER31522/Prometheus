@@ -12,3 +12,27 @@
 .choice small { color: var(--muted); }
 .grow { flex: 1; min-width: 240px; }
 .path { font: 13px/1.5 var(--font-mono); color: var(--ink-2); background: var(--surface); padding: 6px 10px; border-radius: var(--radius-sm); }
+
+.profiles { display: grid; gap: 12px; max-width: 720px; }
+.profile-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.profile-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface);
+  transition: border-color var(--dur-hover) linear, background-color var(--dur-effects) var(--ease-effects);
+}
+.profile-card[data-active] { border-color: var(--accent); background: var(--accent-wash); }
+.profile-main { display: grid; gap: 2px; min-width: 0; }
+.profile-main small { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-editor { display: grid; gap: 2px; animation: pop-in var(--dur-spatial) var(--ease-spatial); }
+.secret { position: relative; display: flex; }
+.secret .input { flex: 1; padding-right: 42px; }
+.eye {
+  all: unset; box-sizing: border-box; position: absolute; right: 4px; top: 4px; width: 28px; height: 28px;
+  display: grid; place-items: center; border-radius: 8px; color: var(--muted); cursor: default;
+}
+.eye:hover { background: var(--line); color: var(--ink); }
+.eye:focus-visible { outline: 2px solid var(--accent); }
+.eye svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.model-picker { position: relative; }
+.model-pop { left: 0; right: 0; }
+.field-error { color: var(--danger); }

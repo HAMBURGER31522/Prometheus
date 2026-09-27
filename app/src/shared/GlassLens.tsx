@@ -49,9 +49,17 @@ export function Lens({ id, target, radius, bezel, scale }: {
       image.current.setAttribute("width", String(width));
       image.current.setAttribute("height", String(height));
     };
-    const observer = new ResizeObserver(paint);
+    // Repaint once a resize settles (the rail animates its width), not on every frame.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const observer = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(paint, 120);
+    });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
   }, [target, radius, bezel]);
   return (
     <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">

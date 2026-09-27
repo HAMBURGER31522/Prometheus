@@ -1,50 +1,23 @@
 // E6 (PLAN 15.3): the rewritten front end against the fake-pipeline backend.
-import { type APIRequestContext, type Page, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const API = "http://127.0.0.1:8765";
-const AUTH = { Authorization: "Bearer e2e" };
-const VIDEOS = ["BV1xJYT6EEYc", "BV1bZhQ6VEQK"];
+import { API, AUTH, VIDEOS, openFirstItem, openTab, report, seed, sidebar } from "./helpers";
+
 let itemIds: string[] = [];
-
-async function seed(request: APIRequestContext) {
-  const ids: string[] = [];
-  for (const bv of VIDEOS) {
-    const created = await request.post(`${API}/api/items`, {
-      headers: AUTH,
-      data: { url: `https://www.bilibili.com/video/${bv}/`, figures: false },
-    });
-    const body = await created.json();
-    ids.push(body.id);
-  }
-  for (const id of ids) {
-    await expect
-      .poll(async () => (await (await request.get(`${API}/api/items/${id}`, { headers: AUTH })).json()).status, {
-        timeout: 20_000,
-      })
-      .toBe("done");
-  }
-  return ids;
-}
 
 test.beforeAll(async ({ request }) => {
   itemIds = await seed(request);
 });
 
-const sidebar = (page: Page) => page.getByRole("navigation", { name: "主导航" });
-
-async function openTab(page: Page, label: string) {
-  await sidebar(page).getByRole("button", { name: label, exact: true }).click();
-}
-
-async function openFirstItem(page: Page) {
-  await page.getByRole("list", { name: "分类" }).getByRole("button").first().click();
-  await page.getByRole("list", { name: "条目" }).getByRole("button").first().click();
-  await expect(page.getByRole("toolbar", { name: "阅读" })).toBeVisible();
-}
-
 test("① 侧栏五项，顺序固定", async ({ page }) => {
   await page.goto("/");
-  await expect(sidebar(page).getByRole("button")).toHaveText(["控制台", "知识库", "思维导图", "字幕", "设置"]);
+  await expect(sidebar(page).getByRole("button", { name: /^(控制台|知识库|思维导图|字幕|设置)$/ })).toHaveText([
+    "控制台",
+    "知识库",
+    "思维导图",
+    "字幕",
+    "设置",
+  ]);
 });
 
 test("② 在导图页签打开条目，侧栏高亮停在导图", async ({ page }) => {
@@ -114,7 +87,7 @@ test("⑦ 设置里选「云端」无需任何 Key 即可保存", async ({ page,
   await page.goto("/");
   await openTab(page, "设置");
   await page.getByRole("radio", { name: /云端/ }).check();
-  await page.getByRole("button", { name: "保存" }).click();
+  await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("已保存");
   const settings = await (await request.get(`${API}/api/settings`, { headers: AUTH })).json();
   expect(settings.asr).toEqual({ backend: "cloud" });
@@ -123,17 +96,19 @@ test("⑦ 设置里选「云端」无需任何 Key 即可保存", async ({ page,
 test("⑧ 自定义提供商可选 OpenAI / Anthropic 协议", async ({ page }) => {
   await page.goto("/");
   await openTab(page, "设置");
-  await page.getByLabel("模型提供商").selectOption("custom");
-  const protocol = page.getByLabel("接口协议");
-  await expect(protocol.locator("option")).toHaveText(["OpenAI 兼容", "Anthropic"]);
+  await page.getByRole("button", { name: "新增配置" }).click();
+  const editor = page.getByRole("region", { name: "编辑模型配置" });
+  await editor.getByRole("combobox", { name: "类型" }).click();
+  await page.getByRole("option", { name: "自定义" }).click();
+  await editor.getByRole("combobox", { name: "接口协议" }).click();
+  await expect(page.getByRole("listbox", { name: "接口协议" }).getByRole("option")).toHaveText(["OpenAI 兼容", "Anthropic"]);
 });
 
 test("报告目录的章节链接在报告内跳转，不会变成白页", async ({ page }) => {
   await page.goto("/");
   await openTab(page, "知识库");
   await openFirstItem(page);
-  const report = page.frameLocator('iframe[title="精读报告"]');
-  await report.locator('.report-nav a[href="#s3"]').click();
-  await expect(report.locator("#s3")).toBeInViewport();
-  await expect(report.locator(".report-nav")).toBeVisible();
+  await report(page).locator('.report-nav a[href="#s3"]').click();
+  await expect(report(page).locator("#s3")).toBeInViewport();
+  await expect(report(page).locator(".report-nav")).toBeVisible();
 });

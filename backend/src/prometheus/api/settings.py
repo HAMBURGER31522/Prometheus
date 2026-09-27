@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus import paths
-from prometheus.llm import capability, pi_models
+from prometheus.llm import capability, model_list, pi_models
 from prometheus.llm.one_shot import OneShotError, run_one_shot
 from prometheus.settings import store
 
@@ -22,15 +22,35 @@ async def put_settings(request: Request):
     backend = (body.get("asr") or {}).get("backend")
     if backend not in ("local", "cloud"):
         return JSONResponse({"code": "INVALID_ASR_BACKEND"}, status_code=422)
-    protocol = ((body.get("llm") or {}).get("custom") or {}).get("protocol", "openai")
-    if protocol not in pi_models.PROTOCOL_APIS:
+    protocols = [((body.get("llm") or {}).get("custom") or {}).get("protocol", "openai")]
+    protocols += [p.get("protocol", "openai") for p in (body.get("llm_profiles") or {}).get("items", [])]
+    if any(protocol not in pi_models.PROTOCOL_APIS for protocol in protocols):
         return JSONResponse({"code": "INVALID_PROTOCOL"}, status_code=422)
     stored = store.load(state.data_dir)
-    incoming = store.restore_secrets(body, stored)
-    store.save(state.data_dir, incoming)
-    if incoming["llm"]["provider"] == "custom":
-        pi_models.apply_custom_provider(state.data_dir, incoming["llm"].get("custom"))
-    return store.masked(store.load(state.data_dir))
+    store.save(state.data_dir, store.restore_secrets(body, stored))
+    saved = store.load(state.data_dir)
+    if saved["llm"]["provider"] == "custom":
+        pi_models.apply_custom_provider(state.data_dir, saved["llm"].get("custom"))
+    return store.masked(saved)
+
+
+@router.post("/api/settings/models")
+def list_models(request: Request, body: dict):
+    """「获取模型列表」 for one profile (PLAN 15.4.8): only ever on the user's click."""
+    state = request.app.state
+    profile = dict(body.get("profile") or {})
+    profile["api_key"] = store.stored_key(state.data_dir, profile)
+    proxy = store.load(state.data_dir)["network"].get("proxy", "")
+
+    def pi_listing() -> str:
+        found = state.get_runtime()
+        llm = {"provider": profile.get("kind"), "api_key": profile["api_key"]}
+        return capability.pi_model_listing(found.node, found.pi_cli, state.data_dir, llm)
+
+    try:
+        return {"models": model_list.list_models(profile, pi_listing=pi_listing, proxy=proxy)}
+    except model_list.ModelListError as exc:
+        return JSONResponse({"code": exc.code, "detail": str(exc)}, status_code=502)
 
 
 @router.post("/api/settings/test-model")
