@@ -95,6 +95,8 @@ def build_prompt(batch: dict, reference: str, *, human: bool, translate: bool = 
     ]
     if reference:
         lines += ["", "参考材料（报告）：", reference[:MAX_REFERENCE]]
+    if translate:  # the format line above sits before a long report: say it again next to the segments
+        lines += ["", '再说一遍输出格式：{"段号": {"text": "改好的原文", "zh": "中文翻译"}}，每一段都要有中文翻译。']
     return "\n".join(lines) + "\n\n" + SEGMENTS_MARK + json.dumps(batch, ensure_ascii=False)
 
 
