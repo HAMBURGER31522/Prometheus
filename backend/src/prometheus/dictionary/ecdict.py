@@ -93,6 +93,8 @@ def _build(rows, target: Path) -> int:
                   "WHERE excluded.word = excluded.key")
         batch = []
         for row in rows:
+            if len(row) < len(header):  # a ragged line: skip it rather than lose the dictionary
+                continue
             word, translation = row[column["word"]].strip(), row[column["translation"]].strip()
             if not translation or not _WORD.fullmatch(word):
                 continue
