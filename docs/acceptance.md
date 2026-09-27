@@ -9,6 +9,10 @@
 | M3/M4 短视频（5–10 分钟，B 站） | https://www.bilibili.com/video/BV1bZhQ6VEQK/ （罗素：为了阻止末日，可以先点燃一场战争吗？· 大圆镜科普） | 498.4 秒 | 2026-09-25 |
 | D5 长视频（约 3 小时，B 站） | **待选定**（见下方 M9 说明） | | |
 | D7 YouTube 视频 | https://www.youtube.com/watch?v=jNQXAC9IVRw（M3 链路验证用）；D5 级 YouTube 样本待定 | | |
+| R5 转写实测·中文 | https://www.youtube.com/watch?v=08PFXFA8Rs8 （影视飓风《UP主们都怎么做字幕？调研100位UP》；参考 = 作者上传的人工 zh-CN 字幕） | 777.9 秒 | 2026-09-26 |
+| R5 转写实测·英文 | https://www.youtube.com/watch?v=BHY0FxzoKZE （TED · Wendy Suzuki《The Brain-Changing Benefits of Exercise》；参考 = TED 人工 en 字幕） | 783.0 秒 | 2026-09-26 |
+
+R5 样本选择说明：B 站的 CC 字幕需要登录才能获取，所以两段样本都取自 YouTube（`E:\google\cookies.txt`，2026-09-26 直连可用，7897 代理当时未开）。李永乐老师等频道的字幕是烧录在画面里的，没有字幕轨道，不能当参考。筛选条件：时长 5–15 分钟，并且有**人工**字幕轨道（yt-dlp 的 `subtitles`，而不是 `automatic_captions`）。
 
 ## D4 极简设计（用户判定）
 
