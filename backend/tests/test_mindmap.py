@@ -73,7 +73,7 @@ def test_labels_and_summaries_have_length_limits():
     outline = load_example()
     tree = good_tree(outline)
     tree["root"]["children"][0]["label"] = "长" * 21
-    tree["root"]["children"][1]["summary"] = "长" * 61
+    tree["root"]["children"][1]["children"][0]["summary"] = "长" * 61  # leaves: 60; themes: 40 (PLAN 15.4.9)
     errors = validate_tree(tree, outline)
     assert any("20" in error for error in errors) and any("60" in error for error in errors)
 
@@ -153,7 +153,8 @@ def test_generate_retries_once_then_saves_json_and_markdown(tmp_path, monkeypatc
     saved = generate.generate_for_item(data_dir, item_id, row, {"provider": "deepseek", "model": "m"},
                                        node_exe="node.exe", pi_cli="cli.js")
     assert saved is True
-    assert len(prompts) == 2 and "上次输出的问题" in prompts[1]
+    skeleton = [p for p in prompts if "末端要点" not in p]  # filling calls come after (PLAN 15.4.9)
+    assert len(skeleton) == 2 and "上次输出的问题" in skeleton[1]
     assert paths.mindmap_json(data_dir, item_id).is_file()
     tree = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
     assert len(tree["root"]["children"]) == 3
@@ -374,3 +375,82 @@ def test_cancelling_a_waiting_mindmap_rerun_drops_it(tmp_path):
     queue._drain_one()
     assert ran == []
     assert items_store.get_item(data_dir, item_id)["mindmap_status"] == "failed"
+
+
+def test_generate_fills_the_leaves_after_the_skeleton(tmp_path, monkeypatch):
+    # PLAN 15.4.9: skeleton first, then one grounded filling call per theme.
+    import re
+
+    from prometheus import paths
+    from prometheus.library import db
+    from prometheus.library import items as items_store
+    from prometheus.llm import one_shot
+    from prometheus.mindmap import generate
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    db.init_db(data_dir)
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
+                                      source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/",
+                                      status="running")
+    report = paths.report_file(data_dir, item_id)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+    skeleton = json.dumps(good_tree(load_example()), ensure_ascii=False)
+
+    def fake_one_shot(work_dir, *, prompt, **kwargs):
+        if "末端要点" not in prompt:
+            return skeleton
+        # A diligent model: every detail is taken from the evidence it was given.
+        details = {}
+        for chunk in prompt.split('要点（编号 "')[1:]:
+            leaf_id = chunk.split('"', 1)[0]
+            source = chunk.split("资料：\n", 1)[1]
+            details[leaf_id] = re.sub(r"\s+", "", source)[:150]
+        return json.dumps(details, ensure_ascii=False)
+
+    monkeypatch.setattr(one_shot, "run_one_shot", fake_one_shot)
+    assert generate.generate_for_item(data_dir, item_id, items_store.get_item(data_dir, item_id),
+                                      {"provider": "deepseek", "model": "m"}, node_exe="node", pi_cli="cli")
+    saved = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
+    leaves = [leaf for theme in saved["root"]["children"] for leaf in theme["children"]]
+    assert leaves and all(leaf.get("detail") for leaf in leaves)
+    assert saved["enrichment"]["coverage"] == 1.0
+    assert leaves[0]["detail"] in paths.mindmap_file(data_dir, item_id).read_text(encoding="utf-8")
+    assert "summary" not in saved["root"], "the root is the title only (PLAN 15.4.9: root ≤ 20 字)"
+
+
+def test_the_retry_fixes_the_previous_tree_instead_of_starting_over(tmp_path, monkeypatch):
+    # A 35-leaf tree regenerated from scratch trades one length slip for another; the one
+    # retry therefore hands back the previous JSON with its problems (PLAN 8.3 / 15.4.2).
+    from prometheus import paths
+    from prometheus.library import db
+    from prometheus.library import items as items_store
+    from prometheus.llm import one_shot
+    from prometheus.mindmap import generate
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    db.init_db(data_dir)
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
+                                      source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/",
+                                      status="running")
+    report = paths.report_file(data_dir, item_id)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+    slipped = good_tree(load_example())
+    slipped["root"]["children"][0]["label"] = "超" * 21
+    answers = [json.dumps(slipped, ensure_ascii=False), json.dumps(good_tree(load_example()), ensure_ascii=False)]
+    prompts = []
+
+    def fake_one_shot(work_dir, *, prompt, **kwargs):
+        if "末端要点" in prompt:
+            return "{}"
+        prompts.append(prompt)
+        return answers[len(prompts) - 1]
+
+    monkeypatch.setattr(one_shot, "run_one_shot", fake_one_shot)
+    assert generate.generate_for_item(data_dir, item_id, items_store.get_item(data_dir, item_id),
+                                      {"provider": "deepseek", "model": "m"}, node_exe="node", pi_cli="cli")
+    assert len(prompts) == 2
+    assert "超" * 21 in prompts[1] and "只修改这些问题" in prompts[1]

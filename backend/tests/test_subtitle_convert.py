@@ -35,3 +35,18 @@ def test_non_chinese_subtitles_unchanged():
 def test_already_simplified_chinese_is_stable():
     segments = [{"start": 0.0, "end": 1.0, "text": "本来就是简体"}]
     assert maybe_simplify(segments, "zh")[0]["text"] == "本来就是简体"
+
+
+def test_bilingual_exports_put_the_translation_on_the_next_line():
+    # PLAN 15.4.9: 原文一行，译文一行; a segment without a translation stays one line.
+    from prometheus.subtitle.format import to_srt, to_txt
+
+    segments = [
+        {"start": 1.0, "end": 2.5, "text": "Hello there.", "zh": "你好。"},
+        {"start": 3.0, "end": 4.0, "text": "No translation."},
+    ]
+    assert to_srt(segments) == (
+        "1\n00:00:01,000 --> 00:00:02,500\nHello there.\n你好。\n\n"
+        "2\n00:00:03,000 --> 00:00:04,000\nNo translation.\n"
+    )
+    assert to_txt(segments) == "[00:00:01] Hello there.\n           你好。\n[00:00:03] No translation.\n"

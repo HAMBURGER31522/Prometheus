@@ -21,7 +21,8 @@ DEFAULT_PROFILE = {
 DEFAULTS = {
     "llm_profiles": {"active": "default", "items": [DEFAULT_PROFILE]},
     # 「云端」 is 必剪 and needs nothing else (PLAN 15.2-7); DashScope fields are gone.
-    "asr": {"backend": "local"},
+    # 「自定义」 is an OpenAI-compatible transcription endpoint (PLAN 15.4.9).
+    "asr": {"backend": "local", "custom": {"base_url": "", "api_key": "", "model": ""}},
     "network": {"proxy": "", "youtube_cookies_file": ""},
     "figures_default": True,
 }
@@ -43,7 +44,12 @@ def _merge(defaults: dict, overrides: dict) -> dict:
 
 def _known_asr(settings: dict) -> dict:
     """Drop asr fields older versions stored (dashscope_api_key, cloud_model)."""
-    settings["asr"] = {key: settings["asr"][key] for key in DEFAULTS["asr"]}
+    asr = settings["asr"]
+    custom = asr.get("custom") if isinstance(asr.get("custom"), dict) else {}
+    settings["asr"] = {
+        "backend": asr.get("backend", "local"),
+        "custom": {key: str(custom.get(key) or "") for key in DEFAULTS["asr"]["custom"]},
+    }
     return settings
 
 
@@ -118,6 +124,9 @@ def masked(settings: dict) -> dict:
         shown["llm"]["api_key"] = mask(shown["llm"]["api_key"])
     for profile in (shown.get("llm_profiles") or {}).get("items", []):
         profile["api_key"] = mask(profile.get("api_key", ""))
+    custom_asr = (shown.get("asr") or {}).get("custom")
+    if isinstance(custom_asr, dict):
+        custom_asr["api_key"] = mask(custom_asr.get("api_key", ""))
     return shown
 
 
@@ -132,6 +141,10 @@ def restore_secrets(incoming: dict, stored: dict) -> dict:
         before = saved.get(profile.get("id"))
         if before and profile.get("api_key") == mask(before.get("api_key", "")):
             profile["api_key"] = before.get("api_key", "")
+    stored_asr = (stored.get("asr") or {}).get("custom") or {}
+    incoming_asr = (merged.get("asr") or {}).get("custom")
+    if isinstance(incoming_asr, dict) and incoming_asr.get("api_key") == mask(stored_asr.get("api_key", "")):
+        incoming_asr["api_key"] = stored_asr.get("api_key", "")
     return merged
 
 

@@ -1,10 +1,12 @@
 // 精读 (PLAN 15.4.5, 15.4.7): the report on its light paper inside the app's palette. The HTML
 // is fetched, themed and shown through srcdoc in a sandbox without allow-same-origin, so the
 // report's own scripts run in an opaque origin and cannot reach the app or its token. The
-// injected script reports the table of contents and follows the reading zoom.
+// injected script reports the table of contents, follows the reading zoom and, coming from
+// 导图's 「在精读中查看」, scrolls to the chapter of that moment (PLAN 15.4.9).
 import { useEffect, useRef, useState } from "react";
 
 import { type ReaderProps } from "../../shared/LibraryPage";
+import { useNav } from "../../shared/NavContext";
 import { ReaderTools, ZoomControls, useZoom } from "../../shared/ReaderTools";
 import { api } from "../../shared/api";
 import { openExternal } from "../../shared/platform";
@@ -18,6 +20,7 @@ export function ReportView({ item }: ReaderProps) {
   const [toc, setToc] = useState<TocItem[]>([]);
   const frame = useRef<HTMLIFrameElement>(null);
   const { zoom } = useZoom();
+  const { nav } = useNav();
 
   useEffect(() => {
     let alive = true;
@@ -47,6 +50,7 @@ export function ReportView({ item }: ReaderProps) {
       } else if (data?.type === "toc" && event.source === frame.current?.contentWindow) {
         setToc(data.items ?? []);
         send({ type: "zoom", value: zoom }); // the report is ready: bring it to the reading zoom
+        if (nav.at !== undefined) send({ type: "goto-time", seconds: nav.at });
       }
     };
     window.addEventListener("message", onMessage);

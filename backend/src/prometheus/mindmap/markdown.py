@@ -47,4 +47,6 @@ def tree_to_markdown(tree: dict, platform: str, video_id: str) -> str:
             for leaf in leaves:
                 summary = f"：{leaf['summary']}" if leaf.get("summary") else ""
                 lines.append(f"- **{leaf['label']}**{summary}{_link(leaf, platform, video_id)}")
+                if leaf.get("detail"):
+                    lines.append(f"  {leaf['detail']}")  # continuation of the list item (PLAN 15.4.9)
     return "\n".join(lines).replace("\n\n\n", "\n\n") + "\n"

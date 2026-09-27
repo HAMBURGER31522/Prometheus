@@ -1,10 +1,11 @@
-// 设置 (PLAN 8.9, 15.2, 15.4.8): model profiles, 本地 / 云端 transcription, network.
+// 设置 (PLAN 8.9, 15.2, 15.4.8, 15.4.9): model profiles, 本地 / 云端 / 自定义 transcription, network.
 import { type FormEvent, useEffect, useState } from "react";
 
 import { type Settings, api } from "../../shared/api";
 import { pickDirectory, pickFile } from "../../shared/platform";
 import { ScrollArea } from "../../shared/ScrollArea";
 import { ModelProfiles } from "./ModelProfiles";
+import { SecretInput } from "./SecretInput";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -87,7 +88,7 @@ export function SettingsPage() {
                 type="radio"
                 name="asr"
                 checked={settings.asr.backend === "local"}
-                onChange={() => update({ asr: { backend: "local" } })}
+                onChange={() => update({ asr: { ...settings.asr, backend: "local" } })}
               />
               <span>
                 <b>本地</b>
@@ -99,14 +100,53 @@ export function SettingsPage() {
                 type="radio"
                 name="asr"
                 checked={settings.asr.backend === "cloud"}
-                onChange={() => update({ asr: { backend: "cloud" } })}
+                onChange={() => update({ asr: { ...settings.asr, backend: "cloud" } })}
               />
               <span>
                 <b>云端（必剪）</b>
                 <small>免费，不需要任何配置；不可用时自动改用本地转写。</small>
               </span>
             </label>
+            <label className="choice">
+              <input
+                type="radio"
+                name="asr"
+                checked={settings.asr.backend === "custom"}
+                onChange={() => update({ asr: { ...settings.asr, backend: "custom" } })}
+              />
+              <span>
+                <b>自定义（OpenAI 兼容）</b>
+                <small>自己的转写接口（/audio/transcriptions）；超过 20MB 的音频在静音处切块上传，失败时自动改用本地转写。</small>
+              </span>
+            </label>
           </div>
+          {settings.asr.backend === "custom" && (
+            <div className="custom-asr" role="group" aria-label="自定义转写接口">
+              <label className="field">
+                <span>接口地址</span>
+                <input
+                  className="input"
+                  placeholder="https://api.example.com/v1"
+                  value={settings.asr.custom.base_url}
+                  onChange={(e) => update({ asr: { ...settings.asr, custom: { ...settings.asr.custom, base_url: e.target.value } } })}
+                />
+              </label>
+              <SecretInput
+                label="API Key"
+                value={settings.asr.custom.api_key}
+                onChange={(api_key) => update({ asr: { ...settings.asr, custom: { ...settings.asr.custom, api_key } } })}
+              />
+              <label className="field">
+                <span>模型名</span>
+                <input
+                  className="input"
+                  placeholder="whisper-1"
+                  value={settings.asr.custom.model}
+                  onChange={(e) => update({ asr: { ...settings.asr, custom: { ...settings.asr.custom, model: e.target.value } } })}
+                />
+              </label>
+            </div>
+          )}
           <div className="row" style={{ marginTop: 12 }}>
             <button
               type="button"

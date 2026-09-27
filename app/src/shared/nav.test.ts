@@ -34,4 +34,12 @@ describe("navigation (PLAN 15.4.5)", () => {
     const reading = { tab: "subtitle" as const, categoryId: 3, itemId: "abc" };
     expect(navReducer(reading, { type: "close" })).toEqual({ tab: "subtitle", categoryId: 3, itemId: null });
   });
+
+  it("「在精读中查看」 opens 精读 on the same item at a moment, and only once", () => {
+    const map = { tab: "mindmap" as const, categoryId: 3, itemId: "abc" };
+    const jumped = navReducer(map, { type: "tab", tab: "library", at: 892 });
+    expect(jumped).toEqual({ ...map, tab: "library", at: 892 });
+    expect(navReducer(jumped, { type: "tab", tab: "subtitle" }).at).toBeUndefined();
+    expect(navReducer(jumped, { type: "close" }).at).toBeUndefined();
+  });
 });

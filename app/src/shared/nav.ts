@@ -22,10 +22,12 @@ export interface NavState {
   tab: Tab;
   categoryId: number | null;
   itemId: string | null;
+  /** A moment (seconds) the next view should show once: 导图's 「在精读中查看」 (PLAN 15.4.9). */
+  at?: number;
 }
 
 export type NavAction =
-  | { type: "tab"; tab: Tab }
+  | { type: "tab"; tab: Tab; at?: number }
   | { type: "category"; categoryId: number | null }
   | { type: "item"; itemId: string }
   | { type: "close" };
@@ -35,12 +37,12 @@ export const initialNav: NavState = { tab: "console", categoryId: null, itemId: 
 export function navReducer(state: NavState, action: NavAction): NavState {
   switch (action.type) {
     case "tab":
-      return { ...state, tab: action.tab };
+      return { ...state, tab: action.tab, at: action.at };
     case "category":
-      return { ...state, categoryId: action.categoryId, itemId: null };
+      return { ...state, categoryId: action.categoryId, itemId: null, at: undefined };
     case "item":
-      return { ...state, itemId: action.itemId };
+      return { ...state, itemId: action.itemId, at: undefined };
     case "close":
-      return { ...state, itemId: null };
+      return { ...state, itemId: null, at: undefined };
   }
 }

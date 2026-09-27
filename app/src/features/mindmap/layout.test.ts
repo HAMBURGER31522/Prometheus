@@ -70,6 +70,47 @@ describe("mind map layout (PLAN 15.4.2, horizontal tidy tree)", () => {
   });
 });
 
+describe("simple at the root, rich at the leaves (PLAN 15.4.9)", () => {
+  const rich = (label: string, time = 10): TreeNode => ({ ...leaf(label, time), detail: "依据报告写的详解。".repeat(14) });
+  const MIXED: TreeNode = {
+    label: "削藩与分配",
+    type: "root",
+    children: [
+      theme("分配的困境", [rich("消费不足"), leaf("技术跑在前面"), rich("资本积累")]),
+      theme("「藩」的形成", [
+        { label: "授权", type: "topic", summary: "中央授权地方", children: [rich("分税制"), leaf("土地财政")] },
+        rich("利益固化"),
+      ]),
+    ],
+  };
+
+  it("a leaf with detail is a wider, taller card; one without stays compact", () => {
+    const { nodes } = layoutTree(MIXED, new Set());
+    const withDetail = nodes.find((n) => n.node.label === "消费不足")!;
+    const plain = nodes.find((n) => n.node.label === "技术跑在前面")!;
+    expect(withDetail.width).toBeGreaterThan(plain.width);
+    expect(withDetail.height).toBeGreaterThan(plain.height);
+    for (const a of nodes) {
+      for (const b of nodes) {
+        if (a !== b && a.depth === b.depth) expect(overlaps(a, b)).toBe(false);
+      }
+    }
+  });
+
+  it("neighbouring columns are the same distance apart, however wide the leaf cards", () => {
+    const { nodes } = layoutTree(MIXED, new Set());
+    const depths = [...new Set(nodes.map((n) => n.depth))].sort();
+    const gaps = depths.slice(1).map((depth) => {
+      const left = Math.max(...nodes.filter((n) => n.depth === depth - 1).map((n) => n.x + n.width));
+      const right = Math.min(...nodes.filter((n) => n.depth === depth).map((n) => n.x));
+      return right - left;
+    });
+    expect(gaps.length).toBe(3);
+    expect(new Set(gaps).size).toBe(1);
+    expect(gaps[0]).toBeGreaterThan(0);
+  });
+});
+
 describe("first view of a big tree", () => {
   const big: TreeNode = {
     label: "长视频",

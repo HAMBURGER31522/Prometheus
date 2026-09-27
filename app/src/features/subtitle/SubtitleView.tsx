@@ -1,5 +1,7 @@
-// 字幕 (PLAN 15.4.5, 15.4.6): every segment in order, `[时:分:秒] 原文`, virtualised for long
-// videos. The corrected text is the default; 「原始识别」 shows what the ASR produced.
+// 字幕 (PLAN 15.4.5, 15.4.6, 15.4.9): every segment in order, `[时:分:秒] 原文`, virtualised for
+// long videos. The corrected text is the default; 「原始识别」 shows what the ASR produced. A
+// non-Chinese transcript shows its Chinese translation under each line; 「译文」 hides it, and
+// resting the pointer on an English word looks it up (Lookup.tsx).
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 
@@ -9,14 +11,18 @@ import { clock, momentLink, sourceLabel } from "../../shared/format";
 import { downloadText, openExternal } from "../../shared/platform";
 import { ScrollArea } from "../../shared/ScrollArea";
 import { ReaderTools, ZoomControls, useZoom } from "../../shared/ReaderTools";
+import { useWordLookup } from "./Lookup";
+import { isForeign, tokenize } from "./words";
 
 const ROW_ESTIMATE = 44;
 
 export function SubtitleView({ item }: ReaderProps) {
   const [variant, setVariant] = useState<"fixed" | "raw">("fixed");
   const [segments, setSegments] = useState<Segment[] | null>(null);
+  const [showZh, setShowZh] = useState(true);
   const scroller = useRef<HTMLDivElement>(null);
   const { zoom } = useZoom();
+  const { wordProps, popup } = useWordLookup();
 
   useEffect(() => {
     let alive = true;
@@ -31,6 +37,7 @@ export function SubtitleView({ item }: ReaderProps) {
   }, [item.id, variant]);
 
   const rows = segments ?? [];
+  const translated = rows.some((segment) => segment.zh);
   const virtual = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scroller.current,
@@ -54,6 +61,19 @@ export function SubtitleView({ item }: ReaderProps) {
         {item.subtitle_status === "failed" && <span className="badge danger">纠错未完成，显示原文</span>}
         {item.notice && <span className="notice">{item.notice}</span>}
         <span className="spacer" />
+        {translated && (
+          <label className="switch-label">
+            <button
+              type="button"
+              role="switch"
+              className="switch"
+              aria-checked={showZh}
+              aria-label="译文"
+              onClick={() => setShowZh(!showZh)}
+            />
+            译文
+          </label>
+        )}
         <label className="switch-label">
           <button
             type="button"
@@ -93,12 +113,30 @@ export function SubtitleView({ item }: ReaderProps) {
                 >
                   {clock(segment.start)}
                 </button>
-                <span className="subtitle-text">{segment.text}</span>
+                <span className="subtitle-text">
+                  {isForeign(segment.text)
+                    ? tokenize(segment.text).map((token, index) =>
+                        token.word ? (
+                          <span key={index} className="word" {...wordProps(token.word)}>
+                            {token.text}
+                          </span>
+                        ) : (
+                          token.text
+                        ),
+                      )
+                    : segment.text}
+                  {showZh && segment.zh && (
+                    <span className="subtitle-zh" data-testid="subtitle-zh">
+                      {segment.zh}
+                    </span>
+                  )}
+                </span>
               </li>
             );
           })}
         </ul>
       </ScrollArea>
+      {popup}
     </div>
   );
 }

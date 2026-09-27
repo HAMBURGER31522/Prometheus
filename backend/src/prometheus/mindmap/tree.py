@@ -10,8 +10,9 @@ import json
 THEMES = (3, 6)
 MAX_DEPTH = 4                 # root -> theme -> topic -> leaf
 MAX_LABEL = 20
-MAX_ROOT_LABEL = 40
+MAX_ROOT_LABEL = 20           # the root is the simplest node (PLAN 15.4.9)
 MAX_SUMMARY = 60
+MAX_THEME_SUMMARY = 40  # themes stay short; leaves grow (PLAN 15.4.9)
 TIME_SLACK_S = 5              # section ranges are rounded to whole seconds
 MIN_COVERAGE = 0.8
 _CHILD_TYPES = {"root": {"theme"}, "theme": {"topic", "leaf"}, "topic": {"leaf"}, "leaf": set()}
@@ -54,8 +55,8 @@ def _walk(node: dict, depth: int, errors: list, leaves: list) -> None:
         errors.append(f"节点「{label[:12]}…」的 label 超过 {limit} 字")
     if kind != "root" and not summary:
         errors.append(f"节点「{label}」缺少 summary")
-    elif len(summary) > MAX_SUMMARY:
-        errors.append(f"节点「{label}」的 summary 超过 {MAX_SUMMARY} 字")
+    elif len(summary) > (limit := MAX_THEME_SUMMARY if kind == "theme" else MAX_SUMMARY):
+        errors.append(f"节点「{label}」的 summary 超过 {limit} 字")
     if depth > MAX_DEPTH:
         errors.append(f"节点「{label}」超过 {MAX_DEPTH} 层（root → theme → topic → leaf）")
         return

@@ -20,7 +20,7 @@ def test_defaults_round_trip_and_masking(client):
 
     loaded = client.get("/api/settings", headers=AUTH).json()
     assert loaded["llm"]["api_key"] == "****1234"
-    assert loaded["asr"] == {"backend": "local"}
+    assert loaded["asr"]["backend"] == "local"
     assert loaded["llm"]["model"] == "deepseek-flash"
 
     on_disk = json.loads(
@@ -59,14 +59,15 @@ def test_cloud_backend_needs_no_key(client):
     response = client.put("/api/settings", json=body, headers=AUTH)
     assert response.status_code == 200
     on_disk = json.loads(paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8"))
-    assert on_disk["asr"] == {"backend": "cloud"}
+    assert on_disk["asr"]["backend"] == "cloud"
 
 
 def test_old_dashscope_fields_are_dropped(client):
     file = paths.settings_file(client.app.state.data_dir)
     file.write_text(json.dumps({"asr": {"backend": "local", "dashscope_api_key": "dash-key-5678",
                                         "cloud_model": "paraformer-v2"}}), encoding="utf-8")
-    assert client.get("/api/settings", headers=AUTH).json()["asr"] == {"backend": "local"}
+    assert client.get("/api/settings", headers=AUTH).json()["asr"] == {
+        "backend": "local", "custom": {"base_url": "", "api_key": "", "model": ""}}
 
 
 def test_backend_switch_preserves_saved_keys(client):
@@ -171,3 +172,17 @@ def test_test_model_reports_image_support_from_the_data_dir_config(client, monke
     monkeypatch.setattr(subprocess, "run", fake_run)
     detail = client.post("/api/settings/test-model", headers=AUTH).json()["detail"]
     assert detail.endswith("支持看图：是")
+
+
+def test_custom_asr_keeps_its_endpoint_and_masks_its_key(client):
+    # PLAN 15.4.9: 「自定义（OpenAI 兼容）」 = address + key + model; the key never goes back out.
+    body = client.get("/api/settings", headers=AUTH).json()
+    body["asr"] = {"backend": "custom", "custom": {
+        "base_url": "https://asr.example/v1", "api_key": "sk-asr-9876", "model": "whisper-1"}}
+    saved = client.put("/api/settings", json=body, headers=AUTH)
+    assert saved.status_code == 200
+    assert saved.json()["asr"]["custom"]["api_key"] == "****9876"
+    assert client.put("/api/settings", json=saved.json(), headers=AUTH).status_code == 200
+    on_disk = json.loads(paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8"))
+    assert on_disk["asr"] == {"backend": "custom", "custom": {
+        "base_url": "https://asr.example/v1", "api_key": "sk-asr-9876", "model": "whisper-1"}}
