@@ -9,22 +9,34 @@ from prometheus.mindmap import markdown, prompt, tree
 from prometheus.report.outline import extract_outline
 
 
+def _report_html(data_dir, item_id: str, row: dict) -> str:
+    """The run's report copy, or the library's once a finished run's cache was cleaned."""
+    report = paths.report_file(data_dir, item_id)
+    if not report.is_file() and row.get("library_path"):
+        report = paths.library_folder(data_dir, row["library_path"]) / paths.LIBRARY_FILES["html"]
+    return report.read_text(encoding="utf-8")
+
+
 def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
                       node_exe: str, pi_cli: str) -> bool:
     """Write mindmap.json + mindmap.md and mark the item ok, or mark it failed."""
     work = paths.work_dir(data_dir, item_id)
-    outline = extract_outline(paths.report_file(data_dir, item_id).read_text(encoding="utf-8"))
+    outline = extract_outline(_report_html(data_dir, item_id, row))
     base = prompt.build_prompt(outline)
     errors: list = []
     parsed = None
     for _ in range(2):
         feedback = "\n\n上次输出的问题：" + "；".join(errors) if errors else ""
-        text = one_shot.run_one_shot(
-            work, prompt=base + feedback,
-            provider=llm["provider"], model=llm["model"],
-            api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
-            node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
-        )
+        try:
+            text = one_shot.run_one_shot(
+                work, prompt=base + feedback,
+                provider=llm["provider"], model=llm["model"],
+                api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
+                node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+            )
+        except Exception:  # noqa: BLE001 - PLAN 8.3: a mind map failure never fails the item
+            items_store.update_item(data_dir, item_id, mindmap_status="failed")
+            return False
         parsed = tree.parse_tree(text)
         errors = ["没有找到包含 root 的 JSON 对象"] if parsed is None else tree.validate_tree(parsed, outline)
         if not errors:

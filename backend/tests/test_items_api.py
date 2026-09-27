@@ -64,6 +64,7 @@ def test_patch_category_id(client):
     category_id = categories_store.create_category(client.app.state.data_dir, "科技")
     created = client.post("/api/items", json={"url": BV_URL, "figures": False})
     item_id = created.json()["id"]
+    wait_for_status(client, item_id, "done")  # the fake classify stage would overwrite the move
     moved = client.patch(f"/api/items/{item_id}", json={"category_id": category_id})
     assert moved.status_code == 200
     assert client.get(f"/api/items/{item_id}").json()["category_id"] == category_id

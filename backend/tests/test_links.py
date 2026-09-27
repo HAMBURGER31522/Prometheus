@@ -57,11 +57,14 @@ def test_rejects_unsupported(text):
 
 
 def test_five_hour_video_can_be_queued(client):
+    from conftest import wait_for_status
     from prometheus.library import items as items_store
 
     item_id = client.post("/api/items", json={
         "url": "https://www.bilibili.com/video/BV1xJYT6EEYc/", "figures": False,
     }).json()["id"]
+    # The fake resolve stage writes the fixture's duration: let it finish first.
+    wait_for_status(client, item_id, "done")
     items_store.update_item(client.app.state.data_dir, item_id, duration_s=5 * 3600)
     row = items_store.get_item(client.app.state.data_dir, item_id)
     assert row["duration_s"] == 5 * 3600

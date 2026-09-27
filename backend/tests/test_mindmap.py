@@ -255,7 +255,8 @@ def _wait_for_mindmap(client, item_id, status, timeout=15.0):
     last = None
     while time.time() < deadline:
         last = client.get(f"/api/items/{item_id}").json()
-        if last.get("mindmap_status") == status:
+        # generate sets the status before publish copies the file: wait for the rerun to end.
+        if last.get("mindmap_status") == status and not client.app.state.queue.is_running(item_id):
             return last
         time.sleep(0.05)
     raise AssertionError(f"mindmap_status never reached {status!r}, last={last!r}")
