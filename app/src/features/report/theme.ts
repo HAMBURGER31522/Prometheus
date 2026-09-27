@@ -44,6 +44,9 @@ html[data-scrolling] ::-webkit-scrollbar-thumb { border-width: 3px; background-c
 `;
 
 // Same idle rule as the app's scroll areas: visible while scrolling, fades 800 ms after.
+// In-page links (#s3 in the table of contents): a srcdoc page resolves "#s3" against the
+// app's own address, so following it would load the app into the frame (a blank page).
+// Scroll to the target instead.
 const SCROLL_SCRIPT = `
 (function () {
   var timer = 0;
@@ -52,6 +55,14 @@ const SCROLL_SCRIPT = `
     clearTimeout(timer);
     timer = setTimeout(function () { document.documentElement.removeAttribute("data-scrolling"); }, 800);
   }, { passive: true, capture: true });
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest && event.target.closest('a[href^="#"]');
+    if (!link) return;
+    event.preventDefault();
+    var id = decodeURIComponent(link.getAttribute("href").slice(1));
+    var target = id ? document.getElementById(id) : document.documentElement;
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, true);
 })();
 `;
 
