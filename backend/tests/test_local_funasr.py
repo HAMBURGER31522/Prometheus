@@ -59,3 +59,42 @@ def test_fewer_timestamps_than_tokens_are_spread_over_the_tokens():
     segments = build_segments(tokens, times, "我们用必剪啊，非常纯粹。", offset_s=0)
     assert "".join(s["text"] for s in segments) == "我们用必剪啊，非常纯粹。"
     assert segments[0]["start"] == 0 and segments[-1]["end"] == 1.8
+
+
+def test_transcribe_array_punctuates_once_across_vad_spans():
+    # A sentence cut by the VAD must not get a full stop at the cut (seen on the R5 sample).
+    import numpy as np
+    from prometheus.transcribe.local_funasr import transcribe_array
+
+    audio = np.zeros(16000 * 10, dtype=np.float32)
+    punctuated = []
+
+    def vad(waveform):
+        return [[[1000, 3000], [4000, 4500], [5000, 7000]]]
+
+    answers = iter([
+        {"preds": "我 们 分 析 做 字", "timestamp": _times(6, step=100)},
+        {"preds": "", "timestamp": []},
+        {"preds": "幕 这 件 事", "timestamp": _times(4, step=100)},
+    ])
+
+    def asr(piece):
+        return [next(answers)]
+
+    def punc(text):
+        punctuated.append(text)
+        return ("我们分析做字幕这件事。", [])
+
+    segments = transcribe_array(audio, vad=vad, asr=asr, punc=punc)
+    assert punctuated == ["我 们 分 析 做 字 幕 这 件 事"]
+    assert [s["text"] for s in segments] == ["我们分析做字幕这件事。"]
+    assert segments[0]["start"] == 1.0 and segments[0]["end"] == 5.4
+
+
+def test_only_mandarin_goes_to_funasr():
+    from prometheus.transcribe.local_funasr import choose_engine
+
+    assert choose_engine("zh") == "funasr"
+    assert choose_engine("en") == "whisper"
+    assert choose_engine("yue") == "whisper"
+    assert choose_engine("ja") == "whisper"

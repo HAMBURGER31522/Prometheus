@@ -88,3 +88,13 @@ def build_segments(tokens: list, times_ms: list, punctuated: str, *, offset_s: f
                 "text": _join(part),
             })
     return segments
+
+
+def transcribe_array(audio, *, vad, asr, punc, sample_rate: int = 16000) -> list:
+    """Stub (R6 red)."""
+    return []
+
+
+def choose_engine(language: str) -> str:
+    """Stub (R6 red)."""
+    return "whisper"

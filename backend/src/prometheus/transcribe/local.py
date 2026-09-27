@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from prometheus import paths
+from prometheus.transcribe import components
 
 WORKER_MODULE = "prometheus.transcribe.local_whisper"
 

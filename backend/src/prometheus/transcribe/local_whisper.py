@@ -18,7 +18,8 @@ class CudaUnavailable(RuntimeError):
     code = "CUDA_UNAVAILABLE"
 
 
-def build_asr_run(raw_result: dict, *, model: str, language: str, elapsed_ms: int) -> AsrRun:
+def build_asr_run(raw_result: dict, *, model: str, language: str, elapsed_ms: int,
+                  engine: str = "faster-whisper") -> AsrRun:  # engine: stub (R6 red)
     normalized = normalize_asr_segments(raw_result.get("segments", []))
     return AsrRun(
         engine="faster-whisper",
