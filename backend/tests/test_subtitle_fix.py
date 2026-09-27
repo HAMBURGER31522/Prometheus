@@ -292,5 +292,5 @@ def test_the_translating_prompt_repeats_the_format_after_the_reference():
     # Live run 2026-09-27: some batches came back corrected but untranslated, twice in a row.
     # The format line sits before a report of up to 12k characters; say it again near the end.
     prompt = fix.build_prompt({"0": "hello"}, "# 报告\n" + "正文" * 3000, human=False, translate=True)
-    tail = prompt[prompt.index("参考材料"):prompt.index(fix.SEGMENTS_MARK)]
+    tail = prompt[prompt.index("参考材料（报告）："):prompt.index(fix.SEGMENTS_MARK)]
     assert '"zh"' in tail and "每一段都要有中文翻译" in tail
