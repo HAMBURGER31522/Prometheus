@@ -15,6 +15,7 @@ from prometheus.api import app as app_api
 from prometheus.api import asr_components as asr_components_api
 from prometheus.api import categories as categories_api
 from prometheus.api import content as content_api
+from prometheus.api import dictionary as dictionary_api
 from prometheus.api import items as items_api
 from prometheus.api import settings as settings_api
 from prometheus.fake.pipeline import build_impls as build_fake_impls
@@ -126,6 +127,7 @@ def create_app(
     app.include_router(content_api.router)
     app.include_router(settings_api.router)
     app.include_router(asr_components_api.router)
+    app.include_router(dictionary_api.router)
     if state.fake:
         from prometheus.fake import llm as fake_llm
 
