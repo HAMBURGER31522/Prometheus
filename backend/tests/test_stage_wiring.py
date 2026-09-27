@@ -130,3 +130,74 @@ def test_report_stage_asks_pi_whether_a_builtin_model_sees_images(data_dir, monk
     monkeypatch.setattr(stages_mod.workspace_mod, "run_report_stage", fake_run)
     stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](ctx)
     assert seen["model_supports_images"] is True
+
+
+def _audio_ready(data_dir, ctx, monkeypatch, backend):
+    import json
+
+    from prometheus.settings import store
+
+    settings = store.load(data_dir)
+    settings["asr"] = {"backend": backend}
+    store.save(data_dir, settings)
+    work = paths.work_dir(data_dir, ctx.item_id)
+    (work / "media.m4a").write_bytes(b"audio")
+    monkeypatch.setattr(stages_mod, "to_wav", lambda source, target: target)
+    monkeypatch.setattr(stages_mod, "to_mp3", lambda source, target: target)
+
+    def local_run(engine):
+        def transcribe_local(data_dir_, item_id, wav):
+            out = paths.work_dir(data_dir_, item_id) / "asr.json"
+            out.write_text(json.dumps({"engine": engine, "language": "zh", "segments": [
+                {"ordinal": 0, "start_ms": 0, "end_ms": 1500, "text": "你好"}]}), encoding="utf-8")
+            return out
+        return transcribe_local
+    return local_run
+
+
+def test_cloud_transcription_goes_to_bcut(data_dir, monkeypatch):
+    import json
+
+    from prometheus.transcribe import bcut
+
+    ctx = _ctx(data_dir)
+    _audio_ready(data_dir, ctx, monkeypatch, "cloud")
+    monkeypatch.setattr(bcut, "transcribe", lambda mp3, **kw: [{"start": 0.0, "end": 1.5, "text": "你好"}])
+
+    def no_local(*args):
+        raise AssertionError("local transcription ran although 必剪 worked")
+
+    monkeypatch.setattr(stages_mod.local_mod, "transcribe_local", no_local)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
+    asr = json.loads((paths.work_dir(data_dir, ctx.item_id) / "asr.json").read_text(encoding="utf-8"))
+    assert asr["engine"] == "bcut"
+    assert paths.segments_file(data_dir, ctx.item_id).is_file()
+    row = items_store.get_item(data_dir, ctx.item_id)
+    assert row.get("transcript_source") == "bcut"
+    assert row.get("notice") is None
+
+
+def test_bcut_unavailable_falls_back_to_local_with_a_notice(data_dir, monkeypatch):
+    # PLAN 15.4.4: 412 / 429 / timeouts / failed tasks -> local, and the item says so.
+    from prometheus.transcribe import bcut
+
+    ctx = _ctx(data_dir)
+    local_run = _audio_ready(data_dir, ctx, monkeypatch, "cloud")
+
+    def unavailable(mp3, **kw):
+        raise bcut.BcutUnavailable("必剪返回 HTTP 412")
+
+    monkeypatch.setattr(bcut, "transcribe", unavailable)
+    monkeypatch.setattr(stages_mod.local_mod, "transcribe_local", local_run("funasr-onnx"))
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    assert row.get("notice") == "必剪不可用，已改用本地转写"
+    assert row.get("transcript_source") == "funasr-onnx"
+
+
+def test_local_transcription_records_the_engine_it_used(data_dir, monkeypatch):
+    ctx = _ctx(data_dir)
+    local_run = _audio_ready(data_dir, ctx, monkeypatch, "local")
+    monkeypatch.setattr(stages_mod.local_mod, "transcribe_local", local_run("faster-whisper"))
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](ctx)
+    assert items_store.get_item(data_dir, ctx.item_id).get("transcript_source") == "faster-whisper"

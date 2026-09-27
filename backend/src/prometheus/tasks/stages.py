@@ -23,7 +23,7 @@ from prometheus.subtitle import convert as subtitle_convert
 from prometheus.subtitle import format as subtitle_format
 from prometheus.transcribe import cloud as cloud_mod
 from prometheus.transcribe import local as local_mod
-from prometheus.transcribe.audio import to_wav
+from prometheus.transcribe.audio import to_mp3, to_wav
 from prometheus.transcribe.transcript import build_transcript_md
 
 

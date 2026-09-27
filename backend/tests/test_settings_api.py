@@ -11,8 +11,7 @@ def test_defaults_round_trip_and_masking(client):
     body = {
         "llm": {"provider": "deepseek", "model": "deepseek-flash", "api_key": "sk-secret-1234",
                 "thinking": "low", "custom": {"base_url": "", "supports_images": False}},
-        "asr": {"backend": "local", "dashscope_api_key": "dash-key-5678",
-                "cloud_model": "paraformer-v2"},
+        "asr": {"backend": "local"},
         "network": {"proxy": "", "youtube_cookies_file": ""},
         "figures_default": True,
     }
@@ -21,7 +20,7 @@ def test_defaults_round_trip_and_masking(client):
 
     loaded = client.get("/api/settings", headers=AUTH).json()
     assert loaded["llm"]["api_key"] == "****1234"
-    assert loaded["asr"]["dashscope_api_key"] == "****5678"
+    assert loaded["asr"] == {"backend": "local"}
     assert loaded["llm"]["model"] == "deepseek-flash"
 
     on_disk = json.loads(
@@ -34,8 +33,7 @@ def test_masked_key_round_trip_keeps_stored_value(client):
     body = {
         "llm": {"provider": "deepseek", "model": "deepseek-flash", "api_key": "sk-secret-1234",
                 "thinking": "low", "custom": {"base_url": "", "supports_images": False}},
-        "asr": {"backend": "local", "dashscope_api_key": "dash-key-5678",
-                "cloud_model": "paraformer-v2"},
+        "asr": {"backend": "local"},
         "network": {"proxy": "", "youtube_cookies_file": ""},
         "figures_default": True,
     }
@@ -47,28 +45,35 @@ def test_masked_key_round_trip_keeps_stored_value(client):
         paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8")
     )
     assert on_disk["llm"]["api_key"] == "sk-secret-1234"
-    assert on_disk["asr"]["dashscope_api_key"] == "dash-key-5678"
 
 
-def test_cloud_backend_without_key_is_rejected(client):
+def test_cloud_backend_needs_no_key(client):
+    # PLAN 15.2-7: 必剪 is keyless, choosing 「云端」 is enough.
     body = {
         "llm": {"provider": "deepseek", "model": "deepseek-flash", "api_key": "",
                 "thinking": "low", "custom": {"base_url": "", "supports_images": False}},
-        "asr": {"backend": "cloud", "dashscope_api_key": "", "cloud_model": "paraformer-v2"},
+        "asr": {"backend": "cloud"},
         "network": {"proxy": "", "youtube_cookies_file": ""},
         "figures_default": True,
     }
     response = client.put("/api/settings", json=body, headers=AUTH)
-    assert response.status_code == 422
-    assert response.json() == {"code": "DASHSCOPE_KEY_REQUIRED"}
+    assert response.status_code == 200
+    on_disk = json.loads(paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8"))
+    assert on_disk["asr"] == {"backend": "cloud"}
+
+
+def test_old_dashscope_fields_are_dropped(client):
+    file = paths.settings_file(client.app.state.data_dir)
+    file.write_text(json.dumps({"asr": {"backend": "local", "dashscope_api_key": "dash-key-5678",
+                                        "cloud_model": "paraformer-v2"}}), encoding="utf-8")
+    assert client.get("/api/settings", headers=AUTH).json()["asr"] == {"backend": "local"}
 
 
 def test_backend_switch_preserves_saved_keys(client):
     body = {
         "llm": {"provider": "deepseek", "model": "deepseek-flash", "api_key": "sk-secret-1234",
                 "thinking": "low", "custom": {"base_url": "", "supports_images": False}},
-        "asr": {"backend": "local", "dashscope_api_key": "dash-key-5678",
-                "cloud_model": "paraformer-v2"},
+        "asr": {"backend": "local"},
         "network": {"proxy": "", "youtube_cookies_file": ""},
         "figures_default": True,
     }
@@ -81,7 +86,7 @@ def test_backend_switch_preserves_saved_keys(client):
         paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8")
     )
     assert on_disk["asr"]["backend"] == "cloud"
-    assert on_disk["asr"]["dashscope_api_key"] == "dash-key-5678"
+    assert on_disk["llm"]["api_key"] == "sk-secret-1234"
 
 
 def test_backend_only_accepts_local_or_cloud(client):
@@ -104,7 +109,7 @@ def test_custom_provider_is_written_to_models_json(client):
         "llm": {"provider": "custom", "model": "my-model", "api_key": "sk-abc",
                 "thinking": "low",
                 "custom": {"base_url": "https://api.example.com/v1", "supports_images": True}},
-        "asr": {"backend": "local", "dashscope_api_key": "", "cloud_model": "paraformer-v2"},
+        "asr": {"backend": "local"},
         "network": {"proxy": "", "youtube_cookies_file": ""},
         "figures_default": True,
     }
@@ -123,7 +128,7 @@ def _custom_body(protocol, base_url):
         "llm": {"provider": "custom", "model": "claude-opus-4-8", "api_key": "sk-abc",
                 "thinking": "low",
                 "custom": {"base_url": base_url, "supports_images": True, "protocol": protocol}},
-        "asr": {"backend": "local", "dashscope_api_key": "", "cloud_model": "paraformer-v2"},
+        "asr": {"backend": "local"},
         "network": {"proxy": "", "youtube_cookies_file": ""},
         "figures_default": True,
     }
