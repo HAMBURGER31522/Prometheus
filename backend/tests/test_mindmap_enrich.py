@@ -175,3 +175,10 @@ def test_the_prompt_asks_for_a_root_without_summary():
     text = build_prompt(extract_outline(HTML))
     assert '"type": "root", "summary"' not in text
     assert "root 只写 label" in text
+
+
+def test_the_prompt_asks_topics_to_be_richer_than_their_theme():
+    from prometheus.mindmap.prompt import build_prompt
+    from prometheus.report.outline import extract_outline
+
+    assert "topic 要比所属 theme 写得更具体、更长" in build_prompt(extract_outline(HTML))
