@@ -18,6 +18,7 @@ MAX_PASSAGE = 300    # characters per related passage
 RELATED = 2          # related passages from other chapters
 MAX_EVIDENCE = 2400
 TIME_SLACK_S = 5
+END_SLACK_S = 2    # a moment this close to a chapter's end belongs to the next one
 
 _H2 = re.compile(r"<h2[^>]*>(.*?)</h2>", re.DOTALL)
 _BLOCK = re.compile(r"<(p|li|td|th|blockquote|figcaption|h3|h4)\b[^>]*>(.*?)</\1>", re.DOTALL)
@@ -86,16 +87,23 @@ class Index:
         self.idf = {gram: math.log(1 + (total - n + 0.5) / (n + 0.5)) for gram, n in frequency.items()}
 
     def section_for(self, seconds) -> int | None:
-        """The chapter that most recently started by `seconds` (chapters overlap by a second
-        or so, and a leaf usually sits at its chapter's start); a moment a little before the
-        first chapter belongs to it."""
+        """The narrowest chapter containing `seconds`, leaving out chapters it falls in the last
+        seconds of: chapters overlap by a second or so and a leaf usually sits at its chapter's
+        start, and an overview chapter spanning others is the least specific. Outside every
+        chapter: the one that started last, or the first one just ahead.
+        Same rule as app/src/features/report/chapters.ts."""
         if seconds is None:
             return None
-        timed = [(span[0], index) for index, span in enumerate(self.ranges) if span is not None]
-        started = [(start, index) for start, index in timed if start <= seconds]
+        timed = [(start, end, index) for index, span in enumerate(self.ranges) if span is not None
+                 for start, end in [span]]
+        for last in (END_SLACK_S, 0):
+            inside = [(end - start, -start, index) for start, end, index in timed if start <= seconds <= end - last]
+            if inside:
+                return min(inside)[2]
+        started = [(start, index) for start, _end, index in timed if start <= seconds]
         if started:
             return max(started)[1]
-        ahead = [(start, index) for start, index in timed if start - TIME_SLACK_S <= seconds]
+        ahead = [(start, index) for start, _end, index in timed if start - TIME_SLACK_S <= seconds]
         return min(ahead)[1] if ahead else None
 
     def search(self, query: str, *, exclude: int | None = None, limit: int = RELATED) -> list:
