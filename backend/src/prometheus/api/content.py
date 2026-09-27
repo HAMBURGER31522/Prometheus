@@ -59,8 +59,15 @@ async def report(request: Request, item_id: str):
 
 
 @router.get("/api/items/{item_id}/mindmap")
-async def mindmap(request: Request, item_id: str):
-    file, error = _library_file(request.app.state.data_dir, item_id, "mindmap")
+async def mindmap(request: Request, item_id: str, format: str = "md"):
+    data_dir = request.app.state.data_dir
+    if format == "json":
+        # The knowledge tree the app draws (PLAN 15.4.2); lives in the cache.
+        tree = _read_or_none(paths.mindmap_json(data_dir, item_id))
+        if tree is None:
+            return JSONResponse({"code": "MINDMAP_NOT_READY"}, status_code=404)
+        return json.loads(tree)
+    file, error = _library_file(data_dir, item_id, "mindmap")
     if error is not None:
         return error
     text = _read_or_none(file) if file else None

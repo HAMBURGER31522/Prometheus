@@ -1,0 +1,98 @@
+{
+  "title": "削藩与分配：中国财政再平衡的逻辑与路径",
+  "root": {
+    "label": "削藩与分配",
+    "type": "root",
+    "summary": "中国财政再平衡的逻辑与路径",
+    "time": null,
+    "children": [
+      {
+        "label": "分配的困境",
+        "type": "theme",
+        "summary": "居民拿到的钱少、消费不足，技术与资本跑在消费前面",
+        "time": null,
+        "children": [
+          {
+            "label": "一个思想实验：钱在三个口袋之间怎么分",
+            "type": "leaf",
+            "summary": "财富沉淀与消费缺口",
+            "time": 1,
+            "children": []
+          },
+          {
+            "label": "谁是“藩”：从分封制到制度性闭环",
+            "type": "leaf",
+            "summary": "分封、郡县与藩镇",
+            "time": 147,
+            "children": []
+          },
+          {
+            "label": "中国的起点：财政包干制与 1994 年分",
+            "type": "leaf",
+            "summary": "从激励到失衡",
+            "time": 405,
+            "children": []
+          }
+        ]
+      },
+      {
+        "label": "「藩」的形成",
+        "type": "theme",
+        "summary": "中央授权地方，地方利益固化后与中央形成制衡",
+        "time": null,
+        "children": [
+          {
+            "label": "分税制的副作用：土地财政、城投与招商内卷",
+            "type": "leaf",
+            "summary": "土地财政收紧",
+            "time": 619,
+            "children": []
+          },
+          {
+            "label": "为什么是现在：三个条件同时成型",
+            "type": "leaf",
+            "summary": "外部环境：内循环成为战略底牌",
+            "time": 892,
+            "children": []
+          },
+          {
+            "label": "中央的棋局：三步收权与三件工具",
+            "type": "leaf",
+            "summary": "2018 年国地税合并",
+            "time": 1131,
+            "children": []
+          }
+        ]
+      },
+      {
+        "label": "再平衡的工具",
+        "type": "theme",
+        "summary": "统一大市场、财税再划分与尚未回答的两个问题",
+        "time": null,
+        "children": [
+          {
+            "label": "重写规则：统一大市场与公平竞争",
+            "type": "leaf",
+            "summary": "全国统一大市场建设条例",
+            "time": 1484,
+            "children": []
+          },
+          {
+            "label": "两条历史路线与两个没有答案的问题",
+            "type": "leaf",
+            "summary": "晁错的路线：硬削",
+            "time": 1548,
+            "children": []
+          },
+          {
+            "label": "结论：一场还没结束的系统性重构",
+            "type": "leaf",
+            "summary": "结论：一场还没结束的系统性重构",
+            "time": 1788,
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

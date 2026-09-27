@@ -46,10 +46,10 @@ class _Trace:
             handle.write(json.dumps(line, ensure_ascii=False) + "\n")
 
 
-def run_item(ctx, impls) -> None:
-    """Run every stage in order; raise TaskCancelled when cancellation is set."""
+def run_item(ctx, impls, stages=STAGES) -> None:
+    """Run the stages in order; raise TaskCancelled when cancellation is set."""
     trace = _Trace(ctx)
-    for stage in STAGES:
+    for stage in stages:
         if ctx.cancel_requested:
             raise TaskCancelled()
         items_store.update_item(ctx.data_dir, ctx.item_id, stage=stage)

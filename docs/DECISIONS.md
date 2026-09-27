@@ -154,3 +154,13 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 
 **D-33 自定义提供商支持 OpenAI / Anthropic 两种协议**
 依据：用户的 justwoker 中转只开放 Anthropic 协议（`/v1/messages`，`/v1/chat/completions` 被 Cloudflare 拦截，返回 403）；venlacy 中转走 OpenAI 协议。2026-09-26 实测：两者的文本和图片输入都正常（justwoker `claude-opus-4-8`，venlacy `gpt-6-sol`）。中转站返回「分组无可用通道」时，是该 Key 所在分组没有上游，与模型能否识图无关。
+
+**D-34 「重新生成导图」只重跑导图，条目保持 done（2026-09-26，R4）**
+问题：PLAN 8.8 规定按钮调用 `POST /items/{id}/regenerate` 带 `{"only": "mindmap"}`，但没说明重跑期间条目处于什么状态，也没说明和整条流水线的队列如何配合。另外，任务成功后缓存里的报告副本已被清理。
+决定：
+- 只接受 `done` 条目（否则返回 409 `NOT_DONE`）。队列只重跑 `mindmap` 和 `publish` 两个阶段，报告改从知识库的 `精读.html` 读取。
+- 重跑期间条目始终是 `done`（精读和字幕照常可读）。`mindmap_status` 为 NULL 表示「生成中」，结束后变为 `ok` 或 `failed`。出错、被取消或应用中途退出（启动时修正），都只把 `mindmap_status` 记为 `failed`。
+- 导图重跑排在整条流水线任务的前面：它只要一两分钟，而且用户正在等它。
+- 删除条目时，先停掉该条目正在进行或排队中的重跑。
+原因：数据库对 `mindmap_status` 有 CHECK 约束（只允许 `ok`/`failed`），用 NULL 表示「待生成」就不用改表结构；而且普通流水线在导图阶段之前本来就是 NULL。条目保持 `done`，重跑失败时就不会把已完成的精读变成「失败」。
+代价：重跑任务只保存在内存里，应用退出后不会自动续跑，需要用户再点一次按钮（此时 `mindmap_status` 已被改为 `failed`，按钮会重新出现）。控制台的任务队列里看不到导图重跑，进度只显示在导图页。

@@ -13,6 +13,7 @@ from prometheus import paths
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
 from prometheus.library import publish as publish_mod
+from prometheus.mindmap.markdown import tree_to_markdown
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 
@@ -70,9 +71,14 @@ def build_impls(data_dir):
         items_store.update_item(data_dir, ctx.item_id, report_title=title)
 
     def mindmap(ctx):
+        tree = json.loads(_fixture("mindmap.json").read_text(encoding="utf-8"))
+        paths.mindmap_json(data_dir, ctx.item_id).write_text(
+            json.dumps(tree, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+        row = items_store.get_item(data_dir, ctx.item_id)
         target = paths.mindmap_file(data_dir, ctx.item_id)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(_fixture("mindmap.md"), target)
+        target.write_text(tree_to_markdown(tree, row["platform"], row["video_id"]), encoding="utf-8")
         items_store.update_item(data_dir, ctx.item_id, mindmap_status="ok")
 
     def classify(ctx):

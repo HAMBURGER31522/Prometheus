@@ -79,6 +79,10 @@ def mark_running_as_interrupted(data_dir) -> None:
     conn = connect(data_dir)
     try:
         conn.execute("UPDATE items SET status = 'interrupted' WHERE status = 'running'")
+        # A mind map rerun clears mindmap_status; quitting mid-run leaves it pending.
+        conn.execute(
+            "UPDATE items SET mindmap_status = 'failed' WHERE status = 'done' AND mindmap_status IS NULL",
+        )
         conn.commit()
     finally:
         conn.close()

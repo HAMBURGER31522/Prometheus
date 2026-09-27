@@ -83,15 +83,14 @@ async def delete_item(request: Request, item_id: str):
     row = items_store.get_item(state.data_dir, item_id)
     if row is None:
         return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
-    if row["status"] in ("queued", "running"):
-        # Deleting a live task: stop it first so no stage recreates the folder.
-        state.queue.cancel(item_id)
-        deadline = time.time() + 15
-        while time.time() < deadline:
-            current = items_store.get_item(state.data_dir, item_id)
-            if current["status"] not in ("queued", "running"):
-                break
-            await asyncio.sleep(0.05)
+    # Stop a live task or a mind map rerun first so no stage recreates the folder.
+    state.queue.cancel(item_id)
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        current = items_store.get_item(state.data_dir, item_id)
+        if current["status"] not in ("queued", "running") and not state.queue.is_running(item_id):
+            break
+        await asyncio.sleep(0.05)
     publish.remove_item(state.data_dir, item_id)
     return None
 
@@ -111,15 +110,21 @@ async def retry_item(request: Request, item_id: str):
 @router.post("/api/items/{item_id}/regenerate")
 async def regenerate_item(request: Request, item_id: str):
     body = await request.json() if await request.body() else {}
-    response = _requeue(request, item_id)
-    if response.status_code == 200 and "figures" in body:
-        items_store.update_item(
-            request.app.state.data_dir, item_id, figures=1 if body["figures"] else 0,
-        )
-    return response
+    if body.get("only") == "mindmap":
+        # 「重新生成导图」(PLAN 8.8): the item stays done while its mind map reruns.
+        state = request.app.state
+        row = items_store.get_item(state.data_dir, item_id)
+        if row is None:
+            return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
+        if row["status"] != "done":
+            return JSONResponse({"code": "NOT_DONE"}, status_code=409)
+        state.queue.enqueue_mindmap(item_id)
+        return {"queued": True}
+    changes = {"figures": 1 if body["figures"] else 0} if "figures" in body else {}
+    return _requeue(request, item_id, **changes)
 
 
-def _requeue(request: Request, item_id: str):
+def _requeue(request: Request, item_id: str, **changes):
     state = request.app.state
     row = items_store.get_item(state.data_dir, item_id)
     if row is None:
@@ -128,7 +133,7 @@ def _requeue(request: Request, item_id: str):
         return JSONResponse({"code": "NOT_RETRYABLE"}, status_code=409)
     items_store.update_item(
         state.data_dir, item_id, status="queued", stage=None,
-        error_code=None, error_message=None, finished_at=None,
+        error_code=None, error_message=None, finished_at=None, **changes,
     )
     state.queue.enqueue(item_id)
     return {"queued": True}

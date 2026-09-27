@@ -1,6 +1,6 @@
 """Category rename, merge, delete and counting (PLAN 8.2)."""
 
-from conftest import BV_URL
+from conftest import BV_URL, wait_for_status
 from prometheus.library import categories as categories_store
 
 
@@ -36,7 +36,10 @@ def test_delete_empty_category(client):
 
 def test_delete_nonempty_category_gets_409(client):
     category_id = make_category(client, "非空")
-    client.post("/api/items", json={"url": BV_URL, "figures": False})
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    # Let the fake pipeline finish first: its classify stage would otherwise
+    # overwrite the category set below (race seen once in CI-like runs).
+    wait_for_status(client, item_id, "done")
     from prometheus.library import items as items_store
 
     items = items_store.list_items(client.app.state.data_dir)
@@ -49,7 +52,10 @@ def test_delete_nonempty_category_gets_409(client):
 def test_merge_moves_items_and_deletes_source(client):
     source = make_category(client, "来源")
     target = make_category(client, "目标")
-    client.post("/api/items", json={"url": BV_URL, "figures": False})
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    # Let the fake pipeline finish first: its classify stage would otherwise
+    # overwrite the category set below (race seen once in CI-like runs).
+    wait_for_status(client, item_id, "done")
     from prometheus.library import items as items_store
 
     items = items_store.list_items(client.app.state.data_dir)

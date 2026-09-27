@@ -64,6 +64,7 @@ def test_patch_category_id(client):
     category_id = categories_store.create_category(client.app.state.data_dir, "科技")
     created = client.post("/api/items", json={"url": BV_URL, "figures": False})
     item_id = created.json()["id"]
+    wait_for_status(client, item_id, "done")  # the fake classify stage would overwrite the move
     moved = client.patch(f"/api/items/{item_id}", json={"category_id": category_id})
     assert moved.status_code == 200
     assert client.get(f"/api/items/{item_id}").json()["category_id"] == category_id
@@ -78,4 +79,20 @@ def test_retry_failed_item(client):
     items_store.update_item(client.app.state.data_dir, item_id, status="failed",
                             error_code="EXTERNAL_API_FAILURE")
     assert client.post(f"/api/items/{item_id}/retry").status_code == 200
-    assert client.get(f"/api/items/{item_id}").json()["status"] == "queued"
+    # The queue may pick the item up before we look, so assert the outcome:
+    # the retried item runs again and finishes.
+    assert client.get(f"/api/items/{item_id}").json()["status"] in ("queued", "running", "done")
+    wait_for_status(client, item_id, "done")
+
+
+def test_regenerate_with_figures_requeues_a_failed_item(client):
+    from prometheus.library import items as items_store
+
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
+    items_store.update_item(client.app.state.data_dir, item_id, status="failed")
+    response = client.post(f"/api/items/{item_id}/regenerate", json={"figures": True})
+    assert response.status_code == 200
+    assert response.json() == {"queued": True}
+    assert items_store.get_item(client.app.state.data_dir, item_id)["figures"] == 1
+    wait_for_status(client, item_id, "done")
