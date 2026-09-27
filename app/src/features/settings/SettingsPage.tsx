@@ -1,15 +1,10 @@
-// 设置 (PLAN 8.9, 15.2): the model and its API key, 本地 / 云端 transcription, network.
+// 设置 (PLAN 8.9, 15.2, 15.4.8): model profiles, 本地 / 云端 transcription, network.
 import { type FormEvent, useEffect, useState } from "react";
 
 import { type Settings, api } from "../../shared/api";
 import { pickDirectory, pickFile } from "../../shared/platform";
 import { ScrollArea } from "../../shared/ScrollArea";
-
-const PROVIDERS: [string, string][] = [
-  ["deepseek", "DeepSeek"],
-  ["zhipu", "智谱"],
-  ["custom", "自定义（导入 API）"],
-];
+import { ModelProfiles } from "./ModelProfiles";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -32,12 +27,10 @@ export function SettingsPage() {
 
   if (!settings) return <p className="empty">{status || "正在读取设置…"}</p>;
 
-  const llm = settings.llm;
   const update = (next: Partial<Settings>) => {
     setSettings({ ...settings, ...next });
     setStatus("");
   };
-  const updateLlm = (next: Partial<Settings["llm"]>) => update({ llm: { ...llm, ...next } });
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -69,77 +62,8 @@ export function SettingsPage() {
 
         <section className="section card">
           <h2>模型</h2>
-          <label className="field">
-            <span>模型提供商</span>
-            <select className="select" value={llm.provider} onChange={(e) => updateLlm({ provider: e.target.value })}>
-              {PROVIDERS.map(([id, label]) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {llm.provider === "custom" && (
-            <>
-              <label className="field">
-                <span>接口地址</span>
-                <input
-                  className="input"
-                  placeholder="https://api.example.com/v1"
-                  value={llm.custom.base_url}
-                  onChange={(e) => updateLlm({ custom: { ...llm.custom, base_url: e.target.value } })}
-                />
-              </label>
-              <label className="field">
-                <span>接口协议</span>
-                <select
-                  className="select"
-                  value={llm.custom.protocol}
-                  onChange={(e) =>
-                    updateLlm({ custom: { ...llm.custom, protocol: e.target.value as "openai" | "anthropic" } })
-                  }
-                >
-                  <option value="openai">OpenAI 兼容</option>
-                  <option value="anthropic">Anthropic</option>
-                </select>
-                <small>Claude 类中转通常只开放 Anthropic 协议（/v1/messages）。</small>
-              </label>
-              <label className="switch-label field">
-                <button
-                  type="button"
-                  role="switch"
-                  className="switch"
-                  aria-checked={llm.custom.supports_images}
-                  aria-label="模型能看图"
-                  onClick={() => updateLlm({ custom: { ...llm.custom, supports_images: !llm.custom.supports_images } })}
-                />
-                模型能看图（开启后配图时会把截图交给模型挑选）
-              </label>
-            </>
-          )}
-          <label className="field">
-            <span>模型名</span>
-            <input className="input" value={llm.model} onChange={(e) => updateLlm({ model: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>API Key</span>
-            <input
-              className="input"
-              type="password"
-              autoComplete="off"
-              value={llm.api_key}
-              onChange={(e) => updateLlm({ api_key: e.target.value })}
-            />
-          </label>
-          <label className="field">
-            <span>思考强度</span>
-            <select className="select" value={llm.thinking} onChange={(e) => updateLlm({ thinking: e.target.value })}>
-              <option value="off">关</option>
-              <option value="low">低</option>
-              <option value="high">高</option>
-            </select>
-          </label>
-          <div className="row">
+          <ModelProfiles profiles={settings.llm_profiles} onChange={(llm_profiles) => update({ llm_profiles })} />
+          <div className="row" style={{ marginTop: 16 }}>
             <button
               type="button"
               className="btn"
@@ -149,9 +73,9 @@ export function SettingsPage() {
                 setTesting(result.ok ? `可用：${result.detail}` : `不可用：${result.detail}`);
               }}
             >
-              测试模型
+              测试当前模型
             </button>
-            <span className="muted">{testing || "先保存，再测试。"}</span>
+            <span className="muted">{testing || "先保存，再测试；会向当前使用的配置发送一次真实请求。"}</span>
           </div>
         </section>
 

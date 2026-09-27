@@ -255,3 +255,18 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 600; letter-spacing: .
   font-variant-numeric: tabular-nums; cursor: default;
 }
 .zoom-level:hover { color: var(--ink); }
+
+/* ---------------- custom select ---------------- */
+.select { position: relative; }
+.select-button {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; height: 36px; padding: 0 10px 0 12px; border-radius: 11px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: default;
+  transition: border-color var(--dur-hover) linear, background-color var(--dur-hover) linear;
+}
+.select-button:hover { border-color: var(--accent); }
+.select-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.select-button svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted); stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform var(--dur-spatial) var(--ease-spatial); }
+.select-button[aria-expanded="true"] svg { transform: rotate(180deg); }
+.select-pop { left: 0; right: 0; }

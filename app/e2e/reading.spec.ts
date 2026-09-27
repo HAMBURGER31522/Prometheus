@@ -75,10 +75,10 @@ test("⑤ 两份模型配置可以切换；Key 可显示；能获取模型列表
     await editor.getByRole("combobox", { name: "类型" }).click();
     await page.getByRole("option", { name: "自定义" }).click();
     await editor.getByLabel("接口地址").fill(`${API}/fake-llm/v1`);
-    await editor.getByLabel("API Key").fill("e2e");
-    await expect(editor.getByLabel("API Key")).toHaveAttribute("type", "password");
+    await editor.getByLabel("API Key", { exact: true }).fill("e2e");
+    await expect(editor.getByLabel("API Key", { exact: true })).toHaveAttribute("type", "password");
     await editor.getByRole("button", { name: "显示 API Key" }).click();
-    await expect(editor.getByLabel("API Key")).toHaveAttribute("type", "text");
+    await expect(editor.getByLabel("API Key", { exact: true })).toHaveAttribute("type", "text");
     await expect(editor.getByRole("combobox", { name: "思考强度" })).toHaveText("中");
     await editor.getByRole("button", { name: "获取模型列表" }).click();
     await page.getByRole("listbox", { name: "模型列表" }).getByRole("option", { name: model }).click();
