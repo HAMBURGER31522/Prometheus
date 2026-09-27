@@ -107,11 +107,14 @@ def fix_segments(segments: list, reference: str, *, human: bool, ask, translate:
     def run(indices):
         prompt = build_prompt({str(i): segments[i]["text"] for i in indices}, reference, human=human,
                               translate=translate)
-        for _attempt in range(2):  # one retry when the reply has no JSON
+        readable = None
+        for _attempt in range(2):  # one retry when the reply has no JSON, or no translation at all
             reply = parse_reply(ask(prompt))
-            if reply is not None:
+            translated = any(isinstance(value, dict) and value.get("zh") for value in (reply or {}).values())
+            if reply is not None and (translated or not translate):
                 return indices, reply
-        return indices, None
+            readable = reply or readable
+        return indices, readable  # an untranslated reply still carries the corrections
 
     stats = {"changed": 0, "rejected": 0, "failed_batches": 0, "translated": 0, "batches": len(batches)}
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
