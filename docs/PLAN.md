@@ -775,7 +775,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R2 架构 | 完成 | 2026-09-26 | eed62ec | E1：搬迁前后同为 150 passed、`ruff` = 0；live 测试 4 个可正常收集；`llm/`、`figures/`、`mindmap/`、`report/outline.py` 就位，`tasks/stages.py` 只做调度 |
 | R3 知识库存储 | 完成 | 2026-09-26 | 63e74a8 | E1：`uv run pytest backend/tests -q -m "not live"` = 0（175 passed，连跑 3 遍稳定）、`ruff` = 0；红 32e1604、605e0cd → 绿 a944c07；真实数据验证：acceptance-output/live-data 的旧版布局副本迁移成功（两个条目分入「战争伦理」「神秘学」，6 个文件齐全，旧 items/ 与根目录 db 清除）；Tauri 外壳与安装冒烟脚本的端口文件改到 .prometheus/logs（cargo check = 0） |
 | R4 思维导图 | 完成 | 2026-09-26 | b1d79fe | E1：`uv run pytest backend/tests -q -m "not live"` = 0（192 passed，连跑 5 遍稳定）、`ruff` = 0；红 9d565e4、542fc25、b146d2d → 绿 244b395、fd60091；校验规则单测覆盖主题数、字数、叶子时间、深度、章节覆盖率、容错解析；按 PLAN 8.8 补上「重新生成导图」（`regenerate` 带 `{"only": "mindmap"}`，D-34），顺带修复 `regenerate` 读取 dict 的 `.status_code` 导致 500 的问题；导图阶段的模型错误不再让条目失败（PLAN 8.3）；修复两处测试竞态（test_links、test_items_api）；live 测试改用 `generate_for_item`（4 个可正常收集，本里程碑未调用真实 API） |
-| R5 转写实测 | 完成 | 2026-09-27 | （合并后补） | 用户选定：中文 FunASR paraformer-zh + 其他语言 faster-whisper turbo（D-35），必剪原样使用（D-36）。E5：`docs/asr-bench.md` 已产出（4 个引擎 × 中英两段样本，另测 Qwen3 的两种加载方式；字错率/词错率、速度、显存、时间戳、标点、体积）；评分规则单测 `scripts/asr-bench/test_metrics.py` 8 passed（红 8b6a46d、b48c856 → 绿 a3b63af、f692324）；`ruff check scripts/asr-bench` = 0；Fun-ASR-Nano 未测 |
+| R5 转写实测 | 完成 | 2026-09-27 | 28da7c7 | 用户选定：中文 FunASR paraformer-zh + 其他语言 faster-whisper turbo（D-35），必剪原样使用（D-36）。E5：`docs/asr-bench.md` 已产出（4 个引擎 × 中英两段样本，另测 Qwen3 的两种加载方式；字错率/词错率、速度、显存、时间戳、标点、体积）；评分规则单测 `scripts/asr-bench/test_metrics.py` 8 passed（红 8b6a46d、b48c856 → 绿 a3b63af、f692324）；`ruff check scripts/asr-bench` = 0；Fun-ASR-Nano 未测 |
 | R6 转写接入 | 未开始 | | | |
 | R7 前端 | 未开始 | | | |
 | R8 发布 | 未开始 | | | |
