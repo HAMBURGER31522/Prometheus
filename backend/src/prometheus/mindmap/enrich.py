@@ -106,9 +106,23 @@ def _accept(value) -> bool:
     return isinstance(value, dict) and all(isinstance(v, str) for v in value.values())
 
 
+def _details(text: str, ids: list) -> dict:
+    """The reply's {leaf id: detail}. Models often quote Chinese phrases with bare "…" inside
+    the strings, which breaks JSON; the leaf ids then frame each detail instead."""
+    value = first_json_object(text, _accept)
+    if value is not None:
+        return value
+    keys = "|".join(re.escape(leaf_id) for leaf_id in ids)
+    found = {}
+    for match in re.finditer(rf'"({keys})"\s*:\s*"(.*?)"\s*(?=,\s*"(?:{keys})"\s*:|\}})', text or "", re.DOTALL):
+        found[match.group(1)] = match.group(2).replace('\\"', '"').replace("\\n", "\n")
+    return found
+
+
 def _fill_theme(theme: dict, leaves: list, evidence: dict, ask) -> tuple:
     """{leaf id: detail or None} for one theme, and how many leaves were rewritten."""
-    reply = first_json_object(ask(build_prompt(theme, leaves, evidence)), _accept) or {}
+    ids = [leaf_id for leaf_id, _leaf in leaves]
+    reply = _details(ask(build_prompt(theme, leaves, evidence)), ids)
     results, failing = {}, {}
     for leaf_id, leaf in leaves:
         detail = (reply.get(leaf_id) or "").strip()
@@ -119,7 +133,7 @@ def _fill_theme(theme: dict, leaves: list, evidence: dict, ask) -> tuple:
             results[leaf_id] = detail
     if failing:
         retry = [(leaf_id, leaf) for leaf_id, leaf in leaves if leaf_id in failing]
-        again = first_json_object(ask(build_prompt(theme, retry, evidence, previous=failing)), _accept) or {}
+        again = _details(ask(build_prompt(theme, retry, evidence, previous=failing)), list(failing))
         for leaf_id, leaf in retry:
             detail = (again.get(leaf_id) or "").strip()
             ok = detail and not check_detail(detail, leaf.get("summary", ""), evidence[leaf_id])
