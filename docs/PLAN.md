@@ -745,7 +745,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 
 **本地转写（D-35、D-39，2026-09-27 补充）**
 
-- **语言判断**：用 faster-whisper 的 `detect_language` 检测音频语言（有 CUDA 用 GPU，否则用 CPU int8）。`zh` 走 FunASR，其他语言走 faster-whisper（和现在一样，需要 NVIDIA 显卡）。
+- **语言判断**：用 faster-whisper 的 `detect_language` 检测音频语言（有 CUDA 用 GPU，否则用 CPU int8）。`zh` 走 FunASR，其他语言走 faster-whisper（和现在一样：有 CUDA 用 GPU，否则用 CPU）。
 - **FunASR**：fsmn-vad → paraformer-large（带逐字时间戳）→ ct-punc，全部用 onnxruntime 在 CPU 上运行（`funasr-onnx` 0.4.3，int8 模型），在单独的子进程里执行，取消时结束进程树。
   - 模型（ModelScope）：`iic/speech_fsmn_vad_zh-cn-16k-common-onnx`、`iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-onnx`、`iic/punc_ct-transformer_cn-en-common-vocab471067-large-onnx`，共约 1.3GB，放在 `.prometheus\models\funasr\`，由「安装本地转写组件」一并下载（直接用 ModelScope 的文件接口，不引入 modelscope 包）。
   - **分段**：先按 。！？；… 断句；超过 30 个字或 8 秒的句子，再在 ，、 处拆开。每段的起止时间取首字和末字的时间戳。
