@@ -26,6 +26,7 @@ def test_defaults_are_one_deepseek_profile_thinking_medium(tmp_path):
 
 
 def test_an_old_single_model_setting_becomes_one_profile(tmp_path):
+    paths.init_data_dir(tmp_path)
     paths.settings_file(tmp_path).write_text(json.dumps({"llm": {
         "provider": "custom", "model": "claude-opus-4-8", "api_key": "sk-old-9999", "thinking": "low",
         "custom": {"base_url": "https://api.justwoker.icu/v1", "supports_images": True, "protocol": "anthropic"},
@@ -39,6 +40,7 @@ def test_an_old_single_model_setting_becomes_one_profile(tmp_path):
 
 
 def test_the_active_profile_drives_what_the_pipeline_reads(tmp_path):
+    paths.init_data_dir(tmp_path)
     settings = store.load(tmp_path)
     settings["llm_profiles"] = {"active": "gpt", "items": [CLAUDE, GPT]}
     store.save(tmp_path, settings)
