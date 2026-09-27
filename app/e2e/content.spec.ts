@@ -45,3 +45,31 @@ test("② 英文条目的字幕每段下方显示中文，工具栏可以关掉�
   await page.getByRole("switch", { name: "译文" }).click();
   await expect(first.getByTestId("subtitle-zh")).toHaveCount(0);
 });
+
+test("③ 悬停英文单词出现查词浮窗：首次下载离线词典，显示原形和释义，可以打开在线词典", async ({ page, request }) => {
+  const created = await request.post(`${API}/api/items`, { headers: AUTH, data: { url: ENGLISH, figures: false } });
+  const id = (await created.json()).id;
+  await expect
+    .poll(async () => (await (await request.get(`${API}/api/items/${id}`, { headers: AUTH })).json()).status, {
+      timeout: 20_000,
+    })
+    .toBe("done");
+  await page.goto("/");
+  await openTab(page, "字幕");
+  await page.getByRole("list", { name: "分类" }).getByRole("button").first().click();
+  await page.getByRole("list", { name: "条目" }).getByRole("button", { name: /English Sample Channel/ }).click();
+  const word = page.getByRole("list", { name: "字幕" }).getByText("sitting", { exact: true });
+  await expect(word).toBeVisible();
+  await word.hover();
+  const popup = page.getByRole("dialog", { name: "查词" });
+  await popup.getByRole("button", { name: /下载离线词典/ }).click();
+  await expect(popup).toContainText("现在分词");
+  await expect(popup).toContainText("vi. 坐");
+  await expect(popup.getByTestId("lookup-headword")).toHaveText("sit");
+  await popup.getByRole("button", { name: "有道" }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __lastOpenedExternal?: string }).__lastOpenedExternal))
+    .toContain("youdao.com");
+  await page.keyboard.press("Escape");
+  await expect(popup).toHaveCount(0);
+});
