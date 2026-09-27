@@ -1,4 +1,4 @@
-"""faster-whisper worker helpers (PLAN 8.5).
+"""Local ASR worker: whisper detects the language, Mandarin goes to FunASR (PLAN 8.5, 15.4.4).
 
 The worker module doubles as a CLI: ``python -m prometheus.transcribe.local_whisper
 <audio> <out.json> <data_dir>`` runs in a subprocess so cancellation can kill the
@@ -9,6 +9,7 @@ import json
 import sys
 import time
 
+from prometheus.transcribe import local_funasr
 from video_report_agent.asr import AsrRun, normalize_asr_segments
 
 MODEL_ID = "large-v3-turbo"
@@ -19,10 +20,10 @@ class CudaUnavailable(RuntimeError):
 
 
 def build_asr_run(raw_result: dict, *, model: str, language: str, elapsed_ms: int,
-                  engine: str = "faster-whisper") -> AsrRun:  # engine: stub (R6 red)
+                  engine: str = "faster-whisper") -> AsrRun:
     normalized = normalize_asr_segments(raw_result.get("segments", []))
     return AsrRun(
-        engine="faster-whisper",
+        engine=engine,
         model=model,
         language=language,
         elapsed_ms=elapsed_ms,
@@ -91,15 +92,22 @@ def run_worker(audio_path: str, out_path: str, data_dir) -> None:
 
     audio = decode_audio(audio_path, sampling_rate=16000)
     language, _probability, _languages = model.detect_language(audio)
-    kwargs = build_transcribe_kwargs(language)
     started = time.perf_counter()
-    raw_segments, _info = model.transcribe(audio, **kwargs)
-    raw_result = {"segments": [
-        {"start": segment.start, "end": segment.end, "text": segment.text}
-        for segment in raw_segments
-    ]}
-    elapsed_ms = round((time.perf_counter() - started) * 1000)
-    run = build_asr_run(raw_result, model=MODEL_ID, language=language, elapsed_ms=elapsed_ms)
+    if local_funasr.choose_engine(language) == "funasr":
+        # Mandarin goes to FunASR on the CPU (D-35, D-39); whisper only picked the language.
+        del model
+        print("asr engine=funasr-onnx (cpu)", file=sys.stderr, flush=True)
+        segments = local_funasr.transcribe_array(audio, **local_funasr.load_models(data_dir))
+        run = build_asr_run({"segments": segments}, model=local_funasr.MODEL_ID, language=language,
+                            elapsed_ms=round((time.perf_counter() - started) * 1000), engine="funasr-onnx")
+    else:
+        raw_segments, _info = model.transcribe(audio, **build_transcribe_kwargs(language))
+        raw_result = {"segments": [
+            {"start": segment.start, "end": segment.end, "text": segment.text}
+            for segment in raw_segments
+        ]}
+        elapsed_ms = round((time.perf_counter() - started) * 1000)
+        run = build_asr_run(raw_result, model=MODEL_ID, language=language, elapsed_ms=elapsed_ms)
     with open(out_path, "w", encoding="utf-8") as stream:
         json.dump(run.to_dict(), stream, ensure_ascii=False)
 

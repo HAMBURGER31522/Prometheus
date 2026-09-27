@@ -69,8 +69,8 @@ def spawn_worker(command: list, *, log_path, out_path=None) -> WorkerHandle:
 
 
 def transcribe_local(data_dir, item_id: str, audio_path):
-    """Run the whisper worker in a subprocess; return the asr.json path (D-19)."""
-    if not cuda_component_installed(data_dir):
+    """Run the local ASR worker in a subprocess; return the asr.json path (D-19)."""
+    if not (cuda_component_installed(data_dir) and components.funasr_models_installed(data_dir)):
         raise CudaUnavailable("尚未安装本地转写组件，请先在设置里启用本地转写。")
     work = paths.work_dir(data_dir, item_id)
     asr_path = work / "asr.json"

@@ -6,6 +6,7 @@ inserted. Walking that string puts each mark back on its token, and the marks
 then cut the tokens into subtitle-sized sentences.
 """
 
+MODEL_ID = "paraformer-large + fsmn-vad + ct-punc (onnx int8)"
 _MARKS = frozenset("，。！？；：、,.!?;:…")
 _SENTENCE_END = frozenset("。！？；….!?;")
 _CLAUSE = frozenset("，、,")
@@ -91,10 +92,54 @@ def build_segments(tokens: list, times_ms: list, punctuated: str, *, offset_s: f
 
 
 def transcribe_array(audio, *, vad, asr, punc, sample_rate: int = 16000) -> list:
-    """Stub (R6 red)."""
-    return []
+    """VAD spans -> paraformer per span -> one punctuation pass over all tokens -> segments.
+
+    Punctuating once keeps a sentence the VAD happened to cut from getting a full stop at the cut.
+    """
+    tokens, times = [], []
+    for start_ms, end_ms in vad(audio)[0]:
+        results = asr(audio[start_ms * sample_rate // 1000:end_ms * sample_rate // 1000]) or [{}]
+        result = results[0] if isinstance(results[0], dict) else {}
+        span_tokens = (result.get("preds") or "").split()
+        if not span_tokens:
+            continue
+        tokens += span_tokens
+        times += [[start + start_ms, end + start_ms]
+                  for start, end in _fit(result.get("timestamp") or [], len(span_tokens))]
+    if not tokens:
+        return []
+    return build_segments(tokens, times, punc(" ".join(tokens))[0], offset_s=0)
 
 
 def choose_engine(language: str) -> str:
-    """Stub (R6 red)."""
-    return "whisper"
+    """Mandarin goes to FunASR (D-35); everything else, Cantonese included, stays on whisper."""
+    return "funasr" if language == "zh" else "whisper"
+
+
+def load_models(data_dir) -> dict:
+    """The three ONNX models on CPU, ready for ``transcribe_array``."""
+    import os
+    import sys
+    import types
+
+    # funasr-onnx imports librosa at module level but only calls it to read audio files by
+    # path; Prometheus always passes arrays, so librosa is not shipped (D-39).
+    sys.modules.setdefault("librosa", types.ModuleType("librosa"))
+    from funasr_onnx import CT_Transformer, Fsmn_vad, Paraformer
+    from prometheus.transcribe import components
+
+    class Vad(Fsmn_vad):
+        # funasr-onnx 0.4.3 uses its 1-element length array as a scalar, which numpy 2
+        # rejects; one waveform per call, so hand back the scalar.
+        def extract_feat(self, waveform_list):
+            feats, feats_len = super().extract_feat(waveform_list)
+            return feats, feats_len[0]
+
+    vad_dir, asr_dir, punc_dir = (str(components.funasr_model_dir(data_dir, model))
+                                  for model, _files in components.FUNASR_MODELS)
+    threads = os.cpu_count() or 4
+    return {
+        "vad": Vad(vad_dir, quantize=True, intra_op_num_threads=threads),
+        "asr": Paraformer(asr_dir, quantize=True, intra_op_num_threads=threads),
+        "punc": CT_Transformer(punc_dir, quantize=True, intra_op_num_threads=threads),
+    }

@@ -40,6 +40,7 @@ def test_asr_backend_env_does_not_affect_local_path(monkeypatch, tmp_path):
     from prometheus import paths
 
     (paths.cuda_dir(data_dir) / "nvidia" / "cublas" / "bin").mkdir(parents=True)
+    monkeypatch.setattr(local.components, "funasr_models_installed", lambda data_dir: True)
 
     asr_payload = json.loads((FIXTURES / "asr.local.json").read_text(encoding="utf-8"))
 
