@@ -206,3 +206,20 @@ def test_stray_ascii_quotes_inside_a_detail_do_not_lose_the_theme(monkeypatch):
     filled, stats = enrich.enrich_tree(json.loads(json.dumps(TREE)), HTML, ask=ask)
     assert all(leaf.get("detail") == quoted for leaf in _leaves(filled["root"]))
     assert stats["rewrites"] == 0
+
+
+def test_an_overview_chapter_does_not_take_the_moments_of_the_chapters_it_spans():
+    # Live report (罗素): the first chapter is an overview spanning 02:15–08:40, before the
+    # chronological 00:20–03:00. Second 160 belongs to the specific chapter, not the overview.
+    html = "".join(
+        f'<h2>{title}<span class="section-time">{span}</span></h2><p>{text}</p>'
+        for title, span, text in [
+            ("开场", "02:15–08:40", "1961 年再次被捕，时隔 43 年回到监狱。"),
+            ("第一次入狱", "00:20–03:00", "1916 至 1918 年因反战传单被罚款、失去教职、入狱。"),
+            ("核威慑", "03:00–05:01", "1948 年提出冷酷的计算。"),
+        ]
+    )
+    index = retrieve.Index(html)
+    assert index.section_for(160) == 1
+    assert index.section_for(200) == 2
+    assert index.section_for(400) == 0
