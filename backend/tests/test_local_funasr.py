@@ -50,3 +50,12 @@ def test_a_mismatched_punctuated_text_loses_no_characters():
     tokens = list("今天天气很好")
     segments = build_segments(tokens, _times(6), "今天气很好。", offset_s=0)
     assert "".join(s["text"] for s in segments).rstrip("。") == "今天天气很好"
+
+
+def test_fewer_timestamps_than_tokens_are_spread_over_the_tokens():
+    # Real paraformer output: fillers such as 啊 (and "O K") can come without a timestamp.
+    tokens = list("我们用必剪啊非常纯粹")
+    times = _times(9)  # one short
+    segments = build_segments(tokens, times, "我们用必剪啊，非常纯粹。", offset_s=0)
+    assert "".join(s["text"] for s in segments) == "我们用必剪啊，非常纯粹。"
+    assert segments[0]["start"] == 0 and segments[-1]["end"] == 1.8
