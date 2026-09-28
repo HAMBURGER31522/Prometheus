@@ -1,11 +1,14 @@
 """Write only the 精读 of finished items again (PLAN 15.4.11 experiments).
 
-    python scripts/report-eval/rewrite.py <data dir> <item id> [<item id> ...]
+    python scripts/report-eval/rewrite.py <data dir> <item id> [<item id> ...] [--frames]
 
-Runs report → finalize → publish with the data dir's settings (精读详细程度 included) and the
-item's kept transcript; subtitles and the mind map stay as they are, so only the report agent
-calls the user's model. Save the old 精读.html first if you want to compare (report-eval/run.py
---report ID=PATH).
+Runs 提取要点 → 规划 → report → finalize → publish with the data dir's settings (精读详细程度
+included) and the item's kept transcript; subtitles and the mind map stay as they are, so only the
+report calls the user's model. Save the old 精读.html first if you want to compare
+(report-eval/run.py --report ID=PATH).
+
+--frames: the finished item's video and frames were cleaned away; turn 配图 on for it, download the
+video again and extract frames first, and clean the scratch up again after a successful run.
 """
 
 import argparse
@@ -13,12 +16,14 @@ import sys
 import time
 from pathlib import Path
 
+from prometheus import paths
 from prometheus import runtime as runtime_mod
 from prometheus.library import items as items_store
-from prometheus.tasks import runner
+from prometheus.tasks import cleanup, runner
 from prometheus.tasks.stages import build_real_impls
 
 STAGES = ("keypoints", "plan", "report", "finalize", "publish")
+WITH_FRAMES = ("download", "frames", *STAGES)
 
 
 def main(argv=None, impls=None) -> int:
@@ -38,10 +43,14 @@ def main(argv=None, impls=None) -> int:
     for row in rows:
         started = time.monotonic()
         ctx = runner.StageContext(data_dir, row["id"])
+        if args.frames:
+            items_store.update_item(data_dir, row["id"], figures=1)
         try:
-            runner.run_item(ctx, impls, stages=STAGES)
+            runner.run_item(ctx, impls, stages=WITH_FRAMES if args.frames else STAGES)
         finally:
-            items_store.update_item(data_dir, row["id"], stage=None)
+            items_store.update_item(data_dir, row["id"], stage=None, stage_detail=None)
+        if args.frames:
+            cleanup.clean_work_dir(paths.work_dir(data_dir, row["id"]))
         print(f"{row.get('report_title') or row['id']}：重写完成，用时 {time.monotonic() - started:.0f} 秒",
               file=sys.stderr)
     return 0
