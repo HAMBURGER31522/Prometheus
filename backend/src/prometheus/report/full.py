@@ -16,6 +16,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from prometheus.figures import notes as frame_notes
 from prometheus.report import assemble as assembling
 from prometheus.report import chapter_checks, chapter_write, keypoints
 from prometheus.report import plan as planning
@@ -127,13 +128,17 @@ def _attachments(profile, figures: bool) -> str:
                        for name, path in files)
 
 
-def _chapter_frames(work: Path, space: Path, chapter: dict) -> None:
-    """Only the candidate frames inside the chapter's time ranges, with their own frames.json."""
+def _frames_in(work: Path, chapter: dict) -> list:
+    """The candidate frames inside the chapter's time ranges."""
     listed = _read_json(work / "frames" / "frames.json") or []
     spans = planning.chapter_ranges(chapter) or []
-    kept = [frame for frame in listed if isinstance(frame, dict)
+    return [frame for frame in listed if isinstance(frame, dict)
             and any(start <= float(frame.get("t", -1)) <= end for start, end in spans)
             and (work / "frames" / str(frame.get("file"))).is_file()]
+
+
+def _copy_frames(work: Path, space: Path, kept: list) -> None:
+    """Only the chapter's frames in its workspace, with their own frames.json."""
     target = space / "frames"
     shutil.rmtree(target, ignore_errors=True)
     target.mkdir(parents=True)
@@ -142,21 +147,42 @@ def _chapter_frames(work: Path, space: Path, chapter: dict) -> None:
     _write_json(target / "frames.json", kept)
 
 
+def _frame_ledger(work: Path, space: Path, number: int, kept: list, look):
+    """What each of the chapter's frames shows, from one look (多配图 ①); kept per frame list.
+    A failed look only means the writer opens the frames itself, as before."""
+    record = work / "chapters" / f"ch-{number:02d}.frames.json"
+    key = _digest(kept)
+    saved = _read_json(record)
+    if isinstance(saved, dict) and saved.get("key") == key:
+        return saved["notes"]
+    if look is None or not kept:
+        return None
+    _copy_frames(work, space, kept)
+    try:
+        found = frame_notes.parse_notes(
+            look(frame_notes.notes_prompt(kept), [space / "frames" / frame["file"] for frame in kept]), kept)
+    except Exception:  # noqa: BLE001 - see the docstring
+        return None
+    _write_json(record, {"key": key, "notes": found})
+    return found
+
+
 def _lost(check: dict) -> int:
-    return len(check["missing"]) + len(check["weak"]) + len(check["thin"])
+    return len(check["missing"]) + len(check["weak"]) + len(check["thin"]) + len(check["unused_frames"])
 
 
 def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -> tuple:
     """(fragment, check, stats) after the two-step review and at most one revision."""
     stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False}
-    questions = reviewing.parse_reader(ask(reviewing.reader_prompt(fragment)), fragment)
+    reply = ask(reviewing.reader_prompt(fragment))
+    questions, pictures = reviewing.parse_reader(reply, fragment), reviewing.parse_pictures(reply, fragment)
     stats["questions"] = len(questions)
-    if not questions:
-        return fragment, check, stats
-    verdicts = reviewing.parse_judge(ask(reviewing.judge_prompt(questions, transcript)), len(questions))
+    verdicts = []
+    if questions:
+        verdicts = reviewing.parse_judge(ask(reviewing.judge_prompt(questions, transcript)), len(questions))
     kinds = Counter((verdict or {}).get("kind") for verdict in verdicts)
     stats["answered"], stats["background"] = kinds[reviewing.ANSWERED], kinds[reviewing.BACKGROUND]
-    fixes = reviewing.fixes(questions, verdicts)
+    fixes = reviewing.fixes(questions, verdicts, pictures)
     if not fixes:
         return fragment, check, stats
     revised = revise(fixes)
@@ -169,19 +195,22 @@ def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -
 
 
 def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, units: list, run_pi, ask, *,
-               attached: str, figures: bool, review: bool, progress) -> dict:
+               attached: str, figures: bool, review: bool, progress, look) -> dict:
     chapter, total = plan["chapters"][number - 1], len(plan["chapters"])
     filename = f"ch-{number:02d}.html"
-    base = chapter_write.chapter_prompt(plan, number, owned, points, units, figures=figures, attached=attached)
+    space = work / "chapters" / f"ch-{number:02d}"
+    kept = _frames_in(work, chapter) if figures else []
+    ledger = _frame_ledger(work, space, number, kept, look) if figures else None
+    base = chapter_write.chapter_prompt(plan, number, owned, points, units, figures=figures, attached=attached,
+                                        frame_notes=ledger)
     key = _digest(base, review)
     record = work / "chapters" / f"ch-{number:02d}.json"
     done = _read_json(record)
     if isinstance(done, dict) and done.get("key") == key:
         return done
-    space = work / "chapters" / f"ch-{number:02d}"
     _prepare(space, figures=figures)
     if figures:
-        _chapter_frames(work, space, chapter)
+        _copy_frames(work, space, kept)
     mine = chapter_write.chapter_units(chapter, owned, points, units)
     spoken = "".join(unit.get("canonical_text", "") for unit in mine)
     index = {unit["unit_id"]: position for position, unit in enumerate(units)}
@@ -193,7 +222,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
         return run_pi(space, prompt, filename).read_text(encoding="utf-8")
 
     def recheck(fragment: str) -> dict:
-        return chapter_checks.check_chapter(fragment, owned, points, spoken, sources=sources)
+        return chapter_checks.check_chapter(fragment, owned, points, spoken, sources=sources, frames=ledger)
 
     progress("写作", number, total)
     fragment = write(base)
@@ -218,6 +247,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
 
 def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, figures: bool, review: bool,
                    progress, workers: int = 3, look=None) -> list:
+    """`look(prompt, files) -> reply`: a call that sees images, for the frame ledger (多配图 ①)."""
     work = Path(work)
     points = {point["id"]: point for point in ledger["points"]}
     owned = planning.assign(plan, ledger)
@@ -226,7 +256,7 @@ def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, 
     def one(number: int) -> dict:
         chapter = plan["chapters"][number - 1]
         return _write_one(work, plan, number, owned.get(chapter["id"], []), points, units, run_pi, ask,
-                          attached=attached, figures=figures, review=review, progress=progress)
+                          attached=attached, figures=figures, review=review, progress=progress, look=look)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return list(pool.map(one, range(1, len(plan["chapters"]) + 1)))

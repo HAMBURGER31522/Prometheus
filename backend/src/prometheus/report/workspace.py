@@ -109,6 +109,20 @@ def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
     return ask
 
 
+def model_look(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
+    """look(prompt, files) -> reply: a one-shot call with images attached (the frame ledger)."""
+    llm = _llm(settings)
+
+    def look(prompt: str, files: list) -> str:
+        return one_shot.run_one_shot(
+            work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
+            thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+            files=files,
+        )
+
+    return look
+
+
 def pi_runner(data_dir, settings: dict, node_exe: str, pi_cli: str, *, deadline: float):
     """run_pi(workspace, prompt, expect) for report/full.py: each run gets what is left of its stage's time."""
     llm = _llm(settings)
@@ -153,6 +167,7 @@ def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, 
         data_dir, work, row, settings, node_exe, pi_cli, figures=figures,
         seconds=3 * pi_timeout_seconds(row.get("duration_s") or 0.0))
     chapters = full.write_chapters(work, plan, ledger, units, run_pi, ask, figures=figures,
-                                   review=review_on(settings), progress=progress)
+                                   review=review_on(settings), progress=progress,
+                                   look=model_look(data_dir, work, settings, node_exe, pi_cli))
     full.finish(work, plan, problems, ledger, chapters, build_input_json(row))
     return work / "report.html"

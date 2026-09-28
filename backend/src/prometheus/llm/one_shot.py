@@ -24,6 +24,7 @@ def run_one_shot(work_dir, *, prompt: str, provider: str, model: str, api_key: s
         node_exe, pi_cli, "-p", *ONE_SHOT_FLAGS,
         "--provider", provider, "--model", model,
         "--thinking", thinking, "--api-key", api_key,
+        *(f"@{path}" for path in files),  # images to look at (pi -p @screenshot.png), after the options
     ]
     env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir)}
     result = subprocess.run(

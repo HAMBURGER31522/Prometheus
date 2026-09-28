@@ -66,6 +66,14 @@ def chapter_prompt(plan: dict, number: int, owned: list, points: dict, units: li
                    "按 figures.md 的写法使用，但不受它第 3 条的张数限制。画面里有正文写不出来的信息就配上，宁多勿少："
                    "幻灯片、图表、板书和公式、代码、软件界面、实物演示、地图。不配：口播人像、转场、片头片尾、广告；"
                    "同一个画面只配一次。图注写画面里的关键信息，和正文互补，不重复正文。\n" if figures else "")
+    offered = [frame for frame in frame_notes or [] if frame.get("useful")]
+    if figures and offered:
+        figure_rule += (
+            "   本章的候选帧已经有人看过，画面内容如下（文件在 frames/ 里，要核对细节时再打开）：\n"
+            + "".join(f"   - {frame['file']}（{frame['label']}，{frame['kind']}）{frame['what']}\n" for frame in offered)
+            + "   每一张都在讲到它的段落后面配上；确实不用的（和已用的图是同一个画面，或者正文已经完整写出了它的信息），"
+            "在片段里写一行 <!-- 不用 文件名：理由 -->，例如 <!-- 不用 f_000332.jpg：与上一张是同一页幻灯片 -->。\n"
+        )
     return (
         f"{attached}\n\n"
         f"## 本章转写（每行开头是单元编号和时间）\n{transcript}\n\n"

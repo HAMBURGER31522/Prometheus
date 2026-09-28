@@ -28,24 +28,34 @@ def reader_prompt(chapter: str) -> str:
         "第一次出现却没有解释的术语、人名、书名、缩写和外语词（每一个都要列出来）、没交代的前提、"
         "说了结论没说理由、提到却没展开的例子、数字缺单位或口径。"
         "每条照抄你问的那句原文（quote，保持原样），再写出你的问题。"
+        "另外，哪里如果配一张图或示意图会更好懂，也列进 pictures：照抄那句原文，写出你想看什么图。"
         "没有疑问就返回空列表。\n"
-        '只输出 JSON：{"questions": [{"quote": "…", "question": "…"}]}\n\n'
+        '只输出 JSON：{"questions": [{"quote": "…", "question": "…"}], "pictures": [{"quote": "…", "want": "…"}]}\n\n'
         f"本章：\n{report_to_markdown(chapter)}\n"
     )
 
 
-def parse_reader(text: str, chapter: str) -> list:
-    """The questions whose quote really is in the chapter."""
+def _quoted(text: str, chapter: str, key: str, field: str) -> list:
+    """The reader's items under `key` whose quote really is in the chapter."""
     value = first_json_object(text or "")
-    items = value.get("questions") if isinstance(value, dict) else None
+    items = value.get(key) if isinstance(value, dict) else None
     body = _norm(report_to_markdown(chapter))
     kept = []
     for item in items if isinstance(items, list) else []:
         item = item if isinstance(item, dict) else {}
-        quote, question = (str(item.get(key) or "").strip() for key in ("quote", "question"))
-        if question and _norm(quote) and _norm(quote) in body:
-            kept.append({"quote": quote, "question": question})
+        quote, asked = (str(item.get(name) or "").strip() for name in ("quote", field))
+        if asked and _norm(quote) and _norm(quote) in body:
+            kept.append({"quote": quote, field: asked})
     return kept
+
+
+def parse_reader(text: str, chapter: str) -> list:
+    return _quoted(text, chapter, "questions", "question")
+
+
+def parse_pictures(text: str, chapter: str) -> list:
+    """Where the reader wants a picture (PLAN 15.4.11, 多配图 ③)."""
+    return _quoted(text, chapter, "pictures", "want")
 
 
 def judge_prompt(questions: list, transcript: str) -> str:
@@ -77,7 +87,7 @@ def parse_judge(text: str, count: int) -> list:
     return verdicts
 
 
-def fixes(questions: list, verdicts: list) -> list:
+def fixes(questions: list, verdicts: list, pictures=()) -> list:
     """What to change in the chapter, in the words chapter_checks.feedback_prompt lists."""
     listed = []
     for question, verdict in zip(questions, verdicts):
@@ -88,4 +98,7 @@ def fixes(questions: list, verdicts: list) -> list:
         elif kind == BACKGROUND:
             listed.append(f"{asked}。视频里没有讲：在这句附近加一个补充说明（<aside class=\"supplement\">），"
                           "用通用知识解释，不写成讲者的话")
+    for picture in pictures:
+        listed.append(f"读者读到「{picture['quote']}」时希望有一张图：{picture['want']}。按 depth.md 画一张图示，"
+                      "或者用本章候选帧里合适的那张；只画本章正文已经写到的内容")
     return listed

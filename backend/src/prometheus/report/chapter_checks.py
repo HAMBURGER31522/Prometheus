@@ -24,6 +24,8 @@ SOURCE_WORD = 1.5        # an English word of the source counts as this many cha
 _NOT_WORDY = re.compile(r"[^一-鿿A-Za-z0-9]")
 _CJK = re.compile(r"[一-鿿]")
 _WORD = re.compile(r"[A-Za-z0-9]+")
+_FRAME_USED = re.compile(r"""src=["']frames/([^"']+)["']""")
+_FRAME_DECLINED = re.compile(r"<!--\s*不用\s*(f_\d+\.jpg)\s*[：:]\s*\S")
 
 
 def _norm(text: str) -> str:
@@ -96,8 +98,15 @@ def _bar(source: str) -> float:
     return max(THIN_BASE, THIN_RATIO * _size(source, word=SOURCE_WORD))
 
 
+def unused_frames(fragment: str, frames) -> list:
+    """Informative frames of the ledger neither shown nor declined with a reason (<!-- 不用 f_…：… -->)."""
+    shown = set(_FRAME_USED.findall(fragment)) | set(_FRAME_DECLINED.findall(fragment))
+    return [frame["file"] for frame in frames or [] if frame.get("useful") and frame["file"] not in shown]
+
+
 def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, sources=None, frames=None) -> dict:
-    """`sources`: {point id: the text of the units it rests on}; without it there is no length check."""
+    """`sources`: {point id: the text of the units it rests on}; without it there is no length check.
+    `frames`: the chapter's frame ledger (figures/notes.py); without it frames are not checked."""
     marking = _marking(fragment)
     root = parse_html(fragment)
     text = root.text(lambda node: node.tag == "h2")
@@ -122,8 +131,15 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
         problems.append(f"要点 {point_id} 讲得太简略，比视频里讲的少（{points[point_id]['text']}）：按 depth.md 的四步补全——"
                         "一句话说清是什么；类比到读者熟悉的东西；展开原理、理由、条件和例子；"
                         "最后说所以呢：它对读者意味着什么、和前后要点是什么关系。讲到零基础读者能自己复述为止")
-    return {"missing": missing, "weak": weak, "thin": thin, "copy_ratio": copy_ratio, "chars": chars,
-            "problems": problems}
+    unused = unused_frames(fragment, frames)
+    by_file = {frame["file"]: frame for frame in frames or []}
+    for file in unused:
+        frame = by_file[file]
+        problems.append(f"候选帧 {file}（{frame['label']}，{frame['kind']}：{frame['what']}）没有用上：在讲到它的段落后面配上这张图，"
+                        f"图注写画面里的关键信息；如果它和已用的图是同一个画面，或者正文已经完整写出了它的信息，"
+                        f"就在片段里写一行 <!-- 不用 {file}：理由 -->")
+    return {"missing": missing, "weak": weak, "thin": thin, "unused_frames": unused, "copy_ratio": copy_ratio,
+            "chars": chars, "problems": problems}
 
 
 def feedback_prompt(problems: list, filename: str) -> str:
