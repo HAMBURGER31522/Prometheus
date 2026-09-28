@@ -15,10 +15,15 @@ changed. The corrected and the raw transcript are grouped on the same boundaries
 to 「原始识别」 shows the same paragraphs.
 """
 
+import json
 import math
 import unicodedata
 from itertools import pairwise
 from typing import NamedTuple
+
+from prometheus import paths
+from prometheus.library import items as items_store
+from prometheus.subtitle import format as subtitle_format
 
 MIN_SECONDS = 10.0
 MAX_SECONDS = 15.0
@@ -206,5 +211,57 @@ def group_pair(shown: list, raw: list) -> tuple:
     return grouped, [_paragraph(raw, mapped[first:last + 1]) for first, last in ranges]
 
 
+def _read(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write(path, value) -> None:
+    """Through a temporary file, so a crash never leaves half a subtitle file behind."""
+    part = path.with_name(path.name + ".part")
+    part.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+    part.replace(path)
+
+
+def save(data_dir, item_id: str, fine: list) -> list:
+    """A new transcription: its paragraphs become the item's subtitles (correction and translation
+    work on them), and the fragments are kept in segments.fine.json."""
+    grouped = group_segments(fine)
+    paths.segments_file(data_dir, item_id).parent.mkdir(parents=True, exist_ok=True)
+    _write(paths.fine_segments_file(data_dir, item_id), fine)
+    _write(paths.segments_file(data_dir, item_id), grouped)
+    return grouped
+
+
+def convert_item(data_dir, row: dict) -> bool:
+    """Group the subtitles of an item made before paragraphs; False when there is nothing to do.
+    segments.fine.json is written last: it marks the item as converted."""
+    item_id = row["id"]
+    fine_file, shown_file = paths.fine_segments_file(data_dir, item_id), paths.segments_file(data_dir, item_id)
+    raw_file = paths.raw_segments_file(data_dir, item_id)
+    if fine_file.is_file() or not shown_file.is_file():
+        return False
+    fine = _read(shown_file)
+    if raw_file.is_file():  # 「原始识别」 gets the same boundaries; the translations stay with the corrected text
+        grouped, raw = group_pair(fine, _read(raw_file))
+        _write(raw_file, raw)
+    else:
+        grouped = group_segments(fine)
+    _write(shown_file, grouped)
+    folder = paths.library_folder(data_dir, row["library_path"]) if row.get("library_path") else None
+    if folder is not None and folder.is_dir():
+        (folder / paths.LIBRARY_FILES["srt"]).write_text(subtitle_format.to_srt(grouped), encoding="utf-8")
+        (folder / paths.LIBRARY_FILES["txt"]).write_text(subtitle_format.to_txt(grouped), encoding="utf-8")
+    _write(fine_file, fine)
+    return True
+
+
 def convert_library(data_dir) -> int:
-    return 0
+    """Once, when the backend starts (PLAN 15.4.10); no model is involved and a second run changes
+    nothing. An item whose files cannot be read stays as it is."""
+    converted = 0
+    for row in items_store.list_items(data_dir):
+        try:
+            converted += convert_item(data_dir, row)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+    return converted

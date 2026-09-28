@@ -97,8 +97,8 @@ def test_long_paragraphs_go_in_batches_of_about_2500_characters():
 
 def test_translated_paragraphs_go_in_batches_of_about_1250_characters():
     calls = []
-    fixed, stats = fix.fix_segments(_segments(["word " * 80] * 10), "", human=False, ask=_translator(calls),
-                                    translate=True)
+    _fixed, stats = fix.fix_segments(_segments(["word " * 80] * 10), "", human=False, ask=_translator(calls),
+                                     translate=True)
     assert _batch_sizes(calls) == [3, 3, 3, 1]
     assert stats["translated"] == 10
 

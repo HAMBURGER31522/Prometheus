@@ -16,6 +16,7 @@ from prometheus.library import publish as publish_mod
 from prometheus.mindmap import enrich
 from prometheus.mindmap.markdown import tree_to_markdown
 from prometheus.subtitle import fix as subtitle_fix_mod
+from prometheus.subtitle import paragraphs as subtitle_paragraphs
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 DICTIONARY_SAMPLE = FIXTURES / "ecdict.sample.csv"  # installed instead of the 23 MB ECDICT (PLAN 15.4.9)
@@ -38,14 +39,18 @@ def _fake_fill(prompt: str) -> str:
 
 def _fake_fix(prompt: str) -> str:
     """A careful model for subtitle correction: keeps every text as it is and, when asked to
-    translate (the English sample), answers from fixtures/segments.en.json."""
+    translate (the English sample), joins the Chinese of the fixtures/segments.en.json fragments
+    that make up each paragraph."""
     mark = subtitle_fix_mod.SEGMENTS_MARK
     batch = json.loads(prompt[prompt.index(mark) + len(mark):])
     if "中文翻译" not in prompt:
         return json.dumps(batch, ensure_ascii=False)
     english = json.loads(_fixture("segments.en.json").read_text(encoding="utf-8"))
-    zh = {segment["text"]: segment["zh"] for segment in english}
-    return json.dumps({key: {"text": text, "zh": zh.get(text, "")} for key, text in batch.items()},
+
+    def translate(text: str) -> str:
+        return "".join(segment["zh"] for segment in english if segment["text"] in text)
+
+    return json.dumps({key: {"text": text, "zh": translate(text)} for key, text in batch.items()},
                       ensure_ascii=False)
 
 
@@ -80,8 +85,7 @@ def build_impls(data_dir):
             segments = [{key: segment[key] for key in ("start", "end", "text")} for segment in english]
             (paths.work_dir(data_dir, ctx.item_id) / "asr.json").write_text(
                 json.dumps({"language": "en", "segments": []}), encoding="utf-8")
-        segments_file = paths.segments_file(data_dir, ctx.item_id)
-        segments_file.write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
+        segments = subtitle_paragraphs.save(data_dir, ctx.item_id, segments)  # like a real transcription
         from prometheus.subtitle import format as subtitle_format
 
         paths.srt_file(data_dir, ctx.item_id).parent.mkdir(parents=True, exist_ok=True)

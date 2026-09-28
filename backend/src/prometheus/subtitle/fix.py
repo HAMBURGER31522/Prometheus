@@ -18,8 +18,9 @@ from prometheus import paths
 from prometheus.library import items as items_store
 
 MAX_REFERENCE = 12000
-BATCH = 120
-TRANSLATE_BATCH = 60  # the reply carries the text and its translation (PLAN 15.4.9)
+# 「每次最多 120 段（约 2500 字）」: a 10–15 s paragraph (PLAN 15.4.10) holds 50–150 characters.
+BATCH, BATCH_CHARS = 120, 2500
+TRANSLATE_BATCH, TRANSLATE_BATCH_CHARS = 60, 1250  # the reply carries the text and its translation (15.4.9)
 CHINESE = frozenset({"zh", "yue"})
 WORKERS = 3
 SEGMENTS_MARK = "字幕分段（JSON）：\n"
@@ -100,11 +101,23 @@ def build_prompt(batch: dict, reference: str, *, human: bool, translate: bool = 
     return "\n".join(lines) + "\n\n" + SEGMENTS_MARK + json.dumps(batch, ensure_ascii=False)
 
 
+def _batches(segments: list, size: int, chars: int) -> list:
+    """Consecutive ranges of at most `size` segments and about `chars` characters."""
+    batches, start, total = [], 0, 0
+    for index, segment in enumerate(segments):
+        if index > start and (index - start >= size or total + len(segment["text"]) > chars):
+            batches.append(range(start, index))
+            start, total = index, 0
+        total += len(segment["text"])
+    if start < len(segments):
+        batches.append(range(start, len(segments)))
+    return batches
+
+
 def fix_segments(segments: list, reference: str, *, human: bool, ask, translate: bool = False) -> tuple:
     """Corrected copies of the segments (times untouched) and what happened to them."""
     fixed = [dict(segment) for segment in segments]
-    size = TRANSLATE_BATCH if translate else BATCH
-    batches = [range(start, min(start + size, len(segments))) for start in range(0, len(segments), size)]
+    batches = _batches(segments, *((TRANSLATE_BATCH, TRANSLATE_BATCH_CHARS) if translate else (BATCH, BATCH_CHARS)))
 
     def run(indices):
         prompt = build_prompt({str(i): segments[i]["text"] for i in indices}, reference, human=human,

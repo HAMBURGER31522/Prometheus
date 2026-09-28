@@ -21,6 +21,7 @@ from prometheus.api import settings as settings_api
 from prometheus.fake.pipeline import build_impls as build_fake_impls
 from prometheus.library import db, migrate
 from prometheus.llm import pi_models
+from prometheus.subtitle import paragraphs as subtitle_paragraphs
 from prometheus.tasks.queue import TaskQueue
 from prometheus.tasks.stages import build_real_impls
 
@@ -57,6 +58,8 @@ class AppState:
         pi_models.ensure_models_json(self.data_dir)
         # Startup recovery (PLAN 7.1): a running row means the process died.
         db.mark_running_as_interrupted(self.data_dir)
+        # Subtitles from before the 10–15 s paragraphs are grouped once (PLAN 15.4.10).
+        subtitle_paragraphs.convert_library(self.data_dir)
         if self.queue is None:
             impls = build_fake_impls(self.data_dir) if self.fake else build_real_impls(self.data_dir, runtime=self.get_runtime)
             self.queue = TaskQueue(self.data_dir, impls)

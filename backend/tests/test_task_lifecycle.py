@@ -78,8 +78,8 @@ def test_unexpected_failure_is_labelled_as_internal(client, monkeypatch):
     assert row["error_message"].startswith("内部错误")
 
 
-KEPT = ["asr.json", "canonical-transcript.jsonl", "input.json", "run.trace.jsonl",
-        "mindmap.json", "segments.json", "segments.raw.json", "source.info.json", "transcript.md"]
+KEPT = ["asr.json", "canonical-transcript.jsonl", "input.json", "run.trace.jsonl", "mindmap.json",
+        "segments.json", "segments.raw.json", "segments.fine.json", "source.info.json", "transcript.md"]
 SCRATCH = ["media.m4a", "media.info.json", "video.mp4", "audio.wav", "pi.events.jsonl",
            "SKILL.md", "report.html", "frames/f_000080.jpg", "sessions/a.jsonl"]
 

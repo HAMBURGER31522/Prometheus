@@ -95,6 +95,11 @@ def raw_segments_file(data_dir: Path, item_id: str) -> Path:
     return cache_dir(data_dir, item_id) / "segments.raw.json"
 
 
+def fine_segments_file(data_dir: Path, item_id: str) -> Path:
+    """The transcription's own fragments, before they became paragraphs (PLAN 15.4.10)."""
+    return cache_dir(data_dir, item_id) / "segments.fine.json"
+
+
 def out_dir(data_dir: Path, item_id: str) -> Path:
     """Finished artifacts waiting to be published into the library."""
     return cache_dir(data_dir, item_id) / "out"

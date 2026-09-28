@@ -317,8 +317,8 @@ def test_an_english_item_is_translated_paragraph_by_paragraph(client):
     shown = client.get(f"/api/items/{item_id}/subtitle").json()
     assert [(p["text"], p.get("zh")) for p in shown] == [
         ("Imagine the money a country earns sitting in three pockets:", "想象一个国家挣到的钱放在三个口袋里"),
-        ("one for households one for companies and one for the government how it moves between them "
-         "decides what people can actually buy.",
+        (("one for households one for companies and one for the government how it moves between them "
+          "decides what people can actually buy."),
          "一个给家庭，一个给企业，还有一个给政府。钱在它们之间怎么流动，决定了人们实际能买多少东西。"),
         ("And that is where the story of fiscal rebalancing begins.", "而这正是财政再平衡故事的开端。"),
     ]
