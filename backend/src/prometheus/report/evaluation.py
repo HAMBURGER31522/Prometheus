@@ -11,8 +11,10 @@ The model is injected as ``ask(prompt) -> reply``; nothing here calls one.
 """
 
 import json
+import math
 import random
 import re
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 from pathlib import Path
@@ -233,6 +235,46 @@ def cjk_counts(html: str, units: list) -> dict:
 
 # ---------- faithfulness ----------
 
+WINDOW, STRIDE, MATCHES = 12, 6, 2
+_K1, _B = 1.5, 0.75
+_DROP = re.compile(r"[^一-鿿A-Za-z0-9]")
+
+
+def _grams(text: str) -> list:
+    """Character bigrams of the wordy characters: no Chinese word segmenter needed."""
+    clean = _DROP.sub("", text.lower())
+    return [clean[i:i + 2] for i in range(len(clean) - 1)]
+
+
+class _Passages:
+    """BM25 over overlapping windows of transcript units: where a sentence's content really is,
+    whatever its citation says."""
+
+    def __init__(self, units: list):
+        starts = range(0, max(len(units) - WINDOW, 0) + 1, STRIDE) if units else []
+        self.windows = [(start, min(start + WINDOW, len(units))) for start in starts]
+        if units and self.windows[-1][1] < len(units):
+            self.windows.append((max(0, len(units) - WINDOW), len(units)))
+        self.docs = [Counter(_grams("".join(u.get("canonical_text", "") for u in units[a:b])))
+                     for a, b in self.windows]
+        lengths = [sum(doc.values()) for doc in self.docs]
+        self.lengths, self.average = lengths, (sum(lengths) / len(lengths)) if lengths else 1.0
+        frequency = Counter(gram for doc in self.docs for gram in doc)
+        total = len(self.docs)
+        self.idf = {gram: math.log(1 + (total - n + 0.5) / (n + 0.5)) for gram, n in frequency.items()}
+
+    def best(self, text: str, limit: int = MATCHES) -> list:
+        terms = set(_grams(text))
+        scored = []
+        for index, doc in enumerate(self.docs):
+            norm = _K1 * (1 - _B + _B * self.lengths[index] / (self.average or 1.0))
+            score = sum(self.idf[t] * doc[t] * (_K1 + 1) / (doc[t] + norm) for t in terms if t in doc)
+            if score > 0:
+                scored.append((score, index))
+        scored.sort(reverse=True)
+        return [self.windows[index] for _score, index in scored[:limit]]
+
+
 def _leaf_blocks(root: _Node):
     for node in root.walk():
         if node.tag in _BLOCKS and not any(child.tag in _BLOCKS for child in node.walk()):
@@ -241,10 +283,12 @@ def _leaf_blocks(root: _Node):
 
 def report_sentences(html: str, units: list) -> list:
     """Body sentences with the transcript units that should support them: the nearest cited units
-    widened by two on each side, else the units inside the chapter's section-time. Supplements,
-    figure captions and headings are left out; so are sentences with nothing to check against."""
+    widened by two on each side (else the units inside the chapter's section-time), plus the
+    passages that best match the sentence anywhere in the transcript, since citations are often
+    off. Supplements, figure captions and headings are left out."""
     root, order = _parse(html), _order(units)
     sections = _sections(root)
+    passages = _Passages(units)
     sentences = []
     for block in _leaf_blocks(root):
         if _in(block, _is_supplement) or _in(block, lambda a: a.tag in ("figure", "header", "h1", "h2")):
@@ -260,8 +304,11 @@ def report_sentences(html: str, units: list) -> list:
             continue
         for piece in _SENTENCE_END.split(block.text()):
             text = " ".join(piece.split())
-            if len(_WORDY.findall(text)) >= MIN_SENTENCE:
-                sentences.append({"text": text, "units": evidence})
+            if len(_WORDY.findall(text)) < MIN_SENTENCE:
+                continue
+            matched = {unit["unit_id"] for start, end in passages.best(text) for unit in units[start:end]}
+            wanted = set(evidence) | matched
+            sentences.append({"text": text, "units": [u["unit_id"] for u in units if u["unit_id"] in wanted]})
     return sentences
 
 
