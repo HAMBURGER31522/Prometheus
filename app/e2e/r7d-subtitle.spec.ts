@@ -95,13 +95,16 @@ test("悬停英文单词：浮窗在中文释义下方显示英英释义，可�
 test("旧词库：浮窗照常显示中文释义并提示更新词库，更新后显示英英释义", async ({ page, request }) => {
   const id = await englishItem(request);
   await dictionaryReady(request);
-  // The sample dictionary has definitions: answer the first lookup like a dictionary built before them.
+  // The sample dictionary has definitions: until 「更新词库」 asks for a new one, answer lookups
+  // like a dictionary built before them.
   let old = true;
+  page.on("request", (sent) => {
+    if (sent.method() === "POST" && sent.url().endsWith("/api/dictionary/install")) old = false;
+  });
   await page.route(
     (url) => url.pathname === "/api/dictionary/lookup",
     async (route) => {
       if (!old || route.request().method() !== "GET") return route.fallback();
-      old = false;
       const response = await route.fetch();
       await route.fulfill({ response, json: { ...(await response.json()), definition: [], needs_update: true } });
     },

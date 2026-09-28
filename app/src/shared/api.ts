@@ -139,6 +139,10 @@ export interface LookupEntry {
   phonetic: string;
   translation: string[];
   inflection: string | null;
+  /** Up to three English definitions (PLAN 15.4.10). */
+  definition: string[];
+  /** The installed dictionary predates English definitions: 「更新词库」 downloads it again. */
+  needs_update: boolean;
 }
 
 export interface ComponentStatus {
