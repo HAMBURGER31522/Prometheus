@@ -264,6 +264,22 @@ def test_the_frame_ledger_is_offered_to_the_writer_and_an_unused_slide_is_sent_b
     assert again.calls == []  # the ledger and the chapters are kept
 
 
+def test_a_chapter_without_frames_is_not_told_about_frames(tmp_path):
+    """One wasted turn per run otherwise: the writer went looking in an empty frames folder."""
+    frames = tmp_path / "frames"
+    frames.mkdir()
+    listed = [{"file": "f_000030.jpg", "t": 30.0, "label": "00:30"}]
+    (frames / "frames.json").write_text(json.dumps(listed), encoding="utf-8")
+    (frames / "f_000030.jpg").write_bytes(b"jpg")
+    units, pi = make_units(), Pi()
+    ledger = full.run_keypoints(tmp_path, units, Model())
+    plan, _problems = full.run_plan(tmp_path, ledger, pi, figures=True, input_json=INPUT)
+    full.write_chapters(tmp_path, plan, ledger, units, pi, Model(), figures=True, review=False,
+                        progress=lambda *args: None, workers=1, look=Look())
+    assert "frames/ 里是本章" in pi.runs("ch-01.html")[0]
+    assert "frames/ 里是本章" not in pi.runs("ch-02.html")[0]
+
+
 def test_the_assembled_report_goes_through_finalize_with_its_frames_inlined(tmp_path):
     """E14 ①「拼装……通过 finalize 的检查」: placeholders filled, frames inlined, nothing external."""
     from prometheus.report.finalize import finalize_report

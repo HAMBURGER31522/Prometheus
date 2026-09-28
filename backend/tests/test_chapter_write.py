@@ -105,6 +105,9 @@ def test_an_hour_long_video_uses_hours_in_the_section_time():
 
 
 def test_a_revision_starts_from_the_draft_with_the_problems_listed():
-    text = write.revision_prompt("【本章任务】", ["要点 K004 没有写到"], "ch-02.html")
+    draft = '<section><h2>研磨</h2><p data-points="K003">上一稿的正文。</p></section>'
+    text = write.revision_prompt("【本章任务】", ["要点 K004 没有写到"], "ch-02.html", draft)
     assert text.startswith("【本章任务】")
     assert "ch-02.html" in text and "K004" in text and "其余" in text
+    # the draft rides along: no turn spent reading it back (every turn resends everything, D-44)
+    assert draft in text and "先读它" not in text
