@@ -420,7 +420,8 @@ def _batches(items: list, size: int) -> list:
     return [items[start:start + size] for start in range(0, len(items), size)]
 
 
-def _questions(units: list, questions_file: Path, call, workers: int) -> dict:
+def ensure_questions(units: list, questions_file: Path, call, workers: int = 3) -> dict:
+    """The item's kept questions, made (once) from its transcript blocks."""
     if questions_file.is_file():
         return json.loads(questions_file.read_text(encoding="utf-8"))
 
@@ -451,7 +452,7 @@ def evaluate_report(units: list, html: str, questions_file, ask, *, points=None,
         return reply
 
     texts = {unit["unit_id"]: unit.get("canonical_text", "") for unit in units}
-    questions = _questions(units, Path(questions_file), call, workers)["questions"]
+    questions = ensure_questions(units, Path(questions_file), call, workers)["questions"]
     markdown = report_to_markdown(html)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         answer_batches = list(pool.map(
