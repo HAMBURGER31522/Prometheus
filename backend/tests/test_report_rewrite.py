@@ -49,3 +49,24 @@ def test_an_unknown_or_unfinished_item_is_refused(tmp_path):
     items_store.update_item(data_dir, item_id, status="failed")
     assert load_script().main([str(data_dir), item_id], impls=impls) == 2
     assert ran == []
+
+
+def test_frames_turns_figures_on_downloads_again_extracts_and_cleans_up_after(tmp_path):
+    """A finished item's video and frames were cleaned away: --frames brings them back for the run."""
+    from prometheus import paths
+
+    data_dir, item_id = finished_item(tmp_path)
+    work = paths.work_dir(data_dir, item_id)
+    ran = []
+
+    def download(ctx):
+        ran.append("download")
+        (work / "video.mp4").write_bytes(b"video")
+
+    impls = {stage: (lambda ctx, stage=stage: ran.append(stage))
+             for stage in ("resolve", "transcribe", "frames", "keypoints", "plan", "report", "finalize", "publish")}
+    impls["download"] = download
+    assert load_script().main([str(data_dir), item_id, "--frames"], impls=impls) == 0
+    assert ran == ["download", "frames", "keypoints", "plan", "report", "finalize", "publish"]
+    assert items_store.get_item(data_dir, item_id)["figures"] == 1
+    assert not (work / "video.mp4").exists()

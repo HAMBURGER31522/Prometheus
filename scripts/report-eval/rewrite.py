@@ -25,6 +25,7 @@ def main(argv=None, impls=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("data_dir", type=Path)
     parser.add_argument("items", nargs="+")
+    parser.add_argument("--frames", action="store_true")
     args = parser.parse_args(argv)
     data_dir = args.data_dir.resolve()  # Pi runs elsewhere: relative paths would point astray
 
