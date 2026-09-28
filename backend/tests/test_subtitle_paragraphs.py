@@ -2,6 +2,7 @@
 fragments (「对吧，」 on its own line); the subtitles are read as paragraphs instead."""
 
 import random
+from itertools import pairwise
 
 from prometheus.subtitle import paragraphs
 from prometheus.subtitle.paragraphs import group_segments
@@ -25,7 +26,7 @@ def _assert_invariants(fine, grouped):
     assert _ink(grouped) == _ink(fine), "a character was lost or changed"
     assert all(paragraph["end"] - paragraph["start"] <= 15 for paragraph in grouped)
     assert all(paragraph["start"] <= paragraph["end"] for paragraph in grouped)
-    assert all(a["end"] <= b["start"] for a, b in zip(grouped, grouped[1:])), "times go backwards"
+    assert all(a["end"] <= b["start"] for a, b in pairwise(grouped)), "times go backwards"
     assert all(set(paragraph) <= {"start", "end", "text", "zh"} for paragraph in grouped)
 
 
