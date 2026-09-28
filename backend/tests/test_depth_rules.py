@@ -54,6 +54,12 @@ def test_diagrams_follow_the_shape_of_the_content_not_a_count():
     assert "不按要点" in RULES
 
 
+def test_the_picture_and_the_text_do_not_repeat_each_other():
+    # user 2026-09-28: 图文不重复是基本 — the diagram carries the structure, the text what it cannot draw
+    assert "每个节点和箭头的含义，正文仍要写清楚" not in RULES
+    assert "不重复" in RULES and "画不出" in RULES
+
+
 def test_its_examples_give_nothing_away_about_the_evaluation_samples():
     # The closed-book questions come from these three videos: no example may touch them.
     for topic in ("卡巴拉", "罗素", "微分", "一对一", "AI", "战争", "学习"):

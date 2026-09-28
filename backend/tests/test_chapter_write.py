@@ -83,6 +83,9 @@ def test_frames_are_chosen_by_what_they_show_with_no_count_limit():
     assert "不受" in task and "张数" in task and "宁多勿少" in task
     assert "只配一次" in task and "口播" in task
     assert not re.search(r"最多\s*\d+\s*张", task)
+    for shown in ("幻灯片", "图表", "板书", "代码", "界面", "实物", "地图"):  # the trigger, spelled out
+        assert shown in task, shown
+    assert "互补" in task and "不重复" in task  # the caption adds to the text, never repeats it
 
 
 def test_an_hour_long_video_uses_hours_in_the_section_time():
