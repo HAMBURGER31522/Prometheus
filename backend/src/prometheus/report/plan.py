@@ -79,7 +79,7 @@ def _chapter_at(seconds: float, chapters: list):
     return None
 
 
-def _valid_skips(plan: dict, known: set) -> dict:
+def valid_skips(plan: dict, known: set) -> dict:
     skips = {}
     for skip in plan.get("skips") or []:
         if isinstance(skip, dict) and skip.get("point") in known and skip.get("reason") in PLAN_SKIPS:
@@ -91,7 +91,7 @@ def assign(plan: dict, ledger: dict) -> dict:
     """{chapter id: [point ids]} for every chapter; legally skipped points belong nowhere."""
     chapters = [c for c in plan.get("chapters") or [] if isinstance(c, dict) and c.get("id")]
     known = {point["id"] for point in ledger["points"]}
-    skipped = _valid_skips(plan, known)
+    skipped = valid_skips(plan, known)
     moves = {k: v for k, v in (plan.get("moves") or {}).items() if k in known}
     ids = {chapter["id"] for chapter in chapters}
     owned = {chapter["id"]: [] for chapter in chapters}
@@ -155,7 +155,7 @@ def validate_plan(plan: dict, ledger: dict) -> list:
                 problems.append(f"{point_id} 标为重复，但它指向的 {other} 也被跳过了")
     owned = assign(plan, ledger)
     placed = {point_id for ids in owned.values() for point_id in ids}
-    legal = set(_valid_skips(plan, set(by_id)))
+    legal = set(valid_skips(plan, set(by_id)))
     for point in ledger["points"]:
         if point["id"] not in placed and point["id"] not in legal:
             problems.append(f"{point['id']}（{_clock(point['start_ms'])}–{_clock(point['end_ms'])}）没有归属章节")
