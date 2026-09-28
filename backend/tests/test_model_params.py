@@ -161,3 +161,42 @@ def test_saving_settings_writes_the_parameters(with_pi):
     [entry] = models["providers"]["custom"]["models"]
     assert entry.get("contextWindow") == 1000000
     assert (entry.get("compat") or {}).get("forceAdaptiveThinking") is True
+
+
+def test_startup_rewrites_the_custom_provider_from_the_saved_settings(tmp_path, pi_cli):
+    """An install from before the model parameters gets them at the next start, without pressing 保存."""
+    from prometheus.server import AppState
+
+    data_dir = data_dir_with(tmp_path, RELAY)
+    target = paths.models_json(data_dir)
+    document = json.loads(target.read_text(encoding="utf-8"))
+    document.setdefault("providers", {})["custom"] = {
+        "baseUrl": "https://api.justwoker.icu", "api": "anthropic-messages", "apiKey": "$PI_API_KEY",
+        "models": [{"id": "claude-opus-4-8", "name": "claude-opus-4-8", "reasoning": True, "input": ["text", "image"]}],
+    }
+    target.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    state = AppState(True, found_runtime=Runtime(Path("node.exe"), pi_cli, Path("ffmpeg.exe"), Path("ffprobe.exe")))
+    state.initialize(data_dir)
+    try:
+        entry = json.loads(target.read_text(encoding="utf-8"))["providers"]["custom"]["models"][0]
+        assert entry["id"] == "claude-opus-4-8"
+        assert entry.get("contextWindow") == 1000000
+        assert entry.get("maxTokens") == 128000
+        assert (entry.get("compat") or {}).get("forceAdaptiveThinking") is True
+    finally:
+        state.shutdown()
+
+
+def test_startup_leaves_models_json_alone_for_a_builtin_provider(tmp_path, pi_cli):
+    from prometheus.server import AppState
+
+    data_dir = data_dir_with(tmp_path, {**RELAY, "id": "ds", "kind": "deepseek", "model": "deepseek-flash"})
+    before = paths.models_json(data_dir).read_text(encoding="utf-8")
+    state = AppState(True, found_runtime=Runtime(Path("node.exe"), pi_cli, Path("ffmpeg.exe"), Path("ffprobe.exe")))
+    state.initialize(data_dir)
+    try:
+        after = paths.models_json(data_dir).read_text(encoding="utf-8")
+        assert "custom" not in json.loads(after).get("providers", {}) or after == before
+        assert json.loads(after)["providers"]["deepseek"] == json.loads(before)["providers"]["deepseek"]
+    finally:
+        state.shutdown()
