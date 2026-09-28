@@ -154,9 +154,13 @@ test("阅读页用「⋯ → 移到」移动文章，原来的分类下拉框不
 test("没有标签的文章，阅读页「⋯」里有「补全标签和摘要」，点了只补这两样", async ({ page }) => {
   // Items finished before tags existed: strip the tags of every item as the app sees them.
   await page.route(`${API}/api/items`, async (route) => {
-    const response = await route.fetch();
-    const rows = (await response.json()) as Record<string, unknown>[];
-    await route.fulfill({ response, json: rows.map((row) => ({ ...row, tags: null, description: null })) });
+    try {
+      const response = await route.fetch();
+      const rows = (await response.json()) as Record<string, unknown>[];
+      await route.fulfill({ response, json: rows.map((row) => ({ ...row, tags: null, description: null })) });
+    } catch {
+      // The page dropped this poll (a newer one or a navigation): there is nobody left to answer.
+    }
   });
   const sent: unknown[] = [];
   await page.route(/\/api\/items\/[0-9a-f]+\/regenerate$/, async (route) => {
