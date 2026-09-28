@@ -47,6 +47,13 @@ def test_it_keeps_the_pictures():
     assert "组件" in RULES
 
 
+def test_diagrams_follow_the_shape_of_the_content_not_a_count():
+    # user 2026-09-28: triggered by content, never one per point or per chapter
+    for shape in ("步骤", "对照", "关系图", "卡片", "柱图"):
+        assert shape in RULES, shape
+    assert "不按要点" in RULES
+
+
 def test_its_examples_give_nothing_away_about_the_evaluation_samples():
     # The closed-book questions come from these three videos: no example may touch them.
     for topic in ("卡巴拉", "罗素", "微分", "一对一", "AI", "战争", "学习"):

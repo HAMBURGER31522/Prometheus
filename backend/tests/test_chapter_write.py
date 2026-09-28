@@ -76,6 +76,15 @@ def test_figures_only_when_the_run_has_frames():
     assert "figures.md" in prompt(figures=True)
 
 
+def test_frames_are_chosen_by_what_they_show_with_no_count_limit():
+    """User 2026-09-28: more pictures, no cap; a frame is used when it shows what words cannot."""
+    task = prompt(figures=True)
+    task = task[task.index("## 任务"):]
+    assert "不受" in task and "张数" in task and "宁多勿少" in task
+    assert "只配一次" in task and "口播" in task
+    assert not re.search(r"最多\s*\d+\s*张", task)
+
+
 def test_an_hour_long_video_uses_hours_in_the_section_time():
     long_plan = {**PLAN, "chapters": [{**chapter, "ranges": [["01:02:00", "01:04:00"]]} for chapter in PLAN["chapters"]]}
     text = write.chapter_prompt(long_plan, 2, [], POINTS, UNITS, figures=False, attached="")
