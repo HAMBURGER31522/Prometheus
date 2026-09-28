@@ -29,7 +29,7 @@ def custom_base_url(custom: dict) -> str:
     return base
 
 
-def apply_custom_provider(data_dir, custom: dict) -> None:
+def apply_custom_provider(data_dir, custom: dict, *, pi_cli=None) -> None:
     """Write the custom provider into models.json (PLAN 8.9, 15.2-2)."""
     target = paths.models_json(data_dir)
     document = json.loads(target.read_text(encoding="utf-8"))

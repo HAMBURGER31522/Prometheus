@@ -186,3 +186,19 @@ def test_custom_asr_keeps_its_endpoint_and_masks_its_key(client):
     on_disk = json.loads(paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8"))
     assert on_disk["asr"] == {"backend": "custom", "custom": {
         "base_url": "https://asr.example/v1", "api_key": "sk-asr-9876", "model": "whisper-1"}}
+
+
+def test_an_empty_custom_asr_key_keeps_the_saved_one(client):
+    # PLAN 15.4.10: the key field starts empty (「留空则不修改」); typing replaces the key.
+    body = client.get("/api/settings", headers=AUTH).json()
+    body["asr"] = {"backend": "custom", "custom": {
+        "base_url": "https://asr.example/v1", "api_key": "sk-asr-9876", "model": "whisper-1"}}
+    client.put("/api/settings", json=body, headers=AUTH)
+    body["asr"]["custom"]["api_key"] = ""
+    assert client.put("/api/settings", json=body, headers=AUTH).status_code == 200
+    on_disk = json.loads(paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8"))
+    assert on_disk["asr"]["custom"]["api_key"] == "sk-asr-9876"
+    body["asr"]["custom"]["api_key"] = "sk-asr-new-5555"
+    client.put("/api/settings", json=body, headers=AUTH)
+    on_disk = json.loads(paths.settings_file(client.app.state.data_dir).read_text(encoding="utf-8"))
+    assert on_disk["asr"]["custom"]["api_key"] == "sk-asr-new-5555"

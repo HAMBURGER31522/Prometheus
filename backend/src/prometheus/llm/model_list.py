@@ -16,6 +16,8 @@ ANTHROPIC_VERSION = "2023-06-01"
 
 class ModelListError(RuntimeError):
     code = "MODEL_LIST_FAILED"
+    status = None
+    reason = ""
 
 
 def _fetch_json(url: str, headers: dict, *, proxy: str = ""):

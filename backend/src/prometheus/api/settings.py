@@ -53,6 +53,11 @@ def list_models(request: Request, body: dict):
         return JSONResponse({"code": exc.code, "detail": str(exc)}, status_code=502)
 
 
+@router.post("/api/settings/model-info")
+def model_info(request: Request, body: dict):
+    return {"source": None, "context_window": None, "max_tokens": None, "thinking_level_map": None}
+
+
 @router.post("/api/settings/test-model")
 def test_model(request: Request):
     """One-shot text call + capability query (PLAN 8.2/8.6/8.7)."""

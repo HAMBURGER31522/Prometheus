@@ -1,0 +1,35 @@
+{
+ "openai-completions": {
+  "kimi-k3": {
+   "id": "kimi-k3",
+   "name": "Kimi K3",
+   "api": "openai-completions",
+   "provider": "github-copilot",
+   "baseUrl": "https://api.individual.githubcopilot.com",
+   "reasoning": true,
+   "input": [
+    "text",
+    "image"
+   ],
+   "cost": {
+    "input": 3,
+    "output": 15,
+    "cacheRead": 0.3,
+    "cacheWrite": 0
+   },
+   "contextWindow": 1048576,
+   "maxTokens": 131072,
+   "headers": {
+    "User-Agent": "GitHubCopilotChat/0.35.0",
+    "Editor-Version": "vscode/1.107.0",
+    "Editor-Plugin-Version": "copilot-chat/0.35.0",
+    "Copilot-Integration-Id": "vscode-chat"
+   },
+   "compat": {
+    "supportsStore": false,
+    "supportsDeveloperRole": false,
+    "supportsReasoningEffort": false
+   }
+  }
+ }
+}
