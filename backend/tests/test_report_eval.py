@@ -69,10 +69,23 @@ def test_sentences_leave_out_supplements_titles_and_scraps():
 
 def test_a_sentence_brings_its_cited_units_widened_or_its_chapters_range():
     sentences = {s["text"]: s for s in ev.report_sentences(REPORT, units())}
-    units_of = lambda text: (sentences.get(text) or {}).get("units")
-    assert units_of("第一句讲的是水温。") == [f"unit-{i:06d}" for i in range(1, 6)]
-    assert units_of("步骤一先称量十五克咖啡粉。") == [f"unit-{i:06d}" for i in range(2, 7)]
-    assert units_of("这一段没有任何出处标注。") == [f"unit-{i:06d}" for i in range(11, 21)]
+    units_of = lambda text: set((sentences.get(text) or {}).get("units") or [])
+    assert {f"unit-{i:06d}" for i in range(1, 6)} <= units_of("第一句讲的是水温。")
+    assert {f"unit-{i:06d}" for i in range(2, 7)} <= units_of("步骤一先称量十五克咖啡粉。")
+    assert {f"unit-{i:06d}" for i in range(11, 21)} <= units_of("这一段没有任何出处标注。")
+
+
+def test_a_sentence_also_brings_the_transcript_passage_that_matches_it():
+    """Citations are often off (the old 104-minute report cited unrelated units for 23 of 40
+    sampled sentences): the passage that best matches the sentence is added to its evidence."""
+    rows = units(40)
+    for index in (29, 30, 31):
+        rows[index]["canonical_text"] = "手冲的时候水温要控制在九十二度左右。"
+    evidence = {s["text"]: set(s["units"]) for s in ev.report_sentences(REPORT, rows)}
+    matched = {"unit-000030", "unit-000031", "unit-000032"}
+    assert matched <= evidence["第一句讲的是水温。"]
+    assert {f"unit-{i:06d}" for i in range(1, 6)} <= evidence["第一句讲的是水温。"]
+    assert not matched & evidence["表格里的内容。"]
 
 
 def test_sampling_is_seeded_and_bounded():
