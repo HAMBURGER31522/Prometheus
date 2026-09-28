@@ -16,6 +16,13 @@ async function itemTitle(request: APIRequestContext, id: string) {
   return (row.report_title || row.source_title) as string;
 }
 
+/** Finished items in a category, read from the backend (a list still rendering would undercount). */
+async function countIn(request: APIRequestContext, name: string) {
+  const id = (await categoriesByName(request)).get(name);
+  const rows = (await (await request.get(`${API}/api/items`, { headers: AUTH })).json()) as { category_id: number; status: string }[];
+  return rows.filter((row) => row.status === "done" && row.category_id === id).length;
+}
+
 const categoryList = (page: Page) => page.getByRole("list", { name: "分类" });
 const categoryButton = (page: Page, name: string) =>
   categoryList(page).getByRole("button", { name: new RegExp(`^${name}\\s*\\d*$`) });
@@ -38,7 +45,7 @@ test.afterEach(async ({ request }) => {
   }
 });
 
-test("「+」新建分类，拖进去的文章在导图和字幕页签里也在新分类下", async ({ page }) => {
+test("「+」新建分类，拖进去的文章在导图和字幕页签里也在新分类下", async ({ page, request }) => {
   await page.goto("/");
   await openTab(page, "知识库");
   await page.getByRole("button", { name: "新建分类" }).click();
@@ -48,7 +55,8 @@ test("「+」新建分类，拖进去的文章在导图和字幕页签里也在�
   await expect(categoryButton(page, "我的分类")).toBeVisible();
 
   await categoryButton(page, UNCATEGORIZED).click();
-  const before = await itemTitles(page).count();
+  const before = await countIn(request, UNCATEGORIZED);
+  await expect(itemTitles(page)).toHaveCount(before);
   const title = await itemTitles(page).first().innerText();
   await page.getByRole("list", { name: "条目" }).getByRole("button").first().dragTo(categoryButton(page, "我的分类"));
 
@@ -105,7 +113,8 @@ test("🗑 删除非空分类后，其中的文章出现在未分类", async ({ 
   await page.goto("/");
   await openTab(page, "字幕");
   await categoryButton(page, UNCATEGORIZED).click();
-  const before = await itemTitles(page).count();
+  const before = await countIn(request, UNCATEGORIZED);
+  await expect(itemTitles(page)).toHaveCount(before);
   await expect(categoryList(page).getByRole("button", { name: `删除「${UNCATEGORIZED}」` })).toHaveCount(0);
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("1 篇会移到「未分类」");
