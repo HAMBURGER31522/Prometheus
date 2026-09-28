@@ -61,8 +61,11 @@ def chapter_prompt(plan: dict, number: int, owned: list, points: dict, units: li
         f"- {point_id}（{points[point_id]['type']}，{_clock(points[point_id]['start_ms'] / 1000, hours)}）"
         f"{points[point_id]['text']}　原话：「{points[point_id]['anchor']}」" for point_id in owned)
     transcript = "\n".join(_unit_line(unit) for unit in chapter_units(chapter, owned, points, units))
+    # No count limit (user 2026-09-28: more pictures); the candidate pool itself is at most 20 per hour.
     figure_rule = ("6. 开了配图：frames/ 里是本章时间范围内的候选帧（清单 frames/frames.json），"
-                   "按 figures.md 使用，本章最多 1 张。\n" if figures else "")
+                   "按 figures.md 的写法使用，但不受它第 3 条的张数限制。画面里有正文写不出来的信息就配上，宁多勿少："
+                   "幻灯片、图表、板书和公式、代码、软件界面、实物演示、地图。不配：口播人像、转场、片头片尾、广告；"
+                   "同一个画面只配一次。图注写画面里的关键信息，和正文互补，不重复正文。\n" if figures else "")
     return (
         f"{attached}\n\n"
         f"## 本章转写（每行开头是单元编号和时间）\n{transcript}\n\n"
