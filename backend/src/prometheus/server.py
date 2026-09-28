@@ -49,6 +49,13 @@ class AppState:
             self._runtime = runtime_mod.resolve(self.runtime_dir)
         return self._runtime
 
+    def _pi_cli(self):
+        """The bundled Pi's cli.js (its catalogue knows model parameters), or None without a runtime."""
+        try:
+            return self.get_runtime().pi_cli
+        except runtime_mod.RuntimeConfigError:
+            return None
+
     def initialize(self, data_dir: Path) -> None:
         self.data_dir = Path(data_dir)
         # Data dirs from before the readable library (M0-M8) move over first.
@@ -56,6 +63,7 @@ class AppState:
         paths.init_data_dir(self.data_dir)
         db.init_db(self.data_dir)
         pi_models.ensure_models_json(self.data_dir)
+        pi_models.refresh_custom_provider(self.data_dir, pi_cli=self._pi_cli())
         # Startup recovery (PLAN 7.1): a running row means the process died.
         db.mark_running_as_interrupted(self.data_dir)
         # Subtitles from before the 10–15 s paragraphs are grouped once (PLAN 15.4.10).

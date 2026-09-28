@@ -49,6 +49,16 @@ def model_fields(data_dir, profile: dict, *, pi_cli=None) -> tuple:
     return pi_catalogue.lookup(model_id, api=api, base_url=profile.get("base_url", ""), pi_cli=pi_cli)
 
 
+def refresh_custom_provider(data_dir, *, pi_cli=None) -> bool:
+    """Rewrite the custom provider from the saved settings at startup (PLAN 15.4.10): installs
+    from before the model parameters would otherwise keep Pi's 128k / 16k defaults until 保存."""
+    llm = store.load(data_dir)["llm"]
+    if llm["provider"] != "custom":
+        return False
+    apply_custom_provider(data_dir, llm.get("custom"), pi_cli=pi_cli)
+    return True
+
+
 def apply_custom_provider(data_dir, custom: dict, *, pi_cli=None) -> None:
     """Write the custom provider into models.json (PLAN 8.9, 15.2-2) with the model's context,
     output, thinking levels and compat filled in; the profile's own numbers win (PLAN 15.4.10).
