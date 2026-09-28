@@ -120,3 +120,18 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **预览数据（acceptance-output/r7-data）已被 R7d 的新后端处理过**：字幕合并成段落（细分段另存 segments.fine.json）、词库更新为带英英释义的版本、settings.json 迁移为多配置格式、当前配置的思考强度按用户要求改为「中」、罗素和卡巴拉已拖回「战争伦理」「神秘学」。改动前的备份在 `tmp/r7d/backup-preview/`（不入库）。
 - **重启预览后端**：先确认 8766 的进程（父进程是 `.venv\Scripts\python.exe -m prometheus.server --port 8766`），`taskkill /PID <父进程> /T /F`，再用第 2 节的命令启动。不要碰 pid 22228。
 - **待用户决定**：导入失败写明原因（规格草案在 PLAN 15.4.10，未提交）；设置页眼睛图标是否显示完整 Key；DeepSeek / 智谱预设要不要也加「获取 API Key」链接；R7e 的四个问题（补充说明框、写作方式、审校默认开、预算）。
+
+## 9. R7e 进行中的注意事项（2026-09-28）
+
+分支 `r7e-report-depth`。规格 PLAN 15.4.11 / E14（用户确认过三轮，后来又加了配图和看大图），实现选择 DECISIONS D-44。R7d 已合并（上一节「待用户决定」的几项都已经定了、做完了）。
+
+- **完整精读的流水线**（`backend/src/prometheus/report/full.py`，阶段 `keypoints`、`plan`、`report`）：要点账本（每 5 分钟一次一次性调用）→ 规划（一次 Pi 运行，不合格重做一次）→ 每章一次 Pi 运行（规则全文附在提示词里，省掉读文件的回合）→ 程序逐章检查（漏写、空洞、照抄、隐藏的每点篇幅检查、有信息的候选帧没用上），最多退回 2 轮 → 零基础读者审校（追问和要图，退回 1 次，丢了要点就撤回）→ 程序拼装 → `coverage.json`。开了配图时，每章写之前先有一次看图调用给候选帧标类型和内容（`figures/notes.py`）。
+- **中间结果按输入的摘要保存**：`keypoints.json`、`plan.json` + `plan.meta.json`、`chapters/ch-NN.json`、`chapters/ch-NN.frames.json`。失败后「重试」只重做缺的部分；成功后清理只留 `coverage.json`。
+- **不写字数**：规则、规划和反馈里都不出现字数（用户要求，理由见 D-44）。隐藏门槛在 `chapter_checks.py` 的 `THIN_BASE`、`THIN_RATIO`，还没用真实样本校准；罗素留作复核样本，不参与校准。
+- **规则面向未知视频**：depth.md 的示例用手冲咖啡，`test_depth_rules.py` 禁止出现评测样本的主题。
+- **真实运行**（花钱，先问用户）：在 bash 里要先设好工具链变量，否则找不到 node / Pi / ffmpeg：
+  `T=E:/tools/Prometheus-Desktop; export PROMETHEUS_TOOLS=$T PROMETHEUS_NODE=$T/node/node.exe PROMETHEUS_PI=$T/pi/node_modules/.bin/pi.cmd PROMETHEUS_FFMPEG=$T/ffmpeg/bin PYTHONUTF8=1`，
+  然后 `uv run python scripts/report-eval/rewrite.py acceptance-output/r7-data <条目ID> [--frames]`。`--frames` 会给条目打开配图、重新下载视频抽帧，成功后清理；没有标签的条目会顺带跑一次分类补标签。跑完在日志末尾打印这次花了多少（Pi 用量是实数，一次性调用按字数估算）。
+- **评测**：`uv run python scripts/report-eval/run.py acceptance-output/r7-data --items <ID> --label <名字> [--report <ID>=<HTML>]`，结果在 `acceptance-output/report-eval/`（不入库）。旧报告备份在 `old/`，第 1 层（只加规则）的英文报告在 `l1/`。
+- **费用**：中转站没有提示缓存，Agent 每一轮都重发全部上下文。预算 60–80 美元，超出前停下来问用户。到开跑英文完整流程之前，累计约 6.8 美元（基线评测、第 1 层重写和评测）。
+- **用户的工作习惯**：需要用户定的事用弹窗问（AskUserQuestion），附推荐项；改规格要先问、得到同意再写进 PLAN；回答要说清楚改了什么、为什么。
