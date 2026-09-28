@@ -12,10 +12,13 @@ function endpoint() {
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(status: number, code?: string) {
+  /** The JSON error body, e.g. 「获取模型列表」's status and reason (PLAN 15.4.10). */
+  body?: Record<string, unknown>;
+  constructor(status: number, code?: string, body?: Record<string, unknown>) {
     super(code ?? `HTTP ${status}`);
     this.status = status;
     this.code = code;
+    this.body = body;
   }
 }
 
@@ -30,13 +33,13 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    let code: string | undefined;
+    let detail: Record<string, unknown> | undefined;
     try {
-      code = (await response.json()).code;
+      detail = await response.json();
     } catch {
       /* not JSON */
     }
-    throw new ApiError(response.status, code);
+    throw new ApiError(response.status, detail?.code as string | undefined, detail);
   }
   return response;
 }
@@ -54,6 +57,8 @@ export const api = {
   testModel: () => json<{ ok: boolean; detail: string }>("POST", "/api/settings/test-model"),
   listModels: async (profile: ModelProfile) =>
     (await json<{ models: string[] }>("POST", "/api/settings/models", { profile })).models,
+  modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url">) =>
+    json<ModelInfo>("POST", "/api/settings/model-info", { profile }),
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
   lookupWord: (word: string) => json<LookupEntry>("GET", `/api/dictionary/lookup?word=${encodeURIComponent(word)}`),
   dictionaryStatus: () => json<ComponentStatus>("GET", "/api/dictionary"),
@@ -165,6 +170,9 @@ export interface ModelProfile {
   model: string;
   supports_images: boolean;
   thinking: string;
+  /** 「高级」 (PLAN 15.4.10): the user's own numbers; null = what the catalogues say. */
+  context_window: number | null;
+  max_tokens: number | null;
 }
 
 /** What Pi's bundled catalogue (source "pi") or the models.dev snapshot knows about a profile's model (PLAN 15.4.10). */

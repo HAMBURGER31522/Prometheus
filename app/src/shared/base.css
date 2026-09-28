@@ -140,11 +140,11 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 600; letter-spacing: .
 .field { display: grid; gap: 6px; margin-bottom: 14px; }
 .field > span { font-size: 13px; color: var(--ink-2); }
 .field small { color: var(--muted); font-size: 12px; }
-.input, .select {
+.input {
   height: 36px; padding: 0 12px; border-radius: var(--radius-sm);
   border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
 }
-.input:focus, .select:focus { outline: none; border-color: var(--accent); }
+.input:focus { outline: none; border-color: var(--accent); }
 .input:disabled { opacity: .5; }
 .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
@@ -292,6 +292,7 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 600; letter-spacing: .
 .zoom-level:hover { color: var(--ink); }
 
 /* ---------------- custom select ---------------- */
+/* The wrapper only anchors the list; the one frame is the button's (PLAN 15.4.10). */
 .select { position: relative; }
 .select-button {
   all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px;
