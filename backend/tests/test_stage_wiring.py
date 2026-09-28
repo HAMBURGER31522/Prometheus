@@ -338,3 +338,24 @@ def test_classify_stage_keeps_an_existing_category(data_dir, monkeypatch):
     assert row["category_id"] == chosen
     assert row["tags"] == '["新标签"]'
     assert row["description"] == "新的一句话。"
+
+
+def test_classify_stage_reads_the_library_report_once_the_cache_is_cleaned(data_dir, monkeypatch):
+    """「补全标签和摘要」runs on finished items whose cached report copy is gone (15.4.10)."""
+    ctx = _ctx(data_dir)
+    folder = data_dir / "人工分类" / "2026-09-27 库里的标题"
+    folder.mkdir(parents=True)
+    (folder / paths.LIBRARY_FILES["html"]).write_text(
+        "<html><body><h1>库里的标题</h1><p>导语。</p></body></html>", encoding="utf-8")
+    items_store.update_item(data_dir, ctx.item_id, status="done",
+                            library_path="人工分类/2026-09-27 库里的标题")
+    seen = {}
+
+    def fake_classify(work, title, *args, **kwargs):
+        seen["title"] = title
+        return {"category": "模型分类", "tags": ["标签"], "description": "一句话。"}
+
+    monkeypatch.setattr(stages_mod, "classify_item", fake_classify)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["classify"](ctx)
+    assert seen["title"] == "库里的标题"
+    assert items_store.get_item(data_dir, ctx.item_id)["tags"] == '["标签"]'
