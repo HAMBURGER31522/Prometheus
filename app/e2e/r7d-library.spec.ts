@@ -1,7 +1,7 @@
 // E13 ② (PLAN 15.4.10): categories are managed by hand and one change shows everywhere.
 import { type APIRequestContext, type Page, expect, test } from "@playwright/test";
 
-import { API, AUTH, openTab, seed } from "./helpers";
+import { API, AUTH, openTab, seed, settle } from "./helpers";
 
 const UNCATEGORIZED = "未分类";
 let itemIds: string[] = [];
@@ -195,4 +195,27 @@ test("拖完一篇以后，点另一篇照常打开", async ({ page, request }) 
   const title = await itemTitles(page).first().innerText();
   await cards.first().click();
   await expect(page.getByRole("toolbar", { name: "阅读" }).getByTestId("reader-title")).toHaveText(title);
+});
+
+test("拖动文章时不会选中页面上的文字", async ({ page, request }) => {
+  await request.post(`${API}/api/categories`, { headers: AUTH, data: { name: "选字测试" } });
+  await page.goto("/");
+  await openTab(page, "知识库");
+  await categoryButton(page, UNCATEGORIZED).click();
+  await expect(itemTitles(page)).toHaveCount(await countIn(request, UNCATEGORIZED));
+  await settle(page);
+  const from = (await page.getByRole("list", { name: "条目" }).getByRole("button").first().boundingBox())!;
+  const to = (await categoryButton(page, "选字测试").boundingBox())!;
+  await page.mouse.move(from.x + 60, from.y + 20);
+  await page.mouse.down();
+  // Sweep across the list heading and the other cards on the way, as a real drag does.
+  await page.mouse.move(from.x + 400, from.y + 200, { steps: 8 });
+  await page.mouse.move(to.x + 40, to.y + to.height / 2, { steps: 12 });
+  const during = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+  await expect(page.locator(".drag-ghost")).toBeVisible();
+  await page.mouse.up();
+  const after = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+  expect(during).toBe("");
+  expect(after).toBe("");
+  await expect(categoryButton(page, "选字测试")).toContainText("1");
 });

@@ -47,3 +47,8 @@ export async function inReport<T>(page: Page, fn: () => T): Promise<T> {
   if (!frame) throw new Error("report frame not found");
   return frame.evaluate(fn);
 }
+
+/** Wait until page transitions (the lists swap through a view transition) have finished. */
+export async function settle(page: Page) {
+  await page.waitForFunction(() => document.getAnimations().length === 0);
+}
