@@ -54,7 +54,7 @@ def _seconds(label) -> int | None:
     return total
 
 
-def _ranges(chapter: dict) -> list | None:
+def chapter_ranges(chapter: dict) -> list | None:
     spans = []
     for span in chapter.get("ranges") or []:
         if not isinstance(span, list | tuple) or len(span) != 2:
@@ -70,7 +70,7 @@ def _chapter_at(seconds: float, chapters: list):
     """The narrowest chapter range containing `seconds`, first leaving out ranges it sits in the last
     seconds of (chapters overlap by a second or so; an overview chapter is the least specific)."""
     timed = [(start, end, index, chapter["id"]) for index, chapter in enumerate(chapters)
-             for start, end in (_ranges(chapter) or [])]
+             for start, end in (chapter_ranges(chapter) or [])]
     for last in (END_SLACK_S, 0):
         inside = [(end - start, -start, index, cid) for start, end, index, cid in timed
                   if start <= seconds <= end - last]
@@ -128,7 +128,7 @@ def validate_plan(plan: dict, ledger: dict) -> list:
         seen.add(cid)
         if not str(chapter.get("title") or "").strip():
             problems.append(f"章节 {cid or number} 没有标题")
-        if _ranges(chapter) is None:
+        if chapter_ranges(chapter) is None:
             problems.append(f"章节 {cid or number} 的时间区间写法不对（应为 [[\"00:00:00\", \"00:07:13\"]]）")
         target = chapter.get("target_chars")
         if isinstance(target, bool) or not isinstance(target, int) or target <= 0:

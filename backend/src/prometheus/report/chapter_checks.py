@@ -97,6 +97,6 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str) -> 
 def feedback_prompt(problems: list, filename: str) -> str:
     listed = "".join(f"- {problem}\n" for problem in problems)
     return (
-        f"你刚写的 {filename} 检查出下面这些问题。在原稿基础上逐条改正，其余内容保持不变，"
-        f"然后把整章重新写入 {filename}：\n{listed}"
+        f"{filename} 里是这一章的上一稿，检查出下面这些问题。先读它，在原稿基础上逐条改正，其余内容保持不变，"
+        f"然后把整章写回 {filename}（可以用 edit 局部修改）：\n{listed}"
     )
