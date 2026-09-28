@@ -298,3 +298,12 @@ def test_the_assembled_report_goes_through_finalize_with_its_frames_inlined(tmp_
     assert title == "手冲咖啡"
     assert "{{" not in html and "视频简介原文" in html
     assert 'src="frames/' not in html and "data:image/jpeg;base64," in html
+
+
+def test_the_review_keeps_what_was_asked_and_how_it_was_judged(tmp_path):
+    """Without this nobody can tell why a chapter's ten questions led to nothing (English run, 2026-09-28)."""
+    _ledger, _plan, chapters, _coverage, _pi, _model = pipeline(tmp_path)
+    details = chapters[0]["review_details"]
+    assert details["questions"] == [{"quote": "咖啡豆的烘焙和萃取之0", "question": "烘焙到什么程度？",
+                                     "verdict": {"kind": "原文有答案", "answer": "中深烘"}}]
+    assert details["pictures"] == [] and "judge_reply" in details
