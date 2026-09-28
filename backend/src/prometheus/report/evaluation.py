@@ -111,7 +111,7 @@ class _Tree(HTMLParser):
             self.stack[-1].children.append(data)
 
 
-def _parse(html: str) -> _Node:
+def parse_html(html: str) -> _Node:
     tree = _Tree()
     tree.feed(html)
     tree.close()
@@ -177,7 +177,7 @@ def _range_units(ranges: list, units: list) -> list:
 
 def component_counts(html: str) -> dict:
     counts = dict.fromkeys(COMPONENT_TAGS + COMPONENT_CLASSES, 0)
-    for node in _parse(html).walk():
+    for node in parse_html(html).walk():
         if node.tag in COMPONENT_TAGS:
             counts[node.tag] += 1
         for name in COMPONENT_CLASSES:
@@ -191,7 +191,7 @@ def citation_coverage(html: str, units: list) -> dict:
     """Each data-source-units attribute stands for the span from its first to its last unit."""
     order = _order(units)
     covered: set = set()
-    for node in _parse(html).walk():
+    for node in parse_html(html).walk():
         indices = [order[i] for i in (node.attrs.get("data-source-units") or "").split() if i in order]
         if indices:
             covered.update(range(min(indices), max(indices) + 1))
@@ -212,13 +212,13 @@ def points_coverage(html: str, points: list, skipped=frozenset()):
     wanted = [point for point in points if point not in skipped]
     if not wanted:
         return None
-    marked = {token for node in _parse(html).walk() for token in (node.attrs.get("data-points") or "").split()}
+    marked = {token for node in parse_html(html).walk() for token in (node.attrs.get("data-points") or "").split()}
     return sum(point in marked for point in wanted) / len(wanted)
 
 
 def chapter_density(html: str) -> list:
     chapters = []
-    for node, title, ranges in _sections(_parse(html)):
+    for node, title, ranges in _sections(parse_html(html)):
         minutes = sum(end - start for start, end in ranges) / 60
         chars = len(_CJK.findall(node.text(lambda n: n.tag == "h2")))
         chapters.append({"title": title, "minutes": minutes, "chars": chars,
@@ -227,7 +227,7 @@ def chapter_density(html: str) -> list:
 
 
 def cjk_counts(html: str, units: list) -> dict:
-    root = _parse(html)
+    root = parse_html(html)
     body = next((node for node in root.walk() if node.tag == "body"), root)
     return {"report": len(_CJK.findall(body.text())),
             "transcript": sum(len(_CJK.findall(unit.get("canonical_text") or "")) for unit in units)}
@@ -286,7 +286,7 @@ def report_sentences(html: str, units: list) -> list:
     widened by two on each side (else the units inside the chapter's section-time), plus the
     passages that best match the sentence anywhere in the transcript, since citations are often
     off. Supplements, figure captions and headings are left out."""
-    root, order = _parse(html), _order(units)
+    root, order = parse_html(html), _order(units)
     sections = _sections(root)
     passages = _Passages(units)
     sentences = []
@@ -320,7 +320,7 @@ def sample_sentences(sentences: list, count: int, *, seed: int = 7) -> list:
 
 
 def report_supplements(html: str, units: list) -> list:
-    root = _parse(html)
+    root = parse_html(html)
     sections = _sections(root)
     found = []
     for node in root.walk():
