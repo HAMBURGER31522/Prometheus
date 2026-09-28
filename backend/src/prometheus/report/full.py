@@ -201,8 +201,9 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
     space = work / "chapters" / f"ch-{number:02d}"
     kept = _frames_in(work, chapter) if figures else []
     ledger = _frame_ledger(work, space, number, kept, look) if figures else None
-    base = chapter_write.chapter_prompt(plan, number, owned, points, units, figures=figures, attached=attached,
-                                        frame_notes=ledger)
+    # a chapter with no frames is not told about frames: the writer went looking anyway (a paid turn)
+    base = chapter_write.chapter_prompt(plan, number, owned, points, units, figures=figures and bool(kept),
+                                        attached=attached, frame_notes=ledger)
     key = _digest(base, review)
     record = work / "chapters" / f"ch-{number:02d}.json"
     done = _read_json(record)
@@ -229,7 +230,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
     check, rounds = recheck(fragment), 0
     while check["problems"] and rounds < MAX_REVISIONS:
         rounds += 1
-        fragment = write(chapter_write.revision_prompt(base, check["problems"], filename))
+        fragment = write(chapter_write.revision_prompt(base, check["problems"], filename, fragment))
         check = recheck(fragment)
     stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False}
     if review:
@@ -237,7 +238,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
         transcript = "\n".join(unit.get("canonical_text", "") for unit in mine)
         fragment, check, stats = _review(
             fragment, check, transcript, ask,
-            lambda fixes: write(chapter_write.revision_prompt(base, fixes, filename)), recheck)
+            lambda fixes: write(chapter_write.revision_prompt(base, fixes, filename, fragment)), recheck)
         (space / filename).write_bytes(fragment.encode("utf-8"))
     result = {"key": key, "number": number, "id": chapter["id"], "title": chapter["title"], "points": owned,
               "fragment": fragment, "check": check, "rounds": rounds, "review": stats}

@@ -105,5 +105,5 @@ def chapter_prompt(plan: dict, number: int, owned: list, points: dict, units: li
 
 
 def revision_prompt(base: str, problems: list, filename: str, draft: str = "") -> str:
-    """A fresh run fixing the draft already in `filename`: the chapter's task again, then the list."""
-    return base + "\n## 修改上一稿\n" + feedback_prompt(problems, filename)
+    """A fresh run fixing the draft in `filename`: the chapter's task again, the draft, then the list."""
+    return base + "\n## 修改上一稿\n" + feedback_prompt(problems, filename, draft)

@@ -142,8 +142,15 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
             "chars": chars, "problems": problems}
 
 
-def feedback_prompt(problems: list, filename: str) -> str:
+def feedback_prompt(problems: list, filename: str, draft: str = "") -> str:
+    """With `draft` the previous version rides along, so the run spends no turn reading it back."""
     listed = "".join(f"- {problem}\n" for problem in problems)
+    if draft:
+        return (
+            f"### 上一稿（{filename} 现在的内容）\n{draft}\n\n"
+            f"上面这一稿检查出下面这些问题。在原稿基础上逐条改正，其余内容保持不变，"
+            f"然后把整章写回 {filename}（可以用 edit 局部修改）：\n{listed}"
+        )
     return (
         f"{filename} 里是这一章的上一稿，检查出下面这些问题。先读它，在原稿基础上逐条改正，其余内容保持不变，"
         f"然后把整章写回 {filename}（可以用 edit 局部修改）：\n{listed}"
