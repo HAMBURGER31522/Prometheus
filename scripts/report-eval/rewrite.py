@@ -20,6 +20,7 @@ from prometheus import paths
 from prometheus import runtime as runtime_mod
 from prometheus.library import items as items_store
 from prometheus.llm import one_shot
+from prometheus.report import evaluation
 from prometheus.tasks import cleanup, runner
 from prometheus.tasks.stages import build_real_impls
 
@@ -41,22 +42,53 @@ def main(argv=None, impls=None) -> int:
     if refused:
         print(f"只能重写已完成的条目：{', '.join(refused)}", file=sys.stderr)
         return 2
-    one_shot.run_one_shot = lambda work_dir, **kwargs: one_shot_call(work_dir, **kwargs)
     impls = impls if impls is not None else build_real_impls(data_dir, runtime=runtime_mod.resolve(None))
-    for row in rows:
-        started = time.monotonic()
-        ctx = runner.StageContext(data_dir, row["id"])
-        if args.frames:
-            items_store.update_item(data_dir, row["id"], figures=1)
-        try:
-            runner.run_item(ctx, impls, stages=WITH_FRAMES if args.frames else STAGES)
-        finally:
-            items_store.update_item(data_dir, row["id"], stage=None, stage_detail=None)
-        if args.frames:
-            cleanup.clean_work_dir(paths.work_dir(data_dir, row["id"]))
-        print(f"{row.get('report_title') or row['id']}：重写完成，用时 {time.monotonic() - started:.0f} 秒",
-              file=sys.stderr)
+    calls: list = []
+
+    def tallied(work_dir, **kwargs):
+        reply = one_shot_call(work_dir, **kwargs)
+        calls.append({"in": kwargs.get("prompt") or "", "out": reply or "", "images": len(kwargs.get("files") or ())})
+        return reply
+
+    original, one_shot.run_one_shot = one_shot.run_one_shot, tallied
+    try:
+        for row in rows:
+            _rewrite(data_dir, row, impls, calls, frames=args.frames)
+    finally:
+        one_shot.run_one_shot = original
     return 0
+
+
+def _rewrite(data_dir, row: dict, impls: dict, calls: list, *, frames: bool) -> None:
+    started, work = time.monotonic(), paths.work_dir(data_dir, row["id"])
+    since, calls[:] = evaluation.pi_events_offsets(work), []
+    stages = WITH_FRAMES if frames else STAGES
+    if not row.get("tags"):  # items from before tags (15.4.10) get them on the way; the category stays
+        stages = (*stages[:-1], "classify", stages[-1])
+    ctx = runner.StageContext(data_dir, row["id"])
+    if frames:
+        items_store.update_item(data_dir, row["id"], figures=1)
+    try:
+        runner.run_item(ctx, impls, stages=stages)
+    finally:
+        items_store.update_item(data_dir, row["id"], stage=None, stage_detail=None)
+        _spend(work, since, calls)
+    if frames:
+        cleanup.clean_work_dir(work)
+    print(f"{row.get('report_title') or row['id']}：重写完成，用时 {time.monotonic() - started:.0f} 秒", file=sys.stderr)
+
+
+def _spend(work, since: dict, calls: list) -> None:
+    """What this run cost: Pi's own records for the agent runs, characters for the one-shot calls."""
+    pi = evaluation.pi_usage(work, since)
+    shot = evaluation.estimate_cost(calls)
+    images = sum(call["images"] for call in calls)
+    image_usd = images * evaluation.IMAGE_TOKENS * evaluation.PRICE_IN / 1_000_000
+    print(f"  Pi 运行：输入 {pi['input']}、输出 {pi['output']}、缓存命中 {pi['cacheRead']} token"
+          f"（{pi['replies']} 次回复），约 {pi['usd']:.2f} 美元", file=sys.stderr)
+    print(f"  一次性调用 {len(calls)} 次：输入约 {shot['tokens_in']}、输出约 {shot['tokens_out']} token，附图 {images} 张，"
+          f"约 {shot['usd'] + image_usd:.2f} 美元（按字数估算）", file=sys.stderr)
+    print(f"  合计约 {pi['usd'] + shot['usd'] + image_usd:.2f} 美元（按 claude-opus-4-8 官方价）", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -486,6 +486,38 @@ def estimate_tokens(text: str) -> int:
     return cjk + (len(text or "") - cjk + 3) // 4
 
 
+PRICE_CACHE_READ, PRICE_CACHE_WRITE = 0.5, 6.25
+IMAGE_TOKENS = 1000  # a 960-pixel-wide frame is about 700 tokens (width x height / 750); rounded up
+
+
+def pi_events_offsets(folder) -> dict:
+    """{pi.events.jsonl: its size now}: what pi_usage should skip later (earlier runs' records)."""
+    return {path: path.stat().st_size for path in Path(folder).rglob("pi.events.jsonl")}
+
+
+def pi_usage(folder, since=None) -> dict:
+    """Tokens of every Pi reply recorded under `folder` after the offsets in `since`: Pi's own usage."""
+    total = {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "replies": 0}
+    for path in Path(folder).rglob("pi.events.jsonl"):
+        with path.open("rb") as handle:
+            handle.seek((since or {}).get(path, 0))
+            for line in handle:
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                message = event.get("message") or {}
+                if event.get("type") != "message_end" or message.get("role") != "assistant":
+                    continue
+                usage = message.get("usage") or {}
+                for key in ("input", "output", "cacheRead", "cacheWrite"):
+                    total[key] += int(usage.get(key) or 0)
+                total["replies"] += 1
+    total["usd"] = (total["input"] * PRICE_IN + total["output"] * PRICE_OUT + total["cacheRead"] * PRICE_CACHE_READ
+                    + total["cacheWrite"] * PRICE_CACHE_WRITE) / 1_000_000
+    return total
+
+
 def estimate_cost(calls: list) -> dict:
     tokens_in = sum(estimate_tokens(call["in"]) for call in calls)
     tokens_out = sum(estimate_tokens(call["out"]) for call in calls)
