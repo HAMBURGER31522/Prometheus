@@ -167,7 +167,9 @@ function LookupPopup({ target, onClose, onHold }: { target: Target; onClose: () 
               <p className="lookup-label">英英释义</p>
               <ul className="lookup-senses" lang="en">
                 {state.entry.definition.map((line) => (
-                  <li key={line}>{line}</li>
+                  <li key={line} title={line}>
+                    {line}
+                  </li>
                 ))}
               </ul>
             </section>
