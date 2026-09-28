@@ -25,10 +25,10 @@ async def status(request: Request):
         if state["thread"] is not None and state["thread"].is_alive():
             progress = state["done"] / state["total"] if state["total"] else None
             return {"state": "installing", "detail": "正在下载离线词典…", "progress": progress}
+        if state["error"]:  # also a failed update: the old dictionary keeps working meanwhile (15.4.10)
+            return {"state": "failed", "detail": state["error"], "progress": None}
         if ecdict.installed(request.app.state.data_dir):
             return {"state": "ready", "detail": "离线词典已就绪", "progress": 1.0}
-        if state["error"]:
-            return {"state": "failed", "detail": state["error"], "progress": None}
     return {"state": "idle", "detail": f"离线词典 ECDICT，首次使用需下载（约 {ecdict.DOWNLOAD_MB}MB）", "progress": None}
 
 
