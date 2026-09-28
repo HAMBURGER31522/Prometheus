@@ -170,7 +170,12 @@ function ProfileEditor({ initial, onSave, onCancel }: {
         </>
       )}
       <div className="key-field">
-        <SecretInput label="API Key" value={profile.api_key} onChange={(api_key) => update({ api_key })} />
+        <SecretInput
+          label="API Key"
+          value={profile.api_key}
+          onChange={(api_key) => update({ api_key })}
+          reveal={() => api.revealKey({ profile_id: profile.id })}
+        />
         {keyUrl && (
           <button type="button" className="key-link" onClick={() => openExternal(keyUrl)}>
             获取 API Key ↗

@@ -14,8 +14,8 @@ export interface Preset {
 }
 
 export const PRESETS: Preset[] = [
-  { label: "DeepSeek", kind: "deepseek" },
-  { label: "智谱", kind: "zhipu" },
+  { label: "DeepSeek", kind: "deepseek", key_url: "https://platform.deepseek.com/api_keys" },
+  { label: "智谱", kind: "zhipu", key_url: "https://bigmodel.cn/usercenter/proj-mgmt/apikeys" },
   {
     label: "Kimi", kind: "custom", base_url: "https://api.moonshot.cn/v1", protocol: "openai", model: "kimi-k3",
     key_url: "https://platform.kimi.com/console/api-keys",

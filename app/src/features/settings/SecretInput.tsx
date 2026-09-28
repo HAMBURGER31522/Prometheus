@@ -2,12 +2,19 @@
 // custom transcription endpoint both use it. A saved key never comes back from the backend,
 // only its mask (「****」 + the last 4): the field then stays empty and says which key is kept
 // (after ModelGate, PLAN 15.4.10). Typing replaces the key; emptying the field keeps the saved one.
+// The eye asks the backend for the saved key and shows it (user 2026-09-28, after CC Switch).
 import { useState } from "react";
 
 const MASK = "****";
 const isMask = (value: string) => value.startsWith(MASK);
 
-export function SecretInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+export function SecretInput({ label, value, onChange, reveal }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  /** Fetches the saved key when the eye opens an empty field. */
+  reveal?: () => Promise<string>;
+}) {
   const [shown, setShown] = useState(false);
   const [saved, setSaved] = useState(isMask(value) ? value : "");
   if (isMask(value) && value !== saved) setSaved(value); // a newer mask after 保存
@@ -29,7 +36,10 @@ export function SecretInput({ label, value, onChange }: { label: string; value: 
           className="eye"
           aria-label={shown ? `隐藏 ${label}` : `显示 ${label}`}
           aria-pressed={shown}
-          onClick={() => setShown(!shown)}
+          onClick={async () => {
+            if (!shown && reveal && isMask(value)) onChange(await reveal());
+            setShown(!shown);
+          }}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />

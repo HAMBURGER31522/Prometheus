@@ -43,6 +43,18 @@ async def put_settings(request: Request):
     return store.masked(saved)
 
 
+@router.post("/api/settings/reveal-key")
+def reveal_key(request: Request, body: dict):
+    """「显示 API Key」 (PLAN 15.4.10, user 2026-09-28): the full key, only when the eye asks for it."""
+    settings = store.load(request.app.state.data_dir)
+    if body.get("target") == "asr":
+        return {"api_key": (settings["asr"].get("custom") or {}).get("api_key", "")}
+    for item in settings["llm_profiles"]["items"]:
+        if item["id"] == body.get("profile_id"):
+            return {"api_key": item.get("api_key", "")}
+    return JSONResponse({"code": "PROFILE_NOT_FOUND"}, status_code=404)
+
+
 @router.post("/api/settings/models")
 def list_models(request: Request, body: dict):
     """「获取模型列表」 for one profile (PLAN 15.4.8): only ever on the user's click."""

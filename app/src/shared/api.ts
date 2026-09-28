@@ -55,6 +55,9 @@ export const api = {
   settings: () => json<Settings>("GET", "/api/settings"),
   saveSettings: (settings: Settings) => json<Settings>("PUT", "/api/settings", settings),
   testModel: () => json<{ ok: boolean; detail: string }>("POST", "/api/settings/test-model"),
+  /** The eye on a key field (PLAN 15.4.10): a profile's saved key, or the custom transcription key. */
+  revealKey: async (target: { profile_id: string } | { target: "asr" }) =>
+    (await json<{ api_key: string }>("POST", "/api/settings/reveal-key", target)).api_key,
   listModels: async (profile: ModelProfile) =>
     (await json<{ models: string[] }>("POST", "/api/settings/models", { profile })).models,
   modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url">) =>
