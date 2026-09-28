@@ -41,7 +41,14 @@ export const report = (page: Page) => page.frameLocator('iframe[title="精读报
 
 /** Evaluate inside the report frame (srcdoc, sandboxed). */
 export async function inReport<T>(page: Page, fn: () => T): Promise<T> {
+  // Right after opening an item (or a reload) the srcdoc frame may not be attached yet.
+  await expect.poll(() => page.frames().some((f) => f.url() === "about:srcdoc"), { timeout: 10_000 }).toBe(true);
   const frame = page.frames().find((f) => f.url() === "about:srcdoc");
   if (!frame) throw new Error("report frame not found");
   return frame.evaluate(fn);
+}
+
+/** Wait until page transitions (the lists swap through a view transition) have finished. */
+export async function settle(page: Page) {
+  await page.waitForFunction(() => document.getAnimations().length === 0);
 }

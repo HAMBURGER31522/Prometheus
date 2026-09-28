@@ -24,6 +24,7 @@ from prometheus.settings import store
 from prometheus.subtitle import convert as subtitle_convert
 from prometheus.subtitle import fix as subtitle_fix
 from prometheus.subtitle import format as subtitle_format
+from prometheus.subtitle import paragraphs as subtitle_paragraphs
 from prometheus.subtitle import vtt
 from prometheus.transcribe import bcut, openai_compat
 from prometheus.transcribe import local as local_mod
@@ -46,13 +47,9 @@ def _work(data_dir, ctx):
 
 def _write_subtitle_files(data_dir, ctx, asr_path) -> None:
     payload = json.loads(Path(asr_path).read_text(encoding="utf-8"))
-    segments = subtitle_convert.segments_from_asr(payload)
-    segments_file = paths.segments_file(data_dir, ctx.item_id)
-    segments_file.parent.mkdir(parents=True, exist_ok=True)
+    # 10–15 s paragraphs before correction; the fragments stay in segments.fine.json (PLAN 15.4.10).
+    segments = subtitle_paragraphs.save(data_dir, ctx.item_id, subtitle_convert.segments_from_asr(payload))
     paths.srt_file(data_dir, ctx.item_id).parent.mkdir(parents=True, exist_ok=True)
-    segments_file.write_text(
-        json.dumps(segments, ensure_ascii=False), encoding="utf-8",
-    )
     paths.srt_file(data_dir, ctx.item_id).write_text(
         subtitle_format.to_srt(segments), encoding="utf-8",
     )
@@ -211,7 +208,7 @@ def build_real_impls(data_dir, runtime=None) -> dict:
     def classify(ctx):
         settings = store.load(data_dir)
         work = _work(data_dir, ctx)
-        html = paths.report_file(data_dir, ctx.item_id).read_text(encoding="utf-8")
+        html = publish_mod.report_html(data_dir, ctx.item_id, _row(data_dir, ctx))
         outline = extract_outline(html)
         h2_titles = [section["title"] for section in outline["sections"]]
         existing = [c["name"] for c in categories_store.list_categories(data_dir)]
@@ -224,7 +221,9 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             node_exe=_node_exe(), pi_cli=_pi_cli(),
             agent_dir=paths.pi_config_dir(data_dir),
         )
-        category_id = categories_store.ensure_category(data_dir, result["category"])
+        # Only the first completion files the item; after that the user's choice stands (15.4.10).
+        category_id = _row(data_dir, ctx).get("category_id") or categories_store.ensure_category(
+            data_dir, result["category"])
         items_store.update_item(
             data_dir, ctx.item_id, category_id=category_id,
             tags=json.dumps(result["tags"], ensure_ascii=False), description=result["description"],

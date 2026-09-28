@@ -72,8 +72,7 @@ test("⑤ 两份模型配置可以切换；Key 可显示；能获取模型列表
     await page.getByRole("button", { name: "新增配置" }).click();
     const editor = page.getByRole("region", { name: "编辑模型配置" });
     await editor.getByLabel("名称").fill(name);
-    await editor.getByRole("combobox", { name: "类型" }).click();
-    await page.getByRole("option", { name: "自定义" }).click();
+    await editor.getByRole("button", { name: "自定义", exact: true }).click();
     await editor.getByLabel("接口地址").fill(`${API}/fake-llm/v1`);
     await editor.getByLabel("API Key", { exact: true }).fill("e2e");
     await expect(editor.getByLabel("API Key", { exact: true })).toHaveAttribute("type", "password");

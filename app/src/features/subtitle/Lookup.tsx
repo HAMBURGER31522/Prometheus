@@ -1,7 +1,8 @@
-// 查词 (PLAN 15.4.9): resting the pointer on an English word for about 300 ms opens a popup
-// with the offline dictionary's phonetic, Chinese translation and base form (went → go), and
-// buttons that open the word in five online dictionaries. The offline dictionary (ECDICT) is a
-// local component downloaded on first use.
+// 查词 (PLAN 15.4.9, 15.4.10): resting the pointer on an English word for about 300 ms opens a
+// popup with the offline dictionary's phonetic, Chinese translation, base form (went → go) and
+// up to three English definitions, and buttons that open the word in seven online dictionaries.
+// The offline dictionary (ECDICT) is a local component downloaded on first use; one downloaded
+// before English definitions offers 「更新词库」 and keeps working until then.
 import { type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -161,6 +162,18 @@ function LookupPopup({ target, onClose, onHold }: { target: Target; onClose: () 
               <li key={line}>{line}</li>
             ))}
           </ul>
+          {state.entry.definition.length > 0 && (
+            <section className="lookup-english" aria-label="英英释义">
+              <p className="lookup-label">英英释义</p>
+              <ul className="lookup-senses" lang="en">
+                {state.entry.definition.map((line) => (
+                  <li key={line} title={line}>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
       {state.kind === "unknown" && <p className="muted">离线词典里没有「{target.word}」，可以在下面的在线词典里查。</p>}
@@ -185,6 +198,14 @@ function LookupPopup({ target, onClose, onHold }: { target: Target; onClose: () 
           </button>
         ))}
       </div>
+      {state.kind === "found" && state.entry.needs_update && (
+        <div className="lookup-update">
+          <span className="muted">更新词库可显示英英释义（约 23MB）</span>
+          <button type="button" className="btn small" onClick={install}>
+            更新词库
+          </button>
+        </div>
+      )}
     </div>
   );
 }

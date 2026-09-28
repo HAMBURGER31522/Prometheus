@@ -62,24 +62,26 @@ def test_model_failure_is_explained_in_chinese(client, monkeypatch):
     monkeypatch.setitem(client.app.state.queue.impls, "report", report_times_out)
     item_id = _start(client)
     row = wait_for_status(client, item_id, "failed")
-    assert row["error_code"] == "EXTERNAL_MODEL_FAILURE"
-    assert "模型" in row["error_message"]
-    assert "Request timed out." in row["error_message"]
+    # PLAN 15.4.10: a plain reason and what to do; the original text stays as the details.
+    assert row["error_code"] == "MODEL_TIMEOUT"
+    assert "模型" in (row.get("error_reason") or "")
+    assert row["error_message"] == "PiError: Request timed out."
 
 
-def test_unexpected_failure_is_labelled_as_internal(client, monkeypatch):
+def test_unexpected_failure_is_labelled_as_unclassified(client, monkeypatch):
     def report_breaks(ctx):
         raise KeyError("oops")
 
     monkeypatch.setitem(client.app.state.queue.impls, "report", report_breaks)
     item_id = _start(client)
     row = wait_for_status(client, item_id, "failed")
-    assert row["error_code"] == "IMPLEMENTATION_FAILURE"
-    assert row["error_message"].startswith("内部错误")
+    assert (row["stage"], row["error_code"]) == ("report", "UNCLASSIFIED")
+    assert row.get("error_reason") == "未归类的错误。"
+    assert row["error_message"] == "KeyError: 'oops'"
 
 
-KEPT = ["asr.json", "canonical-transcript.jsonl", "input.json", "run.trace.jsonl",
-        "mindmap.json", "segments.json", "segments.raw.json", "source.info.json", "transcript.md"]
+KEPT = ["asr.json", "canonical-transcript.jsonl", "input.json", "run.trace.jsonl", "mindmap.json",
+        "segments.json", "segments.raw.json", "segments.fine.json", "source.info.json", "transcript.md"]
 SCRATCH = ["media.m4a", "media.info.json", "video.mp4", "audio.wav", "pi.events.jsonl",
            "SKILL.md", "report.html", "frames/f_000080.jpg", "sessions/a.jsonl"]
 

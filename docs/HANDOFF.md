@@ -108,3 +108,15 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 ## 7. 新窗口的开场白（复制给新会话）
 
 > 继续 Prometheus 项目（F:\project\Prometheus）。先读 docs/HANDOFF.md，再按 AGENTS.md 读 docs/PLAN.md 和 docs/DECISIONS.md。R1–R7c 已完成，下一步本来是 R8，但我先有一些界面修改意见：先听我说完，按 HANDOFF 第 5 节把意见写成规格给我确认，确认后再开分支按红绿做。预览用 HANDOFF 第 2 节的方法启动。
+
+## 8. R7d 进行中的注意事项（2026-09-28）
+
+分支 `r7d-ui-review`。规格 PLAN 15.4.10 / E13，实现选择 DECISIONS D-42、D-43。E13 ① ② 的命令全部为 0，截图在 `docs/screenshots/r7d/`，等用户看过后记入 acceptance.md，再合并。
+
+- **模型参数**：后端每次启动都会按当前配置重写 models.json 里的自定义供应商（上下文、最大输出、思考方式来自随包 Pi 的模型目录）。改设置时也会重写。验证方法：看 `<数据目录>/.prometheus/config/pi/models.json` 里 custom 模型有没有 `contextWindow`。
+- **Key 片段**：设置页 Key 框的灰字会显示末 4 位。截图脚本 `app/scripts/screenshots-r7d.mjs` 在截图前会把它遮成圆点；以后任何截图、日志、提交里都不能出现 Key 片段。
+- **端到端测试**：多个 agent 并行时，端到端测试用 `tmp/e2e.lock` 目录锁排队（共用 8765 端口）。列表切换有过渡动画，用鼠标手动拖拽前先 `settle(page)`（`app/e2e/helpers.ts`）等动画结束。
+- **拖拽**：卡片拖拽是自己用指针事件做的（不是 HTML5 拖放，原因见 D-43）。按下卡片会阻止选字，拖动中整页不可选中。
+- **预览数据（acceptance-output/r7-data）已被 R7d 的新后端处理过**：字幕合并成段落（细分段另存 segments.fine.json）、词库更新为带英英释义的版本、settings.json 迁移为多配置格式、当前配置的思考强度按用户要求改为「中」、罗素和卡巴拉已拖回「战争伦理」「神秘学」。改动前的备份在 `tmp/r7d/backup-preview/`（不入库）。
+- **重启预览后端**：先确认 8766 的进程（父进程是 `.venv\Scripts\python.exe -m prometheus.server --port 8766`），`taskkill /PID <父进程> /T /F`，再用第 2 节的命令启动。不要碰 pid 22228。
+- **待用户决定**：导入失败写明原因（规格草案在 PLAN 15.4.10，未提交）；设置页眼睛图标是否显示完整 Key；DeepSeek / 智谱预设要不要也加「获取 API Key」链接；R7e 的四个问题（补充说明框、写作方式、审校默认开、预算）。

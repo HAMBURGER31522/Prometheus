@@ -135,6 +135,7 @@ export function SettingsPage() {
                 label="API Key"
                 value={settings.asr.custom.api_key}
                 onChange={(api_key) => update({ asr: { ...settings.asr, custom: { ...settings.asr.custom, api_key } } })}
+                reveal={() => api.revealKey({ target: "asr" })}
               />
               <label className="field">
                 <span>模型名</span>

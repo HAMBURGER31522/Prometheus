@@ -123,6 +123,14 @@ def publish(data_dir, item_id: str) -> Path:
     return folder
 
 
+def report_html(data_dir, item_id: str, row: dict) -> str:
+    """The run's report copy, or the library's once a finished run's cache was cleaned."""
+    report = paths.report_file(data_dir, item_id)
+    if not report.is_file() and row.get("library_path"):
+        report = paths.library_folder(data_dir, row["library_path"]) / paths.LIBRARY_FILES["html"]
+    return report.read_text(encoding="utf-8")
+
+
 def files_missing(data_dir, row: dict) -> bool:
     library_path = row.get("library_path")
     return row["status"] == "done" and bool(library_path) and not (Path(data_dir) / library_path).is_dir()

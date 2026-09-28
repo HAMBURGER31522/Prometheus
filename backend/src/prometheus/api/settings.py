@@ -1,13 +1,22 @@
-"""Settings endpoints with validation and key masking (PLAN 8.9)."""
+"""Settings endpoints with validation and key masking (PLAN 8.9, 15.4.10)."""
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus import paths
 from prometheus.llm import capability, model_list, pi_models
 from prometheus.llm.one_shot import OneShotError, run_one_shot
+from prometheus.runtime import RuntimeConfigError
 from prometheus.settings import store
 
 router = APIRouter()
+
+
+def _pi_cli(state):
+    """The bundled Pi's cli.js, whose pi-ai catalogue knows the models' parameters."""
+    try:
+        return state.get_runtime().pi_cli
+    except RuntimeConfigError:
+        return None
 
 
 @router.get("/api/settings")
@@ -30,8 +39,20 @@ async def put_settings(request: Request):
     store.save(state.data_dir, store.restore_secrets(body, stored))
     saved = store.load(state.data_dir)
     if saved["llm"]["provider"] == "custom":
-        pi_models.apply_custom_provider(state.data_dir, saved["llm"].get("custom"))
+        pi_models.apply_custom_provider(state.data_dir, saved["llm"].get("custom"), pi_cli=_pi_cli(state))
     return store.masked(saved)
+
+
+@router.post("/api/settings/reveal-key")
+def reveal_key(request: Request, body: dict):
+    """「显示 API Key」 (PLAN 15.4.10, user 2026-09-28): the full key, only when the eye asks for it."""
+    settings = store.load(request.app.state.data_dir)
+    if body.get("target") == "asr":
+        return {"api_key": (settings["asr"].get("custom") or {}).get("api_key", "")}
+    for item in settings["llm_profiles"]["items"]:
+        if item["id"] == body.get("profile_id"):
+            return {"api_key": item.get("api_key", "")}
+    return JSONResponse({"code": "PROFILE_NOT_FOUND"}, status_code=404)
 
 
 @router.post("/api/settings/models")
@@ -50,7 +71,21 @@ def list_models(request: Request, body: dict):
     try:
         return {"models": model_list.list_models(profile, pi_listing=pi_listing, proxy=proxy)}
     except model_list.ModelListError as exc:
-        return JSONResponse({"code": exc.code, "detail": str(exc)}, status_code=502)
+        return JSONResponse(
+            {"code": exc.code, "status": exc.status, "reason": exc.reason, "detail": str(exc)}, status_code=502,
+        )
+
+
+@router.post("/api/settings/model-info")
+def model_info(request: Request, body: dict):
+    """What Pi's bundled catalogue or the models.dev snapshot knows about one profile's model
+    (PLAN 15.4.10): the page lists the thinking levels and pre-fills 「高级」 from it."""
+    state = request.app.state
+    source, fields = pi_models.model_fields(state.data_dir, dict(body.get("profile") or {}), pi_cli=_pi_cli(state))
+    return {
+        "source": source, "context_window": fields.get("contextWindow"), "max_tokens": fields.get("maxTokens"),
+        "thinking_level_map": fields.get("thinkingLevelMap"),
+    }
 
 
 @router.post("/api/settings/test-model")

@@ -1,7 +1,7 @@
 // E6 (PLAN 15.3): the rewritten front end against the fake-pipeline backend.
 import { expect, test } from "@playwright/test";
 
-import { API, AUTH, VIDEOS, openFirstItem, openTab, report, seed, sidebar } from "./helpers";
+import { API, AUTH, VIDEOS, inReport, openFirstItem, openTab, report, seed, sidebar } from "./helpers";
 
 let itemIds: string[] = [];
 
@@ -98,17 +98,26 @@ test("⑧ 自定义提供商可选 OpenAI / Anthropic 协议", async ({ page }) 
   await openTab(page, "设置");
   await page.getByRole("button", { name: "新增配置" }).click();
   const editor = page.getByRole("region", { name: "编辑模型配置" });
-  await editor.getByRole("combobox", { name: "类型" }).click();
-  await page.getByRole("option", { name: "自定义" }).click();
+  await editor.getByRole("button", { name: "自定义", exact: true }).click();
   await editor.getByRole("combobox", { name: "接口协议" }).click();
   await expect(page.getByRole("listbox", { name: "接口协议" }).getByRole("option")).toHaveText(["OpenAI 兼容", "Anthropic"]);
 });
 
-test("报告目录的章节链接在报告内跳转，不会变成白页", async ({ page }) => {
+test("报告里的章节链接在报告内跳转，不会变成白页；自带目录隐藏，由工具栏「目录」承担", async ({ page }) => {
   await page.goto("/");
   await openTab(page, "知识库");
   await openFirstItem(page);
-  await report(page).locator('.report-nav a[href="#s3"]').click();
+  // Since 15.4.10 the template's left nav is hidden; a link into the report's chapters in the body
+  // must still jump inside the report (a srcdoc page would resolve "#s3" against the app: a blank page).
+  await expect(report(page).locator(".report-nav")).toBeHidden();
+  await inReport(page, () => {
+    const link = document.createElement("a");
+    link.href = "#s3";
+    link.id = "e2e-jump";
+    link.textContent = "跳到第三章";
+    document.querySelector(".paper")!.prepend(link);
+  });
+  await report(page).locator("#e2e-jump").click();
   await expect(report(page).locator("#s3")).toBeInViewport();
-  await expect(report(page).locator(".report-nav")).toBeVisible();
+  await expect(report(page).locator("h1")).toBeVisible();
 });

@@ -12,10 +12,13 @@ function endpoint() {
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(status: number, code?: string) {
+  /** The JSON error body, e.g. 「获取模型列表」's status and reason (PLAN 15.4.10). */
+  body?: Record<string, unknown>;
+  constructor(status: number, code?: string, body?: Record<string, unknown>) {
     super(code ?? `HTTP ${status}`);
     this.status = status;
     this.code = code;
+    this.body = body;
   }
 }
 
@@ -30,13 +33,13 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    let code: string | undefined;
+    let detail: Record<string, unknown> | undefined;
     try {
-      code = (await response.json()).code;
+      detail = await response.json();
     } catch {
       /* not JSON */
     }
-    throw new ApiError(response.status, code);
+    throw new ApiError(response.status, detail?.code as string | undefined, detail);
   }
   return response;
 }
@@ -52,8 +55,13 @@ export const api = {
   settings: () => json<Settings>("GET", "/api/settings"),
   saveSettings: (settings: Settings) => json<Settings>("PUT", "/api/settings", settings),
   testModel: () => json<{ ok: boolean; detail: string }>("POST", "/api/settings/test-model"),
+  /** The eye on a key field (PLAN 15.4.10): a profile's saved key, or the custom transcription key. */
+  revealKey: async (target: { profile_id: string } | { target: "asr" }) =>
+    (await json<{ api_key: string }>("POST", "/api/settings/reveal-key", target)).api_key,
   listModels: async (profile: ModelProfile) =>
     (await json<{ models: string[] }>("POST", "/api/settings/models", { profile })).models,
+  modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url">) =>
+    json<ModelInfo>("POST", "/api/settings/model-info", { profile }),
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
   lookupWord: (word: string) => json<LookupEntry>("GET", `/api/dictionary/lookup?word=${encodeURIComponent(word)}`),
   dictionaryStatus: () => json<ComponentStatus>("GET", "/api/dictionary"),
@@ -73,11 +81,15 @@ export const api = {
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, figures === undefined ? {} : { figures }),
   regenerateMindmap: (id: string) =>
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "mindmap" }),
+  /** 「补全标签和摘要」(PLAN 15.4.10): classify + publish again, the category stays. */
+  fillTags: (id: string) => json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "tags" }),
   queue: () => json<ItemRow[]>("GET", "/api/queue"),
 
   categories: () => json<CategoryRow[]>("GET", "/api/categories"),
   renameCategory: (id: number, name: string) => json<unknown>("PATCH", `/api/categories/${id}`, { name }),
-  deleteCategory: (id: number) => json<void>("DELETE", `/api/categories/${id}`),
+  createCategory: (name: string) => json<CategoryRow>("POST", "/api/categories", { name }),
+  deleteCategory: (id: number, moveItems = false) =>
+    json<void>("DELETE", `/api/categories/${id}${moveItems ? "?move_items=1" : ""}`),
   mergeCategory: (id: number, intoId: number) =>
     json<unknown>("POST", `/api/categories/${id}/merge`, { into_id: intoId }),
 
@@ -107,6 +119,9 @@ export interface ItemRow {
   subtitle_status: "ok" | "failed" | null;
   error_code: string | null;
   error_message: string | null;
+  /** Why it failed and what to do (PLAN 15.4.10); null for rows that failed before that. */
+  error_reason: string | null;
+  error_action: string | null;
   created_at: string;
   finished_at: string | null;
   library_path: string | null;
@@ -130,6 +145,10 @@ export interface LookupEntry {
   phonetic: string;
   translation: string[];
   inflection: string | null;
+  /** Up to three English definitions (PLAN 15.4.10). */
+  definition: string[];
+  /** The installed dictionary predates English definitions: 「更新词库」 downloads it again. */
+  needs_update: boolean;
 }
 
 export interface ComponentStatus {
@@ -161,6 +180,17 @@ export interface ModelProfile {
   model: string;
   supports_images: boolean;
   thinking: string;
+  /** 「高级」 (PLAN 15.4.10): the user's own numbers; null = what the catalogues say. */
+  context_window: number | null;
+  max_tokens: number | null;
+}
+
+/** What Pi's bundled catalogue (source "pi") or the models.dev snapshot knows about a profile's model (PLAN 15.4.10). */
+export interface ModelInfo {
+  source: "pi" | "models.dev" | null;
+  context_window: number | null;
+  max_tokens: number | null;
+  thinking_level_map: Record<string, string | null> | null;
 }
 
 export interface Settings {

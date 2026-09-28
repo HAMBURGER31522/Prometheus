@@ -1,5 +1,5 @@
-// Hover lookup (PLAN 15.4.9): which words of a subtitle line can be looked up, and where the
-// five online dictionaries show a word.
+// Hover lookup (PLAN 15.4.9, 15.4.10): which words of a subtitle line can be looked up, and where
+// the seven online dictionaries show a word.
 
 export type Token = { text: string; word?: string };
 
@@ -33,4 +33,7 @@ export const DICTIONARIES: { name: string; url: (word: string) => string }[] = [
   { name: "柯林斯", url: (word) => `https://www.collinsdictionary.com/dictionary/english/${q(word.toLowerCase())}` },
   { name: "必应", url: (word) => `https://cn.bing.com/dict/search?q=${q(word)}` },
   { name: "韦氏", url: (word) => `https://www.merriam-webster.com/dictionary/${q(word)}` },
+  // Oxford's search lands on the entry (also for Sitting, well-known); /dicts/en/<word> is Eudic's own link.
+  { name: "牛津", url: (word) => `https://www.oxfordlearnersdictionaries.com/search/english/?q=${q(word)}` },
+  { name: "欧路", url: (word) => `https://dict.eudic.net/dicts/en/${q(word)}` },
 ];

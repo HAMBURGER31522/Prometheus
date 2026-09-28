@@ -42,6 +42,12 @@ html, body { background: var(--p-around); }
 .paper { box-shadow: var(--p-shadow); }
 .paper:before, .paper:after { background: linear-gradient(90deg, var(--p-bar-from), var(--p-bar-to)); }
 h1, h2, h3, .subtitle, .report-nav-title { font-family: var(--p-serif); }
+/* The paper follows the window (15.4.10): 40px each side, at most 1280px; the template's left nav
+   is hidden (the toolbar's 目录 does its job) so the template's room for it goes back to the text. */
+.paper { width: auto; max-width: min(1280px, calc(100% - 80px)); margin-left: auto; margin-right: auto; }
+.report-nav { display: none !important; }
+.paper img { width: auto; max-width: 100%; height: auto; }
+.paper svg.pz-capped { display: block; margin-left: auto; margin-right: auto; }
 ::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
 ::-webkit-scrollbar-thumb {
   border: 4px solid transparent; border-radius: 12px; background-clip: padding-box;
@@ -235,6 +241,14 @@ const SCRIPT = `
   addEventListener("keydown", function (event) { if (event.key === "Escape") closeImage(); });
 
   function ready() {
+    /* a chart is drawn for about 900px: a wider paper must not blow it up past its own width */
+    document.querySelectorAll(".paper svg[viewBox]").forEach(function (svg) {
+      if (svg.parentElement && svg.parentElement.closest("svg")) return;
+      var width = parseFloat((svg.getAttribute("viewBox") || "").trim().split(/[^0-9.eE+-]+/)[2]);
+      if (!(width > 0)) return;
+      svg.style.maxWidth = width + "px";
+      svg.classList.add("pz-capped");
+    });
     document.querySelectorAll(".paper img, main img").forEach(function (img) {
       if (img.closest("a")) return;
       img.classList.add("pz-zoomable");

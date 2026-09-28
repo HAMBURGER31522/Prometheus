@@ -6,6 +6,15 @@
 .queue-url { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .queue-stage { font-size: 13px; color: var(--ink-2); }
 .queue-error { font-size: 13px; color: var(--danger); }
+.queue-failure { display: grid; gap: 3px; min-width: 0; }
+.queue-action { font-size: 13px; color: var(--ink-2); }
+.queue-details summary { width: fit-content; font-size: 12px; color: var(--muted); cursor: default; }
+.queue-details summary:hover { color: var(--ink-2); }
+.queue-details pre {
+  margin: 6px 0; padding: 10px 12px; max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 12px/1.55 var(--font-mono); color: var(--ink-2); background: var(--window);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); user-select: text;
+}
 .queue-side { display: flex; gap: 8px; align-items: center; }
 .progress { position: relative; display: block; height: 3px; margin-top: 8px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .progress::after {

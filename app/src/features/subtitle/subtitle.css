@@ -33,3 +33,9 @@
 .lookup-form { font-size: 13px; color: var(--accent); }
 .lookup-senses { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 13px; line-height: 1.55; color: var(--ink-2); }
 .lookup-links { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 4px; border-top: 1px solid var(--line); width: 100%; }
+/* 英英释义 (PLAN 15.4.10): WordNet senses under the Chinese ones; an old dictionary offers an update. */
+.lookup-english { display: grid; gap: 3px; width: 100%; }
+.lookup-label { font-size: 12px; color: var(--muted); }
+/* ECDICT's entries for common words run to a paragraph: two lines each, the rest on hover. */
+.lookup-english .lookup-senses li { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.lookup-update { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }

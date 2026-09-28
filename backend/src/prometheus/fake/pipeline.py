@@ -10,15 +10,19 @@ import shutil
 from pathlib import Path
 
 from prometheus import paths
+from prometheus.ingest.download import IngestError
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
 from prometheus.library import publish as publish_mod
 from prometheus.mindmap import enrich
 from prometheus.mindmap.markdown import tree_to_markdown
 from prometheus.subtitle import fix as subtitle_fix_mod
+from prometheus.subtitle import paragraphs as subtitle_paragraphs
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 DICTIONARY_SAMPLE = FIXTURES / "ecdict.sample.csv"  # installed instead of the 23 MB ECDICT (PLAN 15.4.9)
+# In fake mode this link fails in the download stage with Bilibili's risk control (PLAN 15.4.10 / E13 ②).
+RISK_CONTROL_VIDEO = "BV412RiskCtl"
 
 
 def _fixture(name: str) -> Path:
@@ -38,14 +42,18 @@ def _fake_fill(prompt: str) -> str:
 
 def _fake_fix(prompt: str) -> str:
     """A careful model for subtitle correction: keeps every text as it is and, when asked to
-    translate (the English sample), answers from fixtures/segments.en.json."""
+    translate (the English sample), joins the Chinese of the fixtures/segments.en.json fragments
+    that make up each paragraph."""
     mark = subtitle_fix_mod.SEGMENTS_MARK
     batch = json.loads(prompt[prompt.index(mark) + len(mark):])
     if "中文翻译" not in prompt:
         return json.dumps(batch, ensure_ascii=False)
     english = json.loads(_fixture("segments.en.json").read_text(encoding="utf-8"))
-    zh = {segment["text"]: segment["zh"] for segment in english}
-    return json.dumps({key: {"text": text, "zh": zh.get(text, "")} for key, text in batch.items()},
+
+    def translate(text: str) -> str:
+        return "".join(segment["zh"] for segment in english if segment["text"] in text)
+
+    return json.dumps({key: {"text": text, "zh": translate(text)} for key, text in batch.items()},
                       ensure_ascii=False)
 
 
@@ -71,7 +79,12 @@ def build_impls(data_dir):
         )
 
     def download(ctx):
-        return None
+        if items_store.get_item(data_dir, ctx.item_id)["video_id"] == RISK_CONTROL_VIDEO:
+            # yt-dlp's own words for a 412 on the video page, wrapped like the real download stage.
+            raise IngestError("DOWNLOAD_FAILURE", (
+                f"ERROR: [BiliBili] {RISK_CONTROL_VIDEO}: Unable to download webpage: HTTP Error 412: "
+                "Precondition Failed (caused by <HTTPError 412: Precondition Failed>)"
+            ))
 
     def transcribe(ctx):
         segments = json.loads(_fixture("segments.json").read_text(encoding="utf-8"))
@@ -80,8 +93,7 @@ def build_impls(data_dir):
             segments = [{key: segment[key] for key in ("start", "end", "text")} for segment in english]
             (paths.work_dir(data_dir, ctx.item_id) / "asr.json").write_text(
                 json.dumps({"language": "en", "segments": []}), encoding="utf-8")
-        segments_file = paths.segments_file(data_dir, ctx.item_id)
-        segments_file.write_text(json.dumps(segments, ensure_ascii=False), encoding="utf-8")
+        segments = subtitle_paragraphs.save(data_dir, ctx.item_id, segments)  # like a real transcription
         from prometheus.subtitle import format as subtitle_format
 
         paths.srt_file(data_dir, ctx.item_id).parent.mkdir(parents=True, exist_ok=True)
@@ -132,7 +144,9 @@ def build_impls(data_dir):
         items_store.update_item(data_dir, ctx.item_id, mindmap_status="ok")
 
     def classify(ctx):
-        category_id = categories_store.ensure_category(data_dir, "未分类")
+        # Like the real stage: only the first completion files the item (15.4.10).
+        row = items_store.get_item(data_dir, ctx.item_id)
+        category_id = row.get("category_id") or categories_store.ensure_category(data_dir, "未分类")
         items_store.update_item(
             data_dir, ctx.item_id, category_id=category_id,
             tags='["示例"]', description="假流水线生成的示例条目。",
