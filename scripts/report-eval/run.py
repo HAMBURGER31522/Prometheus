@@ -42,6 +42,9 @@ def fake_ask(prompt: str) -> str:
 
 
 def model_ask(data_dir: Path, work: Path, thinking: str):
+    # Pi runs with `work` as its working directory: a relative config dir would point elsewhere
+    # there and the custom provider would be unknown.
+    data_dir, work = Path(data_dir).resolve(), Path(work).resolve()
     runtime = runtime_mod.resolve(None)
     llm = store.load(data_dir)["llm"]
     work.mkdir(parents=True, exist_ok=True)
