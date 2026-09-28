@@ -1,11 +1,21 @@
 """Subtitle paragraphs of 10–15 seconds (PLAN 15.4.10): whisper and 必剪 cut speech into
 fragments (「对吧，」 on its own line); the subtitles are read as paragraphs instead."""
 
+import json
 import random
 from itertools import pairwise
+from pathlib import Path
 
+import pytest
+from prometheus import paths
+from prometheus.library import db, publish
+from prometheus.library import items as items_store
+from prometheus.subtitle import format as subtitle_format
 from prometheus.subtitle import paragraphs
 from prometheus.subtitle.paragraphs import group_segments
+
+FIXTURES = Path(__file__).parent / "fixtures"
+FINE = "segments.fine.json"
 
 
 def _segments(rows):
@@ -236,3 +246,175 @@ def test_a_raw_transcript_that_does_not_match_is_grouped_on_its_own():
     assert _spans(grouped) == [(0.0, 11.0, "大家好，今天聊聊钱怎么流动。"), (11.0, 16.0, "对吧")]
     assert raw_grouped == group_segments(raw)
     assert _spans(raw_grouped) == [(0.0, 13.0, "大家好今天聊聊钱怎么留动"), (13.0, 16.0, "对吧")]
+
+
+# --- new items: grouped after transcription, before correction ------------------------------------
+
+ENGLISH = "https://www.youtube.com/watch?v=M7lc1UVf-VE"  # a YouTube link is an English item in fake mode
+
+
+def _read(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+
+
+@pytest.fixture
+def data_dir(tmp_path):
+    root = tmp_path / "data"
+    paths.init_data_dir(root)
+    db.init_db(root)
+    return root
+
+
+def test_the_transcribe_stage_writes_paragraphs_and_keeps_the_fragments(data_dir):
+    from conftest import DUMMY_RUNTIME
+    from prometheus.tasks import stages
+    from prometheus.tasks.runner import StageContext
+
+    item_id = items_store.create_item(data_dir, platform="youtube", video_id="BHY0FxzoKZE",
+                                      source_url="https://www.youtube.com/watch?v=BHY0FxzoKZE")
+    work = paths.work_dir(data_dir, item_id)
+    work.mkdir(parents=True, exist_ok=True)
+    (work / "subtitle.en.vtt").write_text(
+        "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nImagine the money\n\n"
+        "00:00:02.000 --> 00:00:04.500\na country earns.\n", encoding="utf-8")
+    stages.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["transcribe"](StageContext(data_dir, item_id))
+    assert _read(paths.segments_file(data_dir, item_id)) == [
+        {"start": 0.0, "end": 4.5, "text": "Imagine the money a country earns."}]
+    assert _read(paths.cache_dir(data_dir, item_id) / FINE) == [
+        {"start": 0.0, "end": 2.0, "text": "Imagine the money"}, {"start": 2.0, "end": 4.5, "text": "a country earns."}]
+
+
+def test_a_new_item_is_corrected_as_paragraphs_and_keeps_its_fragments(client):
+    from conftest import BV_URL, wait_for_status
+
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    row = wait_for_status(client, item_id, "done")
+    data_dir = client.app.state.data_dir
+    fragments = _read(FIXTURES / "segments.json")
+    shown = client.get(f"/api/items/{item_id}/subtitle").json()
+    assert shown == group_segments(fragments)  # the fake model keeps every text as it is
+    assert shown[0]["text"] == "大家好，今天我们聊一聊钱在经济里是怎么流动的。对吧，一个国家挣到的钱大致分成三个口袋，家庭、企业和政府。"
+    assert len(shown) == 5 and all(p["end"] - p["start"] <= 15 for p in shown)
+    # The correction's input was the paragraphs, and the fragments outlive the cache clean-up.
+    assert client.get(f"/api/items/{item_id}/subtitle", params={"variant": "raw"}).json() == shown
+    assert _read(paths.cache_dir(data_dir, item_id) / FINE) == fragments
+    folder = data_dir / row["library_path"]
+    assert (folder / "字幕.srt").read_text(encoding="utf-8") == subtitle_format.to_srt(shown)
+    assert (folder / "字幕.txt").read_text(encoding="utf-8") == subtitle_format.to_txt(shown)
+    assert paragraphs.convert_library(data_dir) == 0, "a new item needs no conversion"
+
+
+def test_an_english_item_is_translated_paragraph_by_paragraph(client):
+    from conftest import wait_for_status
+
+    item_id = client.post("/api/items", json={"url": ENGLISH, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
+    shown = client.get(f"/api/items/{item_id}/subtitle").json()
+    assert [(p["text"], p.get("zh")) for p in shown] == [
+        ("Imagine the money a country earns sitting in three pockets:", "想象一个国家挣到的钱放在三个口袋里"),
+        ("one for households one for companies and one for the government how it moves between them "
+         "decides what people can actually buy.",
+         "一个给家庭，一个给企业，还有一个给政府。钱在它们之间怎么流动，决定了人们实际能买多少东西。"),
+        ("And that is where the story of fiscal rebalancing begins.", "而这正是财政再平衡故事的开端。"),
+    ]
+
+
+# --- old items: converted once when the backend starts, without a model ------------------------------
+
+KABBALAH = _segments([  # from before paragraphs: a whisper window and fragments, no raw transcript
+    (0.3, 30.1, "然后我们还是讲一下封面吧,就是这个封面是这个三个卡巴拉的生命树,对吧,第一个第二个和第三个,对吧,能看出来区别吗,"),
+    (30.1, 31.4, "对吧，"), (31.4, 33.0, "第一个生命树"), (33.0, 35.2, "它是比较典型的。"),
+    (35.2, 36.0, "对吧，"), (36.0, 38.5, "然后上面有这个"), (38.5, 41.0, "七十二个神名。"),
+])
+LEARNING = [  # corrected and translated before paragraphs, next to its raw transcript
+    {"start": 0.0, "end": 2.6, "text": "How could we use AI to learn better?", "zh": "我们要如何用 AI 更好地学习？"},
+    {"start": 2.88, "end": 6.96, "text": "I mean, there's got to be some way to optimize learning.",
+     "zh": "我是说，肯定有办法优化学习。"},
+    {"start": 7.14, "end": 9.16, "text": "I think it's the perfect tool for it.", "zh": "我觉得它是完美的工具。"},
+    {"start": 9.46, "end": 11.74, "text": "It's just not entirely clear yet how.", "zh": "只是还不完全清楚怎么用。"},
+    {"start": 12.08, "end": 13.5, "text": "So yeah,"},
+    {"start": 13.5, "end": 16.2, "text": "this video is my current approach.", "zh": "所以这期视频是我目前的方法。"},
+]
+LEARNING_RAW = [{"start": s["start"], "end": s["end"], "text": " " + s["text"].lower()} for s in LEARNING]
+
+
+def _old_item(data_dir, video_id, shown, raw=None, published=True):
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id=video_id,
+                                      source_url=f"https://www.bilibili.com/video/{video_id}/", status="done")
+    items_store.update_item(data_dir, item_id, report_title=f"旧条目 {video_id}")
+    _write(paths.segments_file(data_dir, item_id), shown)
+    if raw is not None:
+        _write(paths.raw_segments_file(data_dir, item_id), raw)
+    if published:
+        publish.publish(data_dir, item_id)  # 字幕.srt and 字幕.txt from the fragments, as the old app wrote them
+    return item_id
+
+
+def _library(data_dir, item_id):
+    return data_dir / items_store.get_item(data_dir, item_id)["library_path"]
+
+
+def test_an_old_item_is_converted_without_a_model(data_dir):
+    item_id = _old_item(data_dir, "BV1old000001", KABBALAH)
+    assert paragraphs.convert_library(data_dir) == 1
+    grouped = group_segments(KABBALAH)
+    assert len(grouped) < len(KABBALAH) and all(p["end"] - p["start"] <= 15 for p in grouped)
+    assert _read(paths.segments_file(data_dir, item_id)) == grouped
+    assert _read(paths.cache_dir(data_dir, item_id) / FINE) == KABBALAH
+    assert not paths.raw_segments_file(data_dir, item_id).exists()
+    folder = _library(data_dir, item_id)
+    assert (folder / "字幕.srt").read_text(encoding="utf-8") == subtitle_format.to_srt(grouped)
+    assert (folder / "字幕.txt").read_text(encoding="utf-8") == subtitle_format.to_txt(grouped)
+
+
+def test_the_raw_transcript_and_the_translations_are_converted_on_the_same_boundaries(data_dir):
+    item_id = _old_item(data_dir, "BV1old000002", LEARNING, raw=LEARNING_RAW)
+    assert paragraphs.convert_library(data_dir) == 1
+    shown = _read(paths.segments_file(data_dir, item_id))
+    raw = _read(paths.raw_segments_file(data_dir, item_id))
+    assert [(p["start"], p["end"]) for p in shown] == [(0.0, 11.74), (12.08, 16.2)]
+    assert [(p["start"], p["end"]) for p in raw] == [(0.0, 11.74), (12.08, 16.2)]
+    assert shown[0]["zh"] == "我们要如何用 AI 更好地学习？我是说，肯定有办法优化学习。我觉得它是完美的工具。只是还不完全清楚怎么用。"
+    assert shown[1] == {"start": 12.08, "end": 16.2, "text": "So yeah, this video is my current approach.",
+                        "zh": "所以这期视频是我目前的方法。"}
+    assert raw[1] == {"start": 12.08, "end": 16.2, "text": "so yeah, this video is my current approach."}
+    assert _read(paths.cache_dir(data_dir, item_id) / FINE) == LEARNING
+    srt = (_library(data_dir, item_id) / "字幕.srt").read_text(encoding="utf-8")
+    assert srt == subtitle_format.to_srt(shown)
+
+
+def test_converting_again_changes_nothing(data_dir):
+    first = _old_item(data_dir, "BV1old000003", KABBALAH)
+    second = _old_item(data_dir, "BV1old000004", LEARNING, raw=LEARNING_RAW)
+    assert paragraphs.convert_library(data_dir) == 2
+    files = [paths.segments_file(data_dir, first), paths.cache_dir(data_dir, first) / FINE,
+             _library(data_dir, first) / "字幕.srt", _library(data_dir, first) / "字幕.txt",
+             paths.segments_file(data_dir, second), paths.raw_segments_file(data_dir, second),
+             paths.cache_dir(data_dir, second) / FINE, _library(data_dir, second) / "字幕.txt"]
+    before = [path.read_bytes() for path in files]
+    assert paragraphs.convert_library(data_dir) == 0
+    assert [path.read_bytes() for path in files] == before
+
+
+def test_a_broken_or_unpublished_item_does_not_stop_the_others(data_dir):
+    broken = _old_item(data_dir, "BV1old000005", KABBALAH, published=False)
+    paths.segments_file(data_dir, broken).write_text("{not json", encoding="utf-8")
+    unpublished = _old_item(data_dir, "BV1old000006", KABBALAH, published=False)
+    assert paragraphs.convert_library(data_dir) == 1
+    assert _read(paths.segments_file(data_dir, unpublished)) == group_segments(KABBALAH)
+    assert paths.segments_file(data_dir, broken).read_text(encoding="utf-8") == "{not json"
+
+
+def test_the_backend_converts_old_items_when_it_starts(tmp_path, client_factory):
+    root = tmp_path / "library"
+    paths.init_data_dir(root)
+    db.init_db(root)
+    item_id = _old_item(root, "BV1old000007", KABBALAH)
+    client_factory(data_dir=root, fake=True)
+    assert _read(paths.segments_file(root, item_id)) == group_segments(KABBALAH)
+    assert _read(paths.cache_dir(root, item_id) / FINE) == KABBALAH

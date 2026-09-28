@@ -83,6 +83,26 @@ def test_segments_go_in_batches_of_at_most_120():
     assert stats["changed"] == 250 and stats["failed_batches"] == 0
 
 
+def _batch_sizes(calls):
+    return [len(json.loads(call[call.index(fix.SEGMENTS_MARK) + len(fix.SEGMENTS_MARK):])) for call in calls]
+
+
+def test_long_paragraphs_go_in_batches_of_about_2500_characters():
+    # 「每次最多 120 段（约 2500 字）」: a 10–15 s paragraph (PLAN 15.4.10) holds far more than a fragment.
+    calls = []
+    fixed, stats = fix.fix_segments(_segments(["字" * 600] * 12), "", human=False, ask=_echo(calls=calls))
+    assert _batch_sizes(calls) == [4, 4, 4]
+    assert [s["text"] for s in fixed] == ["字" * 600 + "。"] * 12 and stats["failed_batches"] == 0
+
+
+def test_translated_paragraphs_go_in_batches_of_about_1250_characters():
+    calls = []
+    fixed, stats = fix.fix_segments(_segments(["word " * 80] * 10), "", human=False, ask=_translator(calls),
+                                    translate=True)
+    assert _batch_sizes(calls) == [3, 3, 3, 1]
+    assert stats["translated"] == 10
+
+
 def test_rejected_and_missing_segments_keep_their_text():
     segments = _segments(["管中亏报", "我们发现很少有统计型的视频", "那只不过"])
 

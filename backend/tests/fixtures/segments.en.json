@@ -1,6 +1,13 @@
 [
-  {"start": 0.0, "end": 4.2, "text": "Imagine the money a country earns sitting in three pockets", "zh": "想象一个国家挣到的钱放在三个口袋里"},
-  {"start": 4.2, "end": 8.6, "text": "one for households one for companies and one for the government", "zh": "一个给家庭，一个给企业，一个给政府"},
-  {"start": 8.6, "end": 13.1, "text": "how it moves between them decides what people can actually buy", "zh": "钱在它们之间怎么流动，决定了人们实际能买多少东西"},
-  {"start": 13.1, "end": 17.5, "text": "and that is where the story of fiscal rebalancing begins", "zh": "财政再平衡的故事就从这里开始"}
+  {"start": 0.0, "end": 1.6, "text": "Imagine the money", "zh": "想象"},
+  {"start": 1.6, "end": 3.1, "text": "a country earns", "zh": "一个国家挣到的钱"},
+  {"start": 3.1, "end": 4.8, "text": "sitting in three pockets:", "zh": "放在三个口袋里"},
+  {"start": 4.8, "end": 6.6, "text": "one for households", "zh": "一个给家庭，"},
+  {"start": 6.6, "end": 8.4, "text": "one for companies", "zh": "一个给企业，"},
+  {"start": 8.4, "end": 10.6, "text": "and one for the government", "zh": "还有一个给政府。"},
+  {"start": 10.6, "end": 12.5, "text": "how it moves between them", "zh": "钱在它们之间怎么流动，"},
+  {"start": 12.5, "end": 14.6, "text": "decides what people", "zh": "决定了人们"},
+  {"start": 14.6, "end": 16.4, "text": "can actually buy.", "zh": "实际能买多少东西。"},
+  {"start": 16.4, "end": 18.2, "text": "And that is where the story", "zh": "而这正是"},
+  {"start": 18.2, "end": 20.1, "text": "of fiscal rebalancing begins.", "zh": "财政再平衡故事的开端。"}
 ]

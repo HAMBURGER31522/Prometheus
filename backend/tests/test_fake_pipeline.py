@@ -46,16 +46,18 @@ def test_content_endpoints_serve_fake_artifacts(client):
     assert mindmap.headers["content-type"].startswith("text/markdown")
     assert mindmap.text.startswith("# ")
 
+    # fixtures/segments.json in 10–15 s paragraphs (PLAN 15.4.10)
+    first = "大家好，今天我们聊一聊钱在经济里是怎么流动的。对吧，一个国家挣到的钱大致分成三个口袋，家庭、企业和政府。"
     subtitle_json = client.get(f"/api/items/{item_id}/subtitle", params={"format": "json"})
     assert subtitle_json.status_code == 200
-    assert subtitle_json.json()[0]["text"] == "第一句"
+    assert subtitle_json.json()[0]["text"] == first
 
     srt = client.get(f"/api/items/{item_id}/subtitle", params={"format": "srt"})
     assert srt.status_code == 200
-    assert "00:00:00,000 --> 00:00:01,500" in srt.text
+    assert "00:00:00,000 --> 00:00:12,900" in srt.text
 
     txt = client.get(f"/api/items/{item_id}/subtitle", params={"format": "txt"})
-    assert "[00:00:00] 第一句" in txt.text
+    assert f"[00:00:00] {first}" in txt.text
 
 
 def test_fake_item_appears_in_category_counts(client):

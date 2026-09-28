@@ -204,3 +204,7 @@ def group_pair(shown: list, raw: list) -> tuple:
 
     mapped = [follow(piece) for piece in pieces]
     return grouped, [_paragraph(raw, mapped[first:last + 1]) for first, last in ranges]
+
+
+def convert_library(data_dir) -> int:
+    return 0
