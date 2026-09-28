@@ -115,3 +115,24 @@ def test_the_spend_is_tallied_before_the_cleanup(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "Pi 运行：输入 40000、输出 2000" in err
     assert "一次性调用 1 次" in err and "美元" in err
+
+
+def test_a_data_dir_from_before_the_latest_schema_is_brought_up_to_date_first(tmp_path):
+    """Like the app at startup: the preview data dir was still at schema 4 (no stage_detail)."""
+    import sqlite3
+
+    from prometheus import paths
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    conn = sqlite3.connect(paths.db_path(data_dir))
+    conn.executescript(db.SCHEMA_V1)
+    conn.execute("INSERT INTO schema_version (version) VALUES (4)")
+    conn.execute("INSERT INTO items (id, platform, video_id, source_url, figures, status, created_at)"
+                 " VALUES ('a', 'bilibili', 'BV1', 'u', 0, 'done', 'now')")
+    conn.commit()
+    conn.close()
+    ran = []
+    impls = {"report": lambda ctx: ran.append(ctx.item_id)}
+    assert load_script().main([str(data_dir), "a"], impls=impls) == 0
+    assert ran == ["a"]
