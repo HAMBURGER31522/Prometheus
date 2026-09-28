@@ -19,11 +19,13 @@ from pathlib import Path
 from prometheus import paths
 from prometheus import runtime as runtime_mod
 from prometheus.library import items as items_store
+from prometheus.llm import one_shot
 from prometheus.tasks import cleanup, runner
 from prometheus.tasks.stages import build_real_impls
 
 STAGES = ("keypoints", "plan", "report", "finalize", "publish")
 WITH_FRAMES = ("download", "frames", *STAGES)
+one_shot_call = one_shot.run_one_shot  # the real call; tests put a fake here
 
 
 def main(argv=None, impls=None) -> int:
@@ -39,6 +41,7 @@ def main(argv=None, impls=None) -> int:
     if refused:
         print(f"只能重写已完成的条目：{', '.join(refused)}", file=sys.stderr)
         return 2
+    one_shot.run_one_shot = lambda work_dir, **kwargs: one_shot_call(work_dir, **kwargs)
     impls = impls if impls is not None else build_real_impls(data_dir, runtime=runtime_mod.resolve(None))
     for row in rows:
         started = time.monotonic()

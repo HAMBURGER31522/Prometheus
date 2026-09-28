@@ -70,3 +70,48 @@ def test_frames_turns_figures_on_downloads_again_extracts_and_cleans_up_after(tm
     assert ran == ["download", "frames", "keypoints", "plan", "report", "finalize", "publish"]
     assert items_store.get_item(data_dir, item_id)["figures"] == 1
     assert not (work / "video.mp4").exists()
+
+
+def test_an_item_without_tags_gets_them_on_the_way(tmp_path):
+    """罗素 and 卡巴拉 came before tags (15.4.10): the rewrite also runs 分类 for them (category kept)."""
+    data_dir, item_id = finished_item(tmp_path)
+    ran = []
+    impls = {stage: (lambda ctx, stage=stage: ran.append(stage))
+             for stage in ("keypoints", "plan", "report", "finalize", "classify", "publish")}
+    assert load_script().main([str(data_dir), item_id], impls=impls) == 0
+    assert ran == ["keypoints", "plan", "report", "finalize", "classify", "publish"]
+    items_store.update_item(data_dir, item_id, tags='["示例"]')
+    ran.clear()
+    assert load_script().main([str(data_dir), item_id], impls=impls) == 0
+    assert "classify" not in ran
+
+
+def test_the_spend_is_tallied_before_the_cleanup(tmp_path, capsys):
+    """The relay has no prompt cache (D-44): every run says what it cost — Pi's own usage records for
+    the agent runs, characters for the one-shot calls (an estimate)."""
+    import json as json_mod
+
+    from prometheus import paths
+    from prometheus.llm import one_shot
+
+    data_dir, item_id = finished_item(tmp_path)
+    work = paths.work_dir(data_dir, item_id)
+
+    def report(ctx):
+        events = work / "chapters" / "ch-01" / "pi.events.jsonl"
+        events.parent.mkdir(parents=True)
+        usage = {"input": 40_000, "output": 2_000, "cacheRead": 0, "cacheWrite": 0}
+        lines = [{"type": "message_end", "message": {"role": "assistant", "usage": usage}},
+                 {"type": "message_end", "message": {"role": "user"}},
+                 {"type": "message_update", "usage": usage}]
+        events.write_text("\n".join(json_mod.dumps(line) for line in lines), encoding="utf-8")
+        one_shot.run_one_shot(work, prompt="要点" * 500, provider="p", model="m", api_key="", thinking="medium",
+                              node_exe="", pi_cli="", agent_dir=work)
+
+    impls = {"report": report}
+    script = load_script()
+    script.one_shot_call = lambda work_dir, **kwargs: "回答" * 100  # the real call is replaced for the test
+    assert script.main([str(data_dir), item_id, "--frames"], impls=impls) == 0
+    err = capsys.readouterr().err
+    assert "Pi 运行：输入 40000、输出 2000" in err
+    assert "一次性调用 1 次" in err and "美元" in err
