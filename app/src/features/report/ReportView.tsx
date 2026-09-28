@@ -140,20 +140,7 @@ function useDismiss(open: boolean, box: RefObject<HTMLDivElement | null>, close:
 function TocMenu({ items, onPick }: { items: TocItem[]; onPick: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === "Escape" : !box.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", close);
-    window.addEventListener("keydown", close);
-    return () => {
-      window.removeEventListener("mousedown", close);
-      window.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  useDismiss(open, box, () => setOpen(false));
   return (
     <div className="toc" ref={box}>
       <button
