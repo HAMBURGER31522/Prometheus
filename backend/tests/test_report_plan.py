@@ -1,5 +1,7 @@
 """Planning a 完整精读 (PLAN 15.4.11 step 3): chapters, the points each one owns, reasoned skips."""
 
+import re
+
 from prometheus.report import plan as planning
 
 
@@ -70,3 +72,11 @@ def test_the_prompt_names_the_inputs_and_the_output():
     for name in ("keypoints.md", "depth.md", "input.json", "plan.json", "SKILL.md", "modes/standard.md"):
         assert name in prompt
     assert "figures.md" not in prompt and "figures.md" in planning.plan_prompt(figures=True)
+
+
+def test_the_plan_names_no_lengths():
+    prompt = planning.plan_prompt(figures=False)
+    assert "target_chars" not in prompt and not re.search(r"\d+\s*字", prompt)
+    chapters = [{"id": "c1", "title": "水温", "ranges": [["00:00", "04:00"]]},
+                {"id": "c2", "title": "研磨", "ranges": [["04:00", "08:00"]]}]
+    assert planning.validate_plan(plan(chapters=chapters), ledger()) == []

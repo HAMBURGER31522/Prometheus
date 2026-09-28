@@ -1,6 +1,8 @@
 """What one chapter's writer is given (PLAN 15.4.11 step 4): the rules in full, the whole plan, its
 own points and transcript and nothing of the other chapters' sources, and how to mark the points."""
 
+import re
+
 from prometheus.report import chapter_write as write
 
 PLAN = {"title": "手冲咖啡的三个变量", "subtitle": "", "lead": "水温、研磨和粉水比。", "profile": "mechanism",
@@ -50,7 +52,9 @@ def test_the_writer_knows_its_place_its_file_its_heading_and_its_length():
     assert "第 2/3 章" in text and "研磨" in text and "水温" in text and "粉水比" in text
     assert "ch-02.html" in text
     assert '<span class="num">2</span>' in text and "02:00–04:00" in text
-    assert "900" in text
+    task = text[text.index("## 任务"):]
+    assert "900" not in task and not re.search(r"\d+\s*字", task)
+    assert "零基础" in task and "四步" in task and "第一次出现" in task
     assert 'data-points="' in text and "data-source-units" in text
     assert "supplement" in text
 

@@ -1,6 +1,8 @@
 """Checking one written chapter (PLAN 15.4.11 step 5): every owned point marked and really there,
 not pasted from the transcript, not far too short; problems come back as a list to fix."""
 
+import re
+
 from prometheus.report import chapter_checks as checks
 
 POINTS = {
@@ -12,6 +14,8 @@ POINTS = {
              "start_ms": 60_000, "end_ms": 90_000},
 }
 TRANSCRIPT = "然后我们讲水温对吧浅烘的话水温九十二到九十六度然后萃取就是把可溶物泡出来就像泡茶一样泡太久就苦了对吧"
+# What the video says about each point: the text of the units it rests on.
+SOURCES = {"K001": "浅烘的话水温九十二到九十六度", "K002": "萃取就是把可溶物泡出来", "K003": "就像泡茶一样泡太久就苦了"}
 
 GOOD = """<section id="s1"><h2><span class="num">1</span><span class="section-title">水温</span></h2>
 <p data-points="K001">浅烘豆适合用九十二到九十六度的水：水温越高，酸味越少、苦味越多。</p>
@@ -44,12 +48,26 @@ def test_text_pasted_from_the_transcript_is_measured():
     assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["copy_ratio"] == 0.0
 
 
-def test_a_chapter_far_below_its_floor_is_flagged():
-    short = """<section id="s1"><p data-points="K001 K002">九十二度，萃取。</p></section>"""
-    result = checks.check_chapter(short, ["K001", "K002"], POINTS, TRANSCRIPT)
-    assert result["chars"] < result["floor"]
-    assert any("字" in problem and "下限" in problem for problem in result["problems"])
-    assert not any("下限" in p for p in checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["problems"])
+def test_a_point_explained_too_briefly_for_what_the_video_says_is_sent_back_without_a_number():
+    brief = GOOD.replace("萃取指热水把咖啡粉里的可溶物质溶解出来的过程，溶出太少偏酸，太多偏苦。", "萃取就是溶出可溶物质。")
+    result = checks.check_chapter(brief, ["K001", "K002"], POINTS, TRANSCRIPT, sources=SOURCES)
+    assert result["thin"] == ["K002"]
+    problem = next(problem for problem in result["problems"] if "K002" in problem)
+    assert "类比" in problem and "所以呢" in problem
+    assert not re.search(r"\d", problem.replace("K002", ""))  # never a count to stop at
+    assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT, sources=SOURCES)["thin"] == []
+
+
+def test_the_bar_grows_with_what_the_video_says_about_the_point():
+    longer = {**SOURCES, "K001": SOURCES["K001"] * 8}
+    result = checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT, sources=longer)
+    assert result["thin"] == ["K001"]
+
+
+def test_a_paragraph_marking_several_points_is_shared_between_them():
+    both = """<section id="s1"><p data-points="K001 K002">浅烘豆适合用九十二到九十六度的水：水温越高，酸味越少、苦味越多。萃取指热水把咖啡粉里的可溶物质溶解出来。</p></section>"""
+    alone = checks.point_chars(both)
+    assert alone["K001"] == alone["K002"] and alone["K001"] < len(re.sub(r"[^一-鿿]", "", both)) 
 
 
 def test_a_clean_chapter_has_no_problems():

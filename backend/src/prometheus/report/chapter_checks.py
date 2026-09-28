@@ -69,7 +69,11 @@ def _copy_ratio(fragment_text: str, transcript: str) -> float:
     return sum(copied) / len(body)
 
 
-def check_chapter(fragment: str, owned: list, points: dict, transcript: str) -> dict:
+def point_chars(fragment: str) -> dict:
+    return {}
+
+
+def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, sources=None) -> dict:
     marking = _marking(fragment)
     root = parse_html(fragment)
     text = root.text(lambda node: node.tag == "h2")
@@ -90,7 +94,7 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str) -> 
         problems.append(f"本章约 {copy_ratio:.0%} 的文字是照抄转写的口语：改写成完整、通顺的书面语")
     if chars < floor:
         problems.append(f"本章只有 {chars} 字，低于按要点估算的下限 {floor} 字：每个要点都要讲清是什么、为什么、怎么用")
-    return {"missing": missing, "weak": weak, "copy_ratio": copy_ratio, "chars": chars, "floor": floor,
+    return {"missing": missing, "weak": weak, "thin": [], "copy_ratio": copy_ratio, "chars": chars, "floor": floor,
             "problems": problems}
 
 

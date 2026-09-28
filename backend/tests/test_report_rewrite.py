@@ -28,13 +28,15 @@ def finished_item(tmp_path):
     return data_dir, item_id
 
 
-def test_only_report_finalize_and_publish_run_and_the_item_stays_done(tmp_path):
+def test_only_the_report_stages_run_and_the_item_stays_done(tmp_path):
     data_dir, item_id = finished_item(tmp_path)
     ran = []
     impls = {stage: (lambda ctx, stage=stage: ran.append((stage, ctx.item_id)))
-             for stage in ("resolve", "transcribe", "report", "finalize", "subtitle_fix", "mindmap", "publish")}
+             for stage in ("resolve", "transcribe", "keypoints", "plan", "report", "finalize", "subtitle_fix",
+                           "mindmap", "publish")}
     assert load_script().main([str(data_dir), item_id], impls=impls) == 0
-    assert ran == [("report", item_id), ("finalize", item_id), ("publish", item_id)]
+    assert ran == [("keypoints", item_id), ("plan", item_id), ("report", item_id), ("finalize", item_id),
+                   ("publish", item_id)]
     row = items_store.get_item(data_dir, item_id)
     assert (row["status"], row["stage"], row["mindmap_status"]) == ("done", None, "ok")
 

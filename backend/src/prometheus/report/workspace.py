@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 
 from prometheus import paths
+from prometheus.llm import one_shot
+from prometheus.report import full, pi_run
 from prometheus.report.timing import pi_timeout_seconds
 from video_report_agent.pi import PiRunner
 
@@ -78,3 +80,21 @@ def run_report_stage(data_dir, item_id: str, row: dict, settings: dict, *,
     kwargs["agent_dir"] = paths.pi_config_dir(data_dir)
     runner = PiRunner(**kwargs)
     return asyncio.run(runner.run(work))
+
+
+# ---- 完整精读 stages (PLAN 15.4.11). Stubs. ----
+
+def pi_runner(data_dir, settings, node_exe, pi_cli, *, deadline):
+    return lambda workspace, prompt, expect: None
+
+
+def run_keypoints_stage(data_dir, item_id, settings, *, node_exe, pi_cli):
+    return None
+
+
+def run_plan_stage(data_dir, item_id, row, settings, *, node_exe, pi_cli, figures):
+    return None
+
+
+def run_full_report_stage(data_dir, item_id, row, settings, *, node_exe, pi_cli, figures, progress):
+    return None

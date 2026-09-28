@@ -14,6 +14,7 @@ TRANSCRIPT = "浅烘豆用九十二到九十六度，深烘豆用八十五到八
 def test_the_reader_sees_only_the_chapter():
     prompt = review.reader_prompt(CHAPTER)
     assert "浅烘豆要用高一点的水温" in prompt and "没看过视频" in prompt
+    assert "零基础" in prompt and "第一次出现" in prompt and "术语" in prompt
     assert "九十二" not in prompt
 
 

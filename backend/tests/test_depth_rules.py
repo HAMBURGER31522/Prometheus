@@ -1,5 +1,7 @@
 """depth.md, the 完整精读 rules handed to the report agent (PLAN 15.4.11)."""
 
+import re
+
 from prometheus.report.workspace import DEPTH_MD
 
 RULES = DEPTH_MD.read_text(encoding="utf-8")
@@ -8,6 +10,25 @@ RULES = DEPTH_MD.read_text(encoding="utf-8")
 def test_it_tells_the_agent_who_reads_and_how_it_is_tested():
     assert "看不到视频" in RULES
     assert "每 5 分钟 4 道题" in RULES
+
+
+def test_the_reader_is_a_smart_beginner_and_every_point_takes_four_steps():
+    """After the ELI5 skill (user 2026-09-28): what it is, an analogy, the layers, so what."""
+    assert "零基础" in RULES
+    for step in ("是什么", "类比", "所以呢"):
+        assert step in RULES, step
+    assert "复述" in RULES  # the stopping point is understanding, not a length
+
+
+def test_terms_are_explained_in_the_sentence_where_they_first_appear():
+    assert "第一次出现" in RULES and "一句" in RULES
+    for kind in ("术语", "人名", "缩写"):
+        assert kind in RULES, kind
+
+
+def test_it_never_names_a_number_of_characters():
+    # A stated minimum becomes the finish line and a range becomes a cap (user 2026-09-28).
+    assert not re.search(r"\d+\s*字", RULES)
 
 
 def test_it_quotes_each_compressing_rule_it_overrides():

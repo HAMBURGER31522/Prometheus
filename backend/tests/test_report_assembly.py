@@ -107,20 +107,13 @@ FULL = {**SETTINGS, "report": {"depth": "full"}}
 STANDARD = {**SETTINGS, "report": {"depth": "standard"}}
 
 
-def test_full_depth_hands_the_agent_depth_md_and_more_time():
-    """「完整」精读 (PLAN 15.4.11): the extra rules file, a line pointing at it, 3× the time."""
-    kwargs = build_runner_kwargs(ROW, FULL, "n", "c", figures=False, model_supports_images=False)
-    names = [Path(path).name for path in kwargs["extra_files"] or []]
-    assert names == ["depth.md"]
-    assert all(Path(path).is_file() for path in kwargs["extra_files"] or [])
-    assert "depth.md" in kwargs["extra_prompt"]
-    assert kwargs["timeout"] == 3 * (1800 + 600 * 1)
-
-
-def test_full_depth_keeps_figures_alongside():
-    kwargs = build_runner_kwargs(ROW, FULL, "n", "c", figures=True, model_supports_images=True)
-    assert sorted(Path(path).name for path in kwargs["extra_files"] or []) == ["depth.md", "figures.md"]
-    assert "figures.md" in kwargs["extra_prompt"] and "depth.md" in kwargs["extra_prompt"]
+def test_the_single_vra_run_does_not_change_with_the_depth():
+    """「完整」 writes chapter by chapter (report/full.py) and never goes through this run (PLAN 15.4.11)."""
+    full = build_runner_kwargs(ROW, FULL, "n", "c", figures=True, model_supports_images=True)
+    standard = build_runner_kwargs(ROW, STANDARD, "n", "c", figures=True, model_supports_images=True)
+    assert full == standard
+    assert "depth.md" not in full["extra_prompt"]
+    assert [Path(path).name for path in full["extra_files"]] == ["figures.md"]
 
 
 def test_standard_depth_is_the_vra_run_unchanged():

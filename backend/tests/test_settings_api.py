@@ -207,10 +207,21 @@ def test_an_empty_custom_asr_key_keeps_the_saved_one(client):
 def test_report_depth_defaults_to_full_and_takes_standard(client):
     """「精读详细程度」(PLAN 15.4.11): 完整 by default, 标准 is VRA as it was."""
     body = client.get("/api/settings", headers=AUTH).json()
-    assert body.get("report") == {"depth": "full"}
+    assert body.get("report") == {"depth": "full", "review": True}
     body["report"]["depth"] = "standard"
     assert client.put("/api/settings", json=body, headers=AUTH).status_code == 200
-    assert client.get("/api/settings", headers=AUTH).json()["report"] == {"depth": "standard"}
+    assert client.get("/api/settings", headers=AUTH).json()["report"] == {"depth": "standard", "review": True}
+
+
+def test_the_review_is_on_by_default_and_can_be_turned_off(client):
+    """「讲清楚审校」(PLAN 15.4.11): on in 完整 mode unless the user turns it off."""
+    body = client.get("/api/settings", headers=AUTH).json()
+    body["report"]["review"] = False
+    assert client.put("/api/settings", json=body, headers=AUTH).status_code == 200
+    assert client.get("/api/settings", headers=AUTH).json()["report"] == {"depth": "full", "review": False}
+    body["report"]["review"] = "yes"
+    response = client.put("/api/settings", json=body, headers=AUTH)
+    assert response.status_code == 422 and response.json()["code"] == "INVALID_REPORT_REVIEW"
 
 
 def test_report_depth_only_accepts_full_or_standard(client):
