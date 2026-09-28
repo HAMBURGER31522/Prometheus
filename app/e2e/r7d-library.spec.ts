@@ -150,3 +150,35 @@ test("阅读页用「⋯ → 移到」移动文章，原来的分类下拉框不
   await expect(bar).toContainText("目的地");
   await expect(bar.getByTestId("reader-title")).toHaveText(title);
 });
+
+test("没有标签的文章，阅读页「⋯」里有「补全标签和摘要」，点了只补这两样", async ({ page }) => {
+  // Items finished before tags existed: strip the tags of every item as the app sees them.
+  await page.route(`${API}/api/items`, async (route) => {
+    const response = await route.fetch();
+    const rows = (await response.json()) as Record<string, unknown>[];
+    await route.fulfill({ response, json: rows.map((row) => ({ ...row, tags: null, description: null })) });
+  });
+  const sent: unknown[] = [];
+  await page.route(/\/api\/items\/[0-9a-f]+\/regenerate$/, async (route) => {
+    sent.push(route.request().postDataJSON());
+    await route.fulfill({ json: { queued: true } });
+  });
+  await page.goto("/");
+  await openTab(page, "知识库");
+  await categoryButton(page, UNCATEGORIZED).click();
+  await page.getByRole("list", { name: "条目" }).getByRole("button").first().click();
+  const bar = page.getByRole("toolbar", { name: "阅读" });
+  await bar.getByRole("button", { name: "条目操作" }).click();
+  await page.getByRole("menuitem", { name: "补全标签和摘要" }).click();
+  await expect.poll(() => sent).toEqual([{ only: "tags" }]);
+});
+
+test("已有标签的文章不显示「补全标签和摘要」", async ({ page }) => {
+  await page.goto("/");
+  await openTab(page, "知识库");
+  await categoryButton(page, UNCATEGORIZED).click();
+  await page.getByRole("list", { name: "条目" }).getByRole("button").first().click();
+  await page.getByRole("toolbar", { name: "阅读" }).getByRole("button", { name: "条目操作" }).click();
+  await expect(page.getByRole("menuitem", { name: "删除" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "补全标签和摘要" })).toHaveCount(0);
+});
