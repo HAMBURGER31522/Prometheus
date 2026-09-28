@@ -68,6 +68,21 @@ html[data-scrolling] ::-webkit-scrollbar-thumb { border-width: 3px; background-c
   transition: transform var(--p-dur) var(--p-ease);
 }
 .pz-image[data-dragging] { transition: none; cursor: grabbing; }
+.pz-svg { background: var(--paper); }
+.pz-nav {
+  position: fixed; top: 50%; width: 44px; height: 64px; margin-top: -32px; border: 0; border-radius: 12px;
+  background: var(--paper); color: var(--ink); opacity: .8; font-size: 32px; line-height: 1; cursor: pointer;
+}
+.pz-nav:hover { opacity: 1; }
+.pz-nav:disabled { opacity: .25; cursor: default; }
+.pz-prev { left: 20px; }
+.pz-next { right: 20px; }
+.pz-caption {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 12px;
+  align-items: baseline; max-width: min(80%, 900px); padding: 6px 14px; border-radius: 12px;
+  background: var(--paper); color: var(--ink); font-size: 14px; line-height: 1.5; cursor: default;
+}
+.pz-count { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 `;
 
 const SCRIPT = `
@@ -150,9 +165,23 @@ const SCRIPT = `
     }
   });
 
-  /* click-to-zoom images (like Discourse): float up from the page, wheel to zoom around
-     the cursor, drag to move, click outside or Esc to fly back */
+  /* click-to-zoom pictures (like Discourse): float up from the page, wheel to zoom around the
+     cursor, drag to move, the side buttons or ← → for the next picture in page order (PLAN
+     15.4.11), click outside or Esc to fly back. Screenshots and drawn diagrams (top-level SVG) alike. */
   var open = null;
+  function pictures() {
+    return Array.prototype.filter.call(document.querySelectorAll(".paper img, main img, .paper svg, main svg"), function (el) {
+      if (el.closest("a, button, .pz-lightbox")) return false;
+      if (el.tagName.toLowerCase() !== "svg") return true;
+      if (el.parentElement && el.parentElement.closest("svg")) return false;
+      return el.getBoundingClientRect().width >= 160;
+    });
+  }
+  function captionOf(el) {
+    var figure = el.closest("figure");
+    var caption = figure && figure.querySelector("figcaption");
+    return caption ? caption.textContent.trim() : el.getAttribute("alt") || "";
+  }
   function place(state) {
     state.image.style.transform = "translate(" + state.x + "px," + state.y + "px) scale(" + state.scale + ")";
   }
@@ -161,36 +190,109 @@ const SCRIPT = `
     state.x = rect.left;
     state.y = rect.top;
   }
-  function openImage(img) {
-    if (open) return;
-    var rect = img.getBoundingClientRect();
-    var overlay = document.createElement("div");
-    overlay.className = "pz-lightbox";
-    var image = img.cloneNode(true);
-    image.className = "pz-image";
+  function navButton(label, text, className, onClick) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "pz-nav " + className;
+    button.setAttribute("aria-label", label);
+    button.textContent = text;
+    button.addEventListener("click", function (event) {
+      event.stopPropagation();
+      onClick();
+    });
+    return button;
+  }
+  function drag(state, image, event) {
+    event.preventDefault();
+    var startX = event.clientX, startY = event.clientY, fromX = state.x, fromY = state.y;
+    image.setAttribute("data-dragging", "");
+    image.setPointerCapture(event.pointerId);
+    function move(e) {
+      state.x = fromX + e.clientX - startX;
+      state.y = fromY + e.clientY - startY;
+      place(state);
+    }
+    function up() {
+      image.removeAttribute("data-dragging");
+      image.removeEventListener("pointermove", move);
+      image.removeEventListener("pointerup", up);
+    }
+    image.addEventListener("pointermove", move);
+    image.addEventListener("pointerup", up);
+  }
+  /* show el in the open viewer: flying up from its place, or straight in the middle */
+  function mount(state, el, fly) {
+    if (state.image) {
+      state.image.remove();
+      state.img.style.visibility = "";
+    }
+    var rect = el.getBoundingClientRect();
+    var image = el.cloneNode(true);
+    image.setAttribute("class", el.tagName.toLowerCase() === "svg" ? "pz-image pz-svg" : "pz-image");
     image.removeAttribute("width");
     image.removeAttribute("height");
     image.style.width = rect.width + "px";
     image.style.height = rect.height + "px";
-    overlay.appendChild(image);
-    document.body.appendChild(overlay);
-    var state = { img: img, overlay: overlay, image: image, width: rect.width, x: 0, y: 0, scale: 1, moved: false };
-    var natural = img.naturalWidth || rect.width * 2;
-    var fit = Math.min((innerWidth * 0.9) / rect.width, (innerHeight * 0.9) / rect.height, Math.max(1, natural / rect.width));
-    state.fit = fit;
+    image.style.visibility = "";
+    state.overlay.insertBefore(image, state.overlay.firstChild);
+    state.img = el;
+    state.image = image;
+    state.width = rect.width;
+    var natural = el.naturalWidth || rect.width * 2;
+    state.fit = Math.min((innerWidth * 0.9) / rect.width, (innerHeight * 0.8) / rect.height, Math.max(1, natural / rect.width));
+    el.style.visibility = "hidden";
+    image.addEventListener("pointerdown", function (event) { drag(state, image, event); });
+    function centre() {
+      state.scale = state.fit;
+      state.x = (innerWidth - rect.width * state.fit) / 2;
+      state.y = (innerHeight - rect.height * state.fit) / 2;
+      place(state);
+    }
     image.setAttribute("data-dragging", "");
-    fromRect(state, rect);
-    place(state);
-    img.style.visibility = "hidden";
-    open = state;
+    if (fly) {
+      fromRect(state, rect);
+      place(state);
+    } else {
+      centre();
+    }
     requestAnimationFrame(function () {
       image.removeAttribute("data-dragging");
-      overlay.setAttribute("data-open", "");
-      state.scale = fit;
-      state.x = (innerWidth - rect.width * fit) / 2;
-      state.y = (innerHeight - rect.height * fit) / 2;
-      place(state);
+      state.overlay.setAttribute("data-open", "");
+      if (fly) centre();
     });
+    state.index = state.list.indexOf(el);
+    state.count.textContent = state.index + 1 + " / " + state.list.length;
+    state.caption.textContent = captionOf(el);
+    state.prev.disabled = state.index <= 0;
+    state.next.disabled = state.index >= state.list.length - 1;
+  }
+  function step(delta) {
+    if (!open) return;
+    var next = open.list[open.index + delta];
+    if (!next) return;
+    next.scrollIntoView({ block: "center" }); /* the page behind follows, so closing flies back to it */
+    mount(open, next, false);
+  }
+  function openImage(el) {
+    if (open) return;
+    var overlay = document.createElement("div");
+    overlay.className = "pz-lightbox";
+    var state = { overlay: overlay, image: null, img: el, list: pictures(), x: 0, y: 0, scale: 1 };
+    state.prev = navButton("上一张", "‹", "pz-prev", function () { step(-1); });
+    state.next = navButton("下一张", "›", "pz-next", function () { step(1); });
+    var bar = document.createElement("div");
+    bar.className = "pz-caption";
+    state.count = document.createElement("span");
+    state.count.className = "pz-count";
+    state.caption = document.createElement("span");
+    bar.appendChild(state.count);
+    bar.appendChild(state.caption);
+    overlay.appendChild(state.prev);
+    overlay.appendChild(state.next);
+    overlay.appendChild(bar);
+    document.body.appendChild(overlay);
+    open = state;
+    mount(state, el, true);
     overlay.addEventListener("wheel", function (event) {
       event.preventDefault();
       var next = Math.min(state.fit * 4, Math.max(state.fit * 0.5, state.scale * Math.exp(-event.deltaY * 0.0015)));
@@ -199,26 +301,6 @@ const SCRIPT = `
       state.scale = next;
       place(state);
     }, { passive: false });
-    image.addEventListener("pointerdown", function (event) {
-      event.preventDefault();
-      var startX = event.clientX, startY = event.clientY, fromX = state.x, fromY = state.y;
-      state.moved = false;
-      image.setAttribute("data-dragging", "");
-      image.setPointerCapture(event.pointerId);
-      function move(e) {
-        state.x = fromX + e.clientX - startX;
-        state.y = fromY + e.clientY - startY;
-        if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 3) state.moved = true;
-        place(state);
-      }
-      function up() {
-        image.removeAttribute("data-dragging");
-        image.removeEventListener("pointermove", move);
-        image.removeEventListener("pointerup", up);
-      }
-      image.addEventListener("pointermove", move);
-      image.addEventListener("pointerup", up);
-    });
     overlay.addEventListener("click", function (event) {
       if (event.target === overlay) closeImage();
     });
@@ -238,7 +320,23 @@ const SCRIPT = `
     state.image.addEventListener("transitionend", done, { once: true });
     setTimeout(done, 700);
   }
-  addEventListener("keydown", function (event) { if (event.key === "Escape") closeImage(); });
+  addEventListener("keydown", function (event) {
+    if (!open) return;
+    if (event.key === "Escape") closeImage();
+    else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      step(event.key === "ArrowRight" ? 1 : -1);
+    }
+  });
+  /* one listener for every picture, also those added after load */
+  document.addEventListener("click", function (event) {
+    if (open || !event.target.closest) return;
+    var el = event.target.closest("img, svg");
+    while (el && el.parentElement && el.parentElement.closest("svg")) el = el.parentElement.closest("svg");
+    if (!el || pictures().indexOf(el) < 0) return;
+    event.preventDefault();
+    openImage(el);
+  });
 
   function ready() {
     /* a chart is drawn for about 900px: a wider paper must not blow it up past its own width */
@@ -249,11 +347,7 @@ const SCRIPT = `
       svg.style.maxWidth = width + "px";
       svg.classList.add("pz-capped");
     });
-    document.querySelectorAll(".paper img, main img").forEach(function (img) {
-      if (img.closest("a")) return;
-      img.classList.add("pz-zoomable");
-      img.addEventListener("click", function (event) { event.preventDefault(); openImage(img); });
-    });
+    pictures().forEach(function (el) { el.classList.add("pz-zoomable"); });
     post({ type: "toc", items: toc() });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
