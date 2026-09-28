@@ -68,7 +68,7 @@ def model_ask(data_dir: Path, work: Path, thinking: str):
 def summary(result: dict) -> str:
     qa, faithful, supplements = result["qa"], result["faithfulness"], result["supplements"]
     citation, components, cost = result["citation"], result["components"], result["cost"]
-    points = result["points_coverage"]
+    points, skipped, time = result["points_coverage"], result.get("skipped", 0), result.get("time")
     shown = {name: count for name, count in components.items() if count and name != "total"}
     return "\n".join([
         f"### {result['title']}（{result['label']}）",
@@ -77,7 +77,9 @@ def summary(result: dict) -> str:
         (f"- 忠实度抽检：{faithful['sampled']} 句，有依据 {faithful['有依据']}、部分有依据 {faithful['部分有依据']}、"
          f"无依据 {faithful['无依据']}"),
         f"- 补充说明：{supplements['checked']} 条，与视频矛盾 {supplements['矛盾']} 条",
-        f"- 要点覆盖：{'无（没有要点账本）' if points is None else f'{points:.1%}'}",
+        f"- 要点覆盖：{'无（没有要点账本）' if points is None else f'{points:.1%}（跳过 {skipped} 条不计）'}",
+        (f"- 时间覆盖：{time['share']:.1%}，最长漏写 {time['longest_gap_min']:.1f} 分钟（跳过的 {time['excluded']} 个单元不计）"
+         if time else "- 时间覆盖：无（没有要点账本）"),
         f"- 引用覆盖：{citation['share']:.1%}，最长一段没有引用 {citation['longest_gap_min']:.1f} 分钟",
         f"- 组件：共 {components['total']}（{'、'.join(f'{k} {v}' for k, v in shown.items()) or '无'}）",
         f"- 字数：报告 {result['cjk']['report']} 个汉字，转写 {result['cjk']['transcript']} 个汉字",
@@ -115,11 +117,14 @@ def main(argv=None) -> int:
             continue
         report = Path(overrides.get(row["id"]) or
                       paths.library_folder(args.data_dir, row["library_path"]) / paths.LIBRARY_FILES["html"])
-        keypoints = cache / "keypoints.json"
-        points = [p["id"] for p in json.loads(keypoints.read_text(encoding="utf-8"))["points"]] \
-            if keypoints.is_file() else None
+        # A 完整 report has a ledger and a plan: points skipped for a reason count neither way (E14).
+        keypoints, coverage = cache / "keypoints.json", cache / "coverage.json"
+        ledger = json.loads(keypoints.read_text(encoding="utf-8")) if keypoints.is_file() else None
+        skipped = {entry["id"] for entry in json.loads(coverage.read_text(encoding="utf-8")).get("skipped") or []} \
+            if coverage.is_file() else set()
         result = evaluation.evaluate_report(units, report.read_text(encoding="utf-8"), questions_file, ask,
-                                            points=points)
+                                            points=[p["id"] for p in ledger["points"]] if ledger else None,
+                                            skipped=skipped, ledger=ledger)
         result.update(id=row["id"], title=title, label=args.label, report=str(report))
         target = args.out / "results" / f"{row['id']}-{args.label}.json"
         target.parent.mkdir(parents=True, exist_ok=True)

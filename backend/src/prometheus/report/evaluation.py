@@ -207,8 +207,36 @@ def citation_coverage(html: str, units: list) -> dict:
             "longest_gap_min": longest}
 
 
+def _marks(html: str) -> set:
+    return {token for node in parse_html(html).walk() for token in (node.attrs.get("data-points") or "").split()}
+
+
 def time_coverage(html: str, units: list, ledger, skipped=frozenset()):
-    return None
+    """E14's 时间覆盖 for a report with a ledger: the share of the transcript's units under points the
+    report marks, and the longest run of units under neither a written point nor a skip (the ledger's
+    skipped stretches and the plan's skipped points are left out of both)."""
+    if not ledger:
+        return None
+    order = _order(units)
+
+    def span(entry: dict) -> range:
+        first, last = (order.get(unit_id) for unit_id in entry.get("units") or [None, None])
+        return range(first, last + 1) if first is not None and last is not None else range(0)
+
+    marked = _marks(html)
+    covered = {index for point in ledger["points"] if point["id"] in marked for index in span(point)}
+    excluded = {index for point in ledger["points"] if point["id"] in skipped for index in span(point)}
+    excluded |= {index for skip in ledger.get("skips") or [] for index in span(skip)}
+    excluded -= covered
+    counted = len(units) - len(excluded)
+    longest, start = 0.0, None
+    for index, unit in enumerate(units):
+        if index in covered or index in excluded:
+            start = None
+            continue
+        start = unit["start_ms"] if start is None else start
+        longest = max(longest, (unit["end_ms"] - start) / 60000)
+    return {"share": len(covered) / counted if counted else 0.0, "longest_gap_min": longest, "excluded": len(excluded)}
 
 
 def points_coverage(html: str, points: list, skipped=frozenset()):
@@ -494,7 +522,7 @@ def ensure_questions(units: list, questions_file: Path, call, workers: int = 3) 
 
 
 def evaluate_report(units: list, html: str, questions_file, ask, *, points=None, skipped=frozenset(),
-                    seed: int = 7, workers: int = 3) -> dict:
+                    ledger=None, seed: int = 7, workers: int = 3) -> dict:
     calls: list = []
 
     def call(prompt: str) -> str:
@@ -530,6 +558,8 @@ def evaluate_report(units: list, html: str, questions_file, ask, *, points=None,
         "supplements": {"checked": len(supplements), **{name: checked.count(name) for name in CONTRADICTION},
                         "ungraded": checked.count(None)},
         "points_coverage": points_coverage(html, points or [], skipped),
+        "time": time_coverage(html, units, ledger, skipped),
+        "skipped": len(skipped),
         "citation": citation_coverage(html, units),
         "chapters": chapter_density(html),
         "components": component_counts(html),
