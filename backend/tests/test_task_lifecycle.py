@@ -80,7 +80,7 @@ def test_unexpected_failure_is_labelled_as_unclassified(client, monkeypatch):
     assert row["error_message"] == "KeyError: 'oops'"
 
 
-KEPT = ["asr.json", "canonical-transcript.jsonl", "input.json", "run.trace.jsonl", "mindmap.json",
+KEPT = ["asr.json", "canonical-transcript.jsonl", "coverage.json", "input.json", "run.trace.jsonl", "mindmap.json",
         "segments.json", "segments.raw.json", "segments.fine.json", "source.info.json", "transcript.md"]
 SCRATCH = ["media.m4a", "media.info.json", "video.mp4", "audio.wav", "pi.events.jsonl",
            "SKILL.md", "report.html", "frames/f_000080.jpg", "sessions/a.jsonl"]

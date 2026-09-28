@@ -94,6 +94,7 @@ export const api = {
     json<unknown>("POST", `/api/categories/${id}/merge`, { into_id: intoId }),
 
   reportHtml: (id: string) => text(`/api/items/${id}/report`),
+  coverage: (id: string) => json<Coverage>("GET", `/api/items/${id}/coverage`),
   mindmapTree: (id: string) => json<MindmapTree>("GET", `/api/items/${id}/mindmap?format=json`),
   mindmapMarkdown: (id: string) => text(`/api/items/${id}/mindmap`),
   subtitle: (id: string, variant: "fixed" | "raw") =>
@@ -115,6 +116,8 @@ export interface ItemRow {
   figures: number;
   status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted";
   stage: string | null;
+  /** Where a long stage is, e.g. 「写作（第 3/10 章）」 (PLAN 15.4.11). */
+  stage_detail: string | null;
   mindmap_status: "ok" | "failed" | null;
   subtitle_status: "ok" | "failed" | null;
   error_code: string | null;
@@ -207,8 +210,8 @@ export interface Settings {
   asr: { backend: "local" | "cloud" | "custom"; custom: { base_url: string; api_key: string; model: string } };
   network: { proxy: string; youtube_cookies_file: string };
   figures_default: boolean;
-  /** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was. */
-  report: { depth: "full" | "standard" };
+  /** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was; review = 讲清楚审校 in 完整. */
+  report: { depth: "full" | "standard"; review: boolean };
 }
 
 /** coverage.json of a 完整 report (PLAN 15.4.11): what was written, skipped with a reason, or left out. */

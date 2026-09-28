@@ -4,20 +4,7 @@ import { type CSSProperties, type FormEvent, useEffect, useState } from "react";
 import { ApiError, type ItemRow, api, itemTitle } from "../../shared/api";
 import { useNav } from "../../shared/NavContext";
 import { ScrollArea } from "../../shared/ScrollArea";
-
-const STAGES: [string, string][] = [
-  ["resolve", "解析链接"],
-  ["download", "下载"],
-  ["transcribe", "转写"],
-  ["transcript", "整理转写"],
-  ["frames", "抽帧"],
-  ["report", "写精读报告"],
-  ["finalize", "定稿"],
-  ["subtitle_fix", "字幕纠错"],
-  ["mindmap", "生成导图"],
-  ["classify", "分类"],
-  ["publish", "放入知识库"],
-];
+import { STAGES, stageText } from "./stages";
 
 const STATUS: Record<ItemRow["status"], string> = {
   queued: "排队中",
@@ -162,7 +149,7 @@ function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }
         <span className="muted queue-url">{row.source_url}</span>
         {row.status === "running" && (
           <span className="queue-stage">
-            {STAGES[index]?.[1] ?? "准备中"}
+            {stageText(row)}
             <span className="muted">
               {" "}
               · {Math.max(index, 0) + 1}/{STAGES.length}

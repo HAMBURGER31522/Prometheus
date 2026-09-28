@@ -111,6 +111,8 @@ def build_impls(data_dir):
         shutil.copy2(
             _fixture("report.html"), paths.work_dir(data_dir, ctx.item_id) / "report.html",
         )
+        # A 完整 report also leaves its coverage (PLAN 15.4.11): the reader's 「要点 10/11」.
+        shutil.copy2(_fixture("coverage.json"), paths.coverage_file(data_dir, ctx.item_id))
 
     def finalize(ctx):
         html = (_fixture("report.html")).read_text(encoding="utf-8")

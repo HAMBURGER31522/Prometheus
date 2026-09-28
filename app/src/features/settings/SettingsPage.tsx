@@ -206,7 +206,7 @@ export function SettingsPage() {
                 type="radio"
                 name="report-depth"
                 checked={settings.report.depth === "full"}
-                onChange={() => update({ report: { depth: "full" } })}
+                onChange={() => update({ report: { ...settings.report, depth: "full" } })}
               />
               <span>
                 <b>完整</b>
@@ -218,7 +218,7 @@ export function SettingsPage() {
                 type="radio"
                 name="report-depth"
                 checked={settings.report.depth === "standard"}
-                onChange={() => update({ report: { depth: "standard" } })}
+                onChange={() => update({ report: { ...settings.report, depth: "standard" } })}
               />
               <span>
                 <b>标准</b>
@@ -226,6 +226,19 @@ export function SettingsPage() {
               </span>
             </label>
           </div>
+          {settings.report.depth === "full" && (
+            <label className="switch-label field">
+              <button
+                type="button"
+                role="switch"
+                className="switch"
+                aria-checked={settings.report.review}
+                aria-label="讲清楚审校"
+                onClick={() => update({ report: { ...settings.report, review: !settings.report.review } })}
+              />
+              讲清楚审校：让一位零基础读者逐章追问，看不懂的地方退回去补写（多几次模型调用）
+            </label>
+          )}
         </section>
 
         <section className="section card">

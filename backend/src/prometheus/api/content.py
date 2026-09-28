@@ -58,6 +58,15 @@ async def report(request: Request, item_id: str):
     return Response(text, media_type="text/html")
 
 
+@router.get("/api/items/{item_id}/coverage")
+async def coverage(request: Request, item_id: str):
+    """「要点 142/146」 in the reader (PLAN 15.4.11); only 完整 reports have one."""
+    text = _read_or_none(paths.coverage_file(request.app.state.data_dir, item_id))
+    if text is None:
+        return JSONResponse({"code": "COVERAGE_NOT_READY"}, status_code=404)
+    return json.loads(text)
+
+
 @router.get("/api/items/{item_id}/mindmap")
 async def mindmap(request: Request, item_id: str, format: str = "md"):
     data_dir = request.app.state.data_dir
