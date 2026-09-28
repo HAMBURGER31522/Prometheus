@@ -18,6 +18,7 @@ from pathlib import Path
 
 from prometheus import paths
 from prometheus import runtime as runtime_mod
+from prometheus.library import db
 from prometheus.library import items as items_store
 from prometheus.llm import one_shot
 from prometheus.report import evaluation
@@ -36,6 +37,7 @@ def main(argv=None, impls=None) -> int:
     parser.add_argument("--frames", action="store_true")
     args = parser.parse_args(argv)
     data_dir = args.data_dir.resolve()  # Pi runs elsewhere: relative paths would point astray
+    db.init_db(data_dir)  # an older data dir gets the new columns, as the app does at startup
 
     rows = [items_store.get_item(data_dir, item_id) for item_id in args.items]
     refused = [item_id for item_id, row in zip(args.items, rows, strict=True) if not row or row["status"] != "done"]
