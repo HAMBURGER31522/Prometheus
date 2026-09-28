@@ -88,6 +88,16 @@ def test_frames_are_chosen_by_what_they_show_with_no_count_limit():
     assert "互补" in task and "不重复" in task  # the caption adds to the text, never repeats it
 
 
+def test_the_writer_sees_what_each_candidate_frame_shows_and_how_to_decline_one():
+    ledger = [{"file": "f_000150.jpg", "t": 150.0, "label": "02:30", "kind": "幻灯片", "what": "研磨度对照卡", "useful": True},
+              {"file": "f_000170.jpg", "t": 170.0, "label": "02:50", "kind": "口播人像", "what": "讲者对着镜头", "useful": False}]
+    task = prompt(figures=True, frame_notes=ledger)
+    task = task[task.index("## 任务"):]
+    assert "f_000150.jpg" in task and "02:30" in task and "幻灯片" in task and "研磨度对照卡" in task
+    assert "f_000170.jpg" not in task  # a talking head is not offered
+    assert "<!-- 不用 f_000150.jpg：" in task or "<!-- 不用 f_" in task
+
+
 def test_an_hour_long_video_uses_hours_in_the_section_time():
     long_plan = {**PLAN, "chapters": [{**chapter, "ranges": [["01:02:00", "01:04:00"]]} for chapter in PLAN["chapters"]]}
     text = write.chapter_prompt(long_plan, 2, [], POINTS, UNITS, figures=False, attached="")

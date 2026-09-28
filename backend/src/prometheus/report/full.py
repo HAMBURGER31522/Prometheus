@@ -217,7 +217,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
 
 
 def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, figures: bool, review: bool,
-                   progress, workers: int = 3) -> list:
+                   progress, workers: int = 3, look=None) -> list:
     work = Path(work)
     points = {point["id"]: point for point in ledger["points"]}
     owned = planning.assign(plan, ledger)

@@ -193,3 +193,24 @@ def test_every_pi_run_gets_what_is_left_of_the_stage_time(data_dir, monkeypatch,
     with pytest.raises(PiRunError, match="timed out"):
         late(tmp_path, "任务", "plan.json")
     assert seen == {}
+
+
+def test_the_frame_ledger_looks_through_the_configured_model_with_the_frames_attached(data_dir, monkeypatch, tmp_path):
+    ctx = _ctx(data_dir, figures=1)
+    seen = {}
+    monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
+    monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
+    monkeypatch.setattr(workspace_mod.full, "write_chapters", lambda *args, **kwargs: seen.update(look=kwargs["look"]) or [])
+    monkeypatch.setattr(workspace_mod.full, "finish", lambda *args: {})
+
+    def fake_one_shot(work_dir, **kwargs):
+        seen["call"] = kwargs
+        return "{}"
+
+    monkeypatch.setattr(workspace_mod.one_shot, "run_one_shot", fake_one_shot)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="node.exe",
+                                        pi_cli="cli.js", figures=True, progress=lambda *args: None)
+    frame = tmp_path / "f_000030.jpg"
+    assert seen["look"]("看图", [frame]) == "{}"
+    assert seen["call"]["files"] == [frame] and seen["call"]["prompt"] == "看图"

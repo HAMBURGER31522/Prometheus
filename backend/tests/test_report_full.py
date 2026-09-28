@@ -227,3 +227,38 @@ def test_with_figures_a_chapter_gets_only_the_frames_in_its_time(tmp_path):
     assert sorted(path.name for path in first.iterdir()) == ["f_000030.jpg", "frames.json"]
     assert [frame["file"] for frame in json.loads((first / "frames.json").read_text(encoding="utf-8"))] == ["f_000030.jpg"]
     assert "figures.md" in pi.runs("ch-01.html")[0] and "配图规则" in pi.runs("ch-01.html")[0]
+
+
+class Look:
+    """look(prompt, files): the frame ledger's one look per chapter; every frame is a slide."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, prompt, files):
+        self.calls.append([path.name for path in files])
+        return json.dumps({"frames": {path.name: {"kind": "幻灯片", "what": f"讲义第{path.name[2:8]}秒那页"}
+                                      for path in files}}, ensure_ascii=False)
+
+
+def test_the_frame_ledger_is_offered_to_the_writer_and_an_unused_slide_is_sent_back_once_looked_at(tmp_path):
+    frames = tmp_path / "frames"
+    frames.mkdir()
+    listed = [{"file": "f_000030.jpg", "t": 30.0, "label": "00:30"}, {"file": "f_000400.jpg", "t": 400.0, "label": "06:40"}]
+    (frames / "frames.json").write_text(json.dumps(listed), encoding="utf-8")
+    for frame in listed:
+        (frames / frame["file"]).write_bytes(b"jpg")
+    units, pi, look = make_units(), Pi(), Look()
+    ledger = full.run_keypoints(tmp_path, units, Model())
+    plan, _problems = full.run_plan(tmp_path, ledger, pi, figures=True, input_json=INPUT)
+    chapters = full.write_chapters(tmp_path, plan, ledger, units, pi, Model(), figures=True, review=False,
+                                   progress=lambda *args: None, workers=1, look=look)
+    assert look.calls == [["f_000030.jpg"], ["f_000400.jpg"]]
+    first = pi.runs("ch-01.html")
+    assert "f_000030.jpg" in first[0] and "讲义第000030秒那页" in first[0]
+    assert len(first) == 3 and "f_000030.jpg" in first[1]  # never used, never declined: two revisions
+    assert chapters[0]["check"]["unused_frames"] == ["f_000030.jpg"]
+    again = Look()
+    full.write_chapters(tmp_path, plan, ledger, units, Pi(), Model(), figures=True, review=False,
+                        progress=lambda *args: None, workers=1, look=again)
+    assert again.calls == []  # the ledger and the chapters are kept

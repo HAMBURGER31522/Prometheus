@@ -43,6 +43,18 @@ def test_the_judge_sees_the_transcript_and_sorts_each_question():
     assert [v["kind"] if v else None for v in verdicts] == ["原文有答案", "术语或背景", None]
 
 
+def test_the_reader_may_ask_for_a_picture_where_one_would_help():
+    assert "图" in review.reader_prompt(CHAPTER) and "pictures" in review.reader_prompt(CHAPTER)
+    reply = json.dumps({"questions": [], "pictures": [
+        {"quote": "水温和研磨一起决定萃取率", "want": "水温、研磨和萃取率的关系图"},
+        {"quote": "不在本章里的一句话", "want": "随便一张图"},
+    ]}, ensure_ascii=False)
+    pictures = review.parse_pictures(reply, CHAPTER)
+    assert pictures == [{"quote": "水温和研磨一起决定萃取率", "want": "水温、研磨和萃取率的关系图"}]
+    fixes = review.fixes([], [], pictures)
+    assert len(fixes) == 1 and "关系图" in fixes[0] and "只画本章正文已经写到的内容" in fixes[0]
+
+
 def test_fixes_answer_from_the_source_or_with_a_supplement_and_drop_the_rest():
     questions = [{"quote": "浅烘豆要用高一点的水温", "question": "高一点是多少度？"},
                  {"quote": "萃取率", "question": "萃取率是什么？"},

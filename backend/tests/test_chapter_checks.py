@@ -70,6 +70,27 @@ def test_a_paragraph_marking_several_points_is_shared_between_them():
     assert alone["K001"] == alone["K002"] and alone["K001"] < len(re.sub(r"[^一-鿿]", "", both)) 
 
 
+FRAMES = [{"file": "f_000030.jpg", "t": 30.0, "label": "00:30", "kind": "幻灯片", "what": "三种烘焙度的颜色对比", "useful": True},
+          {"file": "f_000050.jpg", "t": 50.0, "label": "00:50", "kind": "口播人像", "what": "讲者对着镜头", "useful": False}]
+
+
+def test_an_informative_frame_left_out_without_a_reason_is_sent_back():
+    result = checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)
+    assert result["unused_frames"] == ["f_000030.jpg"]
+    problem = next(problem for problem in result["problems"] if "f_000030.jpg" in problem)
+    assert "三种烘焙度的颜色对比" in problem and "<!-- 不用 f_000030.jpg：" in problem
+
+
+def test_a_frame_used_or_declined_with_a_reason_is_fine():
+    figure = '<figure class="report-figure"><img src="frames/f_000030.jpg" alt="颜色对比"><figcaption>浅中深三种颜色</figcaption></figure>'
+    used = GOOD.replace("</section>", figure + "</section>")
+    assert checks.check_chapter(used, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)["unused_frames"] == []
+    declined = GOOD + "\n<!-- 不用 f_000030.jpg：和正文里的对照表是同一组信息 -->"
+    assert checks.check_chapter(declined, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)["unused_frames"] == []
+    no_reason = GOOD + "\n<!-- 不用 f_000030.jpg -->"
+    assert checks.check_chapter(no_reason, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)["unused_frames"] == ["f_000030.jpg"]
+
+
 def test_a_clean_chapter_has_no_problems():
     assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["problems"] == []
 

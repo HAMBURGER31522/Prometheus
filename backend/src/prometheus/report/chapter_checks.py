@@ -96,7 +96,7 @@ def _bar(source: str) -> float:
     return max(THIN_BASE, THIN_RATIO * _size(source, word=SOURCE_WORD))
 
 
-def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, sources=None) -> dict:
+def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, sources=None, frames=None) -> dict:
     """`sources`: {point id: the text of the units it rests on}; without it there is no length check."""
     marking = _marking(fragment)
     root = parse_html(fragment)

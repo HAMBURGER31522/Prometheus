@@ -42,7 +42,7 @@ def _time_label(chapter: dict, hours: bool) -> str:
 
 
 def chapter_prompt(plan: dict, number: int, owned: list, points: dict, units: list, *,
-                   figures: bool, attached: str) -> str:
+                   figures: bool, attached: str, frame_notes=None) -> str:
     chapters = plan["chapters"]
     chapter = chapters[number - 1]
     last_end = max([end for c in chapters for _start, end in chapter_ranges(c) or []]
