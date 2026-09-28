@@ -68,6 +68,26 @@ def test_another_report_of_the_item_meets_the_same_questions(tmp_path):
     assert new["report"] == str(other)
 
 
+def test_a_full_report_is_measured_against_its_ledger_with_the_plans_skips_left_out(tmp_path):
+    data_dir, item_id = data_dir_with_item(tmp_path)
+    cache = paths.cache_dir(data_dir, item_id)
+    ledger = {"points": [{"id": "K001", "units": ["unit-000001", "unit-000002"]},
+                         {"id": "K002", "units": ["unit-000009", "unit-000010"]}], "skips": []}
+    (cache / "keypoints.json").write_bytes(json.dumps(ledger).encode("utf-8"))
+    (cache / "coverage.json").write_bytes(json.dumps({"skipped": [{"id": "K002", "reason": "广告推广"}]},
+                                                     ensure_ascii=False).encode("utf-8"))
+    marked = tmp_path / "marked.html"
+    marked.write_bytes(REPORT.replace("<p data-source-units", '<p data-points="K001" data-source-units').encode("utf-8"))
+    out = tmp_path / "out"
+    assert load_runner().main([str(data_dir), "--out", str(out), "--label", "new", "--fake",
+                               "--report", f"{item_id}={marked}"]) == 0
+    result = json.loads((out / "results" / f"{item_id}-new.json").read_text(encoding="utf-8"))
+    assert result["points_coverage"] == 1.0  # K002 was skipped for a reason
+    assert result["time"]["excluded"] == 2
+    summary = (out / "summary-new.md").read_text(encoding="utf-8")
+    assert "时间覆盖" in summary and "跳过 1 条" in summary
+
+
 def test_questions_only_stops_after_the_questions(tmp_path):
     data_dir, item_id = data_dir_with_item(tmp_path)
     out = tmp_path / "out"

@@ -207,6 +207,10 @@ def citation_coverage(html: str, units: list) -> dict:
             "longest_gap_min": longest}
 
 
+def time_coverage(html: str, units: list, ledger, skipped=frozenset()):
+    return None
+
+
 def points_coverage(html: str, points: list, skipped=frozenset()):
     """Share of the key points (not legally skipped) that some data-points attribute marks."""
     wanted = [point for point in points if point not in skipped]

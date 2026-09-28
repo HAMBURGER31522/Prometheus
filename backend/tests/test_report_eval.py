@@ -49,6 +49,22 @@ def test_points_coverage_counts_marked_points_and_skips_legal_skips():
     assert ev.points_coverage(REPORT, []) is None
 
 
+def test_time_coverage_counts_the_units_of_written_points_and_leaves_the_skipped_out():
+    """E14 「时间覆盖 ≥ 90% 且最长漏写 ≤ 2 分钟（不算跳过段）」 from the ledger, not from citations."""
+    thirty = [{"unit_id": f"unit-{i:06d}", "start_ms": i * 30_000, "end_ms": (i + 1) * 30_000, "canonical_text": "x"}
+              for i in range(10)]
+    ledger = {"points": [{"id": "K001", "units": ["unit-000000", "unit-000001"]},
+                         {"id": "K002", "units": ["unit-000002", "unit-000003"]},
+                         {"id": "K003", "units": ["unit-000004", "unit-000005"]},
+                         {"id": "K004", "units": ["unit-000006", "unit-000006"]}],
+              "skips": [{"units": ["unit-000007", "unit-000007"], "reason": "寒暄与课堂管理"}]}
+    html = '<p data-points="K001 K002">写到了。</p>'
+    result = ev.time_coverage(html, thirty, ledger, skipped={"K004"})
+    # units 0–3 written, 6 (a skipped point) and 7 (a skipped stretch) left out, 4–5 and 8–9 missing
+    assert result == {"share": 0.5, "longest_gap_min": 1.0, "excluded": 2}
+    assert ev.time_coverage(html, thirty, None) is None
+
+
 def test_chapter_density_is_characters_per_minute_of_source():
     chapters = ev.chapter_density(REPORT)
     assert [chapter["title"] for chapter in chapters] == ["第一章", "第二章"]
