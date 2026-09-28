@@ -262,3 +262,23 @@ def test_the_frame_ledger_is_offered_to_the_writer_and_an_unused_slide_is_sent_b
     full.write_chapters(tmp_path, plan, ledger, units, Pi(), Model(), figures=True, review=False,
                         progress=lambda *args: None, workers=1, look=again)
     assert again.calls == []  # the ledger and the chapters are kept
+
+
+def test_the_assembled_report_goes_through_finalize_with_its_frames_inlined(tmp_path):
+    """E14 ①「拼装……通过 finalize 的检查」: placeholders filled, frames inlined, nothing external."""
+    from prometheus.report.finalize import finalize_report
+
+    frames = tmp_path / "frames"
+    frames.mkdir()
+    (frames / "f_000030.jpg").write_bytes(b"\xff\xd8jpg")
+    (tmp_path / "source.info.json").write_text(json.dumps({"description": "视频简介原文"}, ensure_ascii=False),
+                                               encoding="utf-8")
+    figure = '<figure class="report-figure" data-frame-t="30"><img src="frames/f_000030.jpg" alt="颜色"><figcaption>颜色</figcaption></figure>'
+    pi = Pi(chapter=lambda prompt, attempt: section(prompt).replace("</section>", figure + "</section>"))
+    pipeline(tmp_path, pi=pi, review=False)
+    final = tmp_path / "out" / "精读.html"
+    title = finalize_report(tmp_path / "report.html", final, tmp_path)
+    html = final.read_text(encoding="utf-8")
+    assert title == "手冲咖啡"
+    assert "{{" not in html and "视频简介原文" in html
+    assert 'src="frames/' not in html and "data:image/jpeg;base64," in html
