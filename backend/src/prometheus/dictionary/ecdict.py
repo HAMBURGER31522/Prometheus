@@ -169,4 +169,6 @@ def lookup(data_dir, word: str):
         "phonetic": row[1] or "",
         "translation": [line.strip() for line in row[2].replace("\\n", "\n").splitlines() if line.strip()],
         "inflection": inflection,
+        "definition": [],
+        "needs_update": False,
     }
