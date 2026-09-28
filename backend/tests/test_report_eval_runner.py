@@ -74,3 +74,18 @@ def test_questions_only_stops_after_the_questions(tmp_path):
     assert load_runner().main([str(data_dir), "--out", str(out), "--questions-only", "--fake"]) == 0
     assert (out / "questions" / f"{item_id}.json").is_file()
     assert not (out / "results").exists()
+
+
+def test_a_relative_data_dir_still_gives_pi_an_absolute_config_dir(tmp_path, monkeypatch):
+    """Pi runs in another working directory: a relative config dir made it lose the custom provider."""
+    data_dir, _ = data_dir_with_item(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    runner = load_runner()
+    seen = {}
+    monkeypatch.setattr(runner.runtime_mod, "resolve", lambda _: type("R", (), {"node": "n", "pi_cli": "c"})())
+    monkeypatch.setattr(runner.one_shot, "run_one_shot", lambda work, **kwargs: seen.update(kwargs, work=work) or "{}")
+    ask = runner.model_ask(Path("data"), Path("out") / "work", "low")
+    ask("提示词")
+    assert Path(seen["agent_dir"]).is_absolute()
+    assert Path(seen["work"]).is_absolute()
+    assert Path(seen["agent_dir"]) == paths.pi_config_dir(data_dir.resolve())
