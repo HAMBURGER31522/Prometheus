@@ -224,7 +224,9 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             node_exe=_node_exe(), pi_cli=_pi_cli(),
             agent_dir=paths.pi_config_dir(data_dir),
         )
-        category_id = categories_store.ensure_category(data_dir, result["category"])
+        # Only the first completion files the item; after that the user's choice stands (15.4.10).
+        category_id = _row(data_dir, ctx).get("category_id") or categories_store.ensure_category(
+            data_dir, result["category"])
         items_store.update_item(
             data_dir, ctx.item_id, category_id=category_id,
             tags=json.dumps(result["tags"], ensure_ascii=False), description=result["description"],
