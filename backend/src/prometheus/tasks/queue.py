@@ -143,9 +143,11 @@ class TaskQueue:
                     self.data_dir, item_id, status="cancelled", stage=None, finished_at=_now(),
                 )
             else:
-                code, message = errors.describe(exc)
+                # The stage stays (PLAN 15.4.10): the console says in which step it failed.
+                stage = (items_store.get_item(self.data_dir, item_id) or {}).get("stage")
+                code, message = errors.describe(stage, exc)
                 items_store.update_item(
-                    self.data_dir, item_id, status="failed", stage=None,
+                    self.data_dir, item_id, status="failed",
                     error_code=code, error_message=message, finished_at=_now(),
                 )
         else:

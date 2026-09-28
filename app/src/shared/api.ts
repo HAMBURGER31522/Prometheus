@@ -119,6 +119,9 @@ export interface ItemRow {
   subtitle_status: "ok" | "failed" | null;
   error_code: string | null;
   error_message: string | null;
+  /** Why it failed and what to do (PLAN 15.4.10); null for rows that failed before that. */
+  error_reason: string | null;
+  error_action: string | null;
   created_at: string;
   finished_at: string | null;
   library_path: string | null;

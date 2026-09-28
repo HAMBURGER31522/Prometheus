@@ -120,6 +120,33 @@ export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () =>
   );
 }
 
+/** A failed row (PLAN 15.4.10): the step, why, what to do; the original error folded under 「详情」. */
+function Failure({ row }: { row: ItemRow }) {
+  const [copied, setCopied] = useState(false);
+  const step = STAGES.find(([id]) => id === row.stage)?.[1];
+  const copy = () =>
+    navigator.clipboard.writeText(row.error_message ?? "").then(
+      () => setCopied(true),
+      () => undefined, // no clipboard: the text itself can still be selected
+    );
+  return (
+    <div className="queue-failure">
+      <span className="queue-error">
+        {step ? `在「${step}」这一步失败：` : "失败："}
+        {row.error_reason}
+      </span>
+      <span className="queue-action">怎么办：{row.error_action}</span>
+      <details className="queue-details">
+        <summary>详情</summary>
+        <pre>{row.error_message}</pre>
+        <button type="button" className="btn small quiet" onClick={copy}>
+          {copied ? "已复制" : "复制"}
+        </button>
+      </details>
+    </div>
+  );
+}
+
 function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }) {
   const { go } = useNav();
   const index = STAGES.findIndex(([id]) => id === row.stage);
@@ -142,7 +169,11 @@ function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }
             </span>
           </span>
         )}
-        {row.error_message && <span className="queue-error">{row.error_message}</span>}
+        {row.status === "failed" && row.error_reason ? (
+          <Failure row={row} />
+        ) : (
+          row.error_message && <span className="queue-error">{row.error_message}</span>
+        )}
         {row.notice && <span className="muted">{row.notice}</span>}
         <span className="progress" style={{ "--p": progress } as CSSProperties} aria-hidden="true" />
       </div>

@@ -31,8 +31,9 @@ def run_one_shot(work_dir, *, prompt: str, provider: str, model: str, api_key: s
         cwd=str(Path(work_dir)), env=env, check=False,
     )
     if result.returncode != 0:
+        # The whole stderr: it is the console's 「详情」 and what the failure is sorted by (15.4.10).
         raise OneShotError(
             f"一次性文本调用失败（exit {result.returncode}）："
-            + result.stderr.decode("utf-8", "replace")[-300:]
+            + result.stderr.decode("utf-8", "replace").strip()
         )
     return result.stdout.decode("utf-8").strip()

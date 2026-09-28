@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from prometheus.ingest.links import LinkUnsupported, parse_url
 from prometheus.library import items as items_store
 from prometheus.library import publish
+from prometheus.tasks import errors
 
 router = APIRouter()
 
@@ -45,8 +46,8 @@ async def list_items(
 
 
 def _with_file_state(data_dir, row: dict) -> dict:
-    """Flag items whose library folder was moved or deleted outside the app."""
-    return {**row, "files_missing": publish.files_missing(data_dir, row)}
+    """Flag items whose library folder was moved or deleted outside the app; say why one failed."""
+    return {**row, "files_missing": publish.files_missing(data_dir, row), **errors.view(data_dir, row)}
 
 
 @router.get("/api/queue")
@@ -54,7 +55,8 @@ async def queue_view(request: Request):
     data_dir = request.app.state.data_dir
     active = [row for row in items_store.list_items(data_dir) if row["status"] != "done"]
     done = items_store.list_items(data_dir, status="done")
-    return active + list(reversed(done[-20:]))
+    # A failed row says why and what to do (PLAN 15.4.10).
+    return [{**row, **errors.view(data_dir, row)} for row in active + list(reversed(done[-20:]))]
 
 
 @router.get("/api/items/{item_id}")

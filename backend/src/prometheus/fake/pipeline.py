@@ -10,6 +10,7 @@ import shutil
 from pathlib import Path
 
 from prometheus import paths
+from prometheus.ingest.download import IngestError
 from prometheus.library import categories as categories_store
 from prometheus.library import items as items_store
 from prometheus.library import publish as publish_mod
@@ -20,6 +21,7 @@ from prometheus.subtitle import paragraphs as subtitle_paragraphs
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 DICTIONARY_SAMPLE = FIXTURES / "ecdict.sample.csv"  # installed instead of the 23 MB ECDICT (PLAN 15.4.9)
+# In fake mode this link fails in the download stage with Bilibili's risk control (PLAN 15.4.10 / E13 ②).
 RISK_CONTROL_VIDEO = "BV412RiskCtl"
 
 
@@ -77,7 +79,12 @@ def build_impls(data_dir):
         )
 
     def download(ctx):
-        return None
+        if items_store.get_item(data_dir, ctx.item_id)["video_id"] == RISK_CONTROL_VIDEO:
+            # yt-dlp's own words for a 412 on the video page, wrapped like the real download stage.
+            raise IngestError("DOWNLOAD_FAILURE", (
+                f"ERROR: [BiliBili] {RISK_CONTROL_VIDEO}: Unable to download webpage: HTTP Error 412: "
+                "Precondition Failed (caused by <HTTPError 412: Precondition Failed>)"
+            ))
 
     def transcribe(ctx):
         segments = json.loads(_fixture("segments.json").read_text(encoding="utf-8"))
