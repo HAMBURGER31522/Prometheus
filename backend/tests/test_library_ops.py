@@ -66,3 +66,20 @@ def test_a_folder_deleted_in_explorer_is_reported_missing(client):
     report = client.get(f"/api/items/{row['id']}/report")
     assert report.status_code == 404
     assert report.json()["code"] == "FILES_MISSING"
+
+
+def test_deleting_a_category_with_items_moves_them_to_uncategorized(client):
+    row = _done(client)
+    data_dir = client.app.state.data_dir
+    target = categories_store.create_category(data_dir, "神秘学")
+    assert client.patch(f"/api/items/{row['id']}", json={"category_id": target}).status_code == 200
+    assert client.delete(f"/api/categories/{target}").status_code == 409
+    assert client.delete(f"/api/categories/{target}?move_items=1").status_code == 204
+    moved = client.get(f"/api/items/{row['id']}").json()
+    names = {cat["id"]: cat["name"] for cat in client.get("/api/categories").json()}
+    assert names[moved["category_id"]] == "未分类"
+    assert "神秘学" not in names.values()
+    assert moved["library_path"].startswith("未分类/")
+    assert (data_dir / moved["library_path"] / "精读.html").is_file()
+    assert not (data_dir / "神秘学").exists()
+    assert _indexed_categories(client)[row["id"]] == "未分类"

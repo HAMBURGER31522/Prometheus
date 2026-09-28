@@ -7,6 +7,7 @@ the queue does, which the module-level stage tests never exercised.
 import pytest
 from conftest import DUMMY_RUNTIME
 from prometheus import paths
+from prometheus.library import categories as categories_store
 from prometheus.library import db
 from prometheus.library import items as items_store
 from prometheus.tasks import stages as stages_mod
@@ -322,3 +323,18 @@ def test_custom_unavailable_falls_back_to_local_with_a_notice(data_dir, monkeypa
     row = items_store.get_item(data_dir, ctx.item_id)
     assert row.get("notice") == "自定义转写不可用，已改用本地转写"
     assert row.get("transcript_source") == "funasr-onnx"
+
+
+def test_classify_stage_keeps_an_existing_category(data_dir, monkeypatch):
+    """Regenerating keeps the category the user chose; only tags and description change."""
+    ctx = _ctx(data_dir)
+    _write_report(data_dir, ctx.item_id)
+    chosen = categories_store.ensure_category(data_dir, "人工分类")
+    items_store.update_item(data_dir, ctx.item_id, category_id=chosen)
+    monkeypatch.setattr(stages_mod, "classify_item", lambda *args, **kwargs: {
+        "category": "模型分类", "tags": ["新标签"], "description": "新的一句话。"})
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["classify"](ctx)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    assert row["category_id"] == chosen
+    assert row["tags"] == '["新标签"]'
+    assert row["description"] == "新的一句话。"

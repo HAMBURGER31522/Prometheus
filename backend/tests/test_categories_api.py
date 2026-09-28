@@ -65,3 +65,24 @@ def test_merge_moves_items_and_deletes_source(client):
     assert response.status_code == 200
     assert client.get(f"/api/items/{items[0]['id']}").json()["category_id"] == target
     assert client.get("/api/categories").json()[0]["name"] == "目标"
+
+
+def test_create_category(client):
+    response = client.post("/api/categories", json={"name": "自定义"})
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "自定义" and isinstance(body["id"], int)
+    assert [row["name"] for row in client.get("/api/categories").json()] == ["自定义"]
+
+
+def test_create_duplicate_category_gets_409(client):
+    make_category(client, "科技")
+    response = client.post("/api/categories", json={"name": "科技"})
+    assert response.status_code == 409
+    assert response.json()["code"] == "CATEGORY_NAME_TAKEN"
+
+
+def test_create_blank_category_gets_422(client):
+    response = client.post("/api/categories", json={"name": "   "})
+    assert response.status_code == 422
+    assert client.get("/api/categories").json() == []
