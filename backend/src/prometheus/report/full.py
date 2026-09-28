@@ -172,26 +172,31 @@ def _lost(check: dict) -> int:
 
 
 def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -> tuple:
-    """(fragment, check, stats) after the two-step review and at most one revision."""
+    """(fragment, check, stats, details) after the two-step review and at most one revision; the
+    details keep what was asked and how it was judged, so a review that led nowhere can be read."""
     stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False}
     reply = ask(reviewing.reader_prompt(fragment))
     questions, pictures = reviewing.parse_reader(reply, fragment), reviewing.parse_pictures(reply, fragment)
     stats["questions"] = len(questions)
-    verdicts = []
+    verdicts, judged = [], ""
     if questions:
-        verdicts = reviewing.parse_judge(ask(reviewing.judge_prompt(questions, transcript)), len(questions))
+        judged = ask(reviewing.judge_prompt(questions, transcript)) or ""
+        verdicts = reviewing.parse_judge(judged, len(questions))
+    details = {"questions": [{**question, "verdict": verdict} for question, verdict in zip(questions, verdicts)]
+               if verdicts else [{**question, "verdict": None} for question in questions],
+               "pictures": pictures, "judge_reply": judged}
     kinds = Counter((verdict or {}).get("kind") for verdict in verdicts)
     stats["answered"], stats["background"] = kinds[reviewing.ANSWERED], kinds[reviewing.BACKGROUND]
     fixes = reviewing.fixes(questions, verdicts, pictures)
     if not fixes:
-        return fragment, check, stats
+        return fragment, check, stats, details
     revised = revise(fixes)
     stats["revised"] = True
     again = recheck(revised)
     if _lost(again) > _lost(check):  # a clearer chapter must not cost points
         stats["reverted"] = True
-        return fragment, check, stats
-    return revised, again, stats
+        return fragment, check, stats, details
+    return revised, again, stats, details
 
 
 def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, units: list, run_pi, ask, *,
@@ -233,15 +238,16 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
         fragment = write(chapter_write.revision_prompt(base, check["problems"], filename, fragment))
         check = recheck(fragment)
     stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False}
+    details = None
     if review:
         progress("审校", number, total)
         transcript = "\n".join(unit.get("canonical_text", "") for unit in mine)
-        fragment, check, stats = _review(
+        fragment, check, stats, details = _review(
             fragment, check, transcript, ask,
             lambda fixes: write(chapter_write.revision_prompt(base, fixes, filename, fragment)), recheck)
         (space / filename).write_bytes(fragment.encode("utf-8"))
     result = {"key": key, "number": number, "id": chapter["id"], "title": chapter["title"], "points": owned,
-              "fragment": fragment, "check": check, "rounds": rounds, "review": stats}
+              "fragment": fragment, "check": check, "rounds": rounds, "review": stats, "review_details": details}
     _write_json(record, result)
     return result
 
