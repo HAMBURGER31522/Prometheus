@@ -20,6 +20,7 @@ WINDOWS_PROMPT = (
     "报告一律用简体中文撰写，专有名词和术语可以保留原文。"
 )
 FIGURES_PROMPT = "另读 figures.md，按其中规则使用 frames/ 里的候选帧。"
+DEPTH_PROMPT = "本任务的用户要求完整精读：另读 depth.md，按其中规则写；它优先于 standard.md 和 SKILL.md 里与它冲突的默认取舍。"
 
 
 def build_input_json(row: dict) -> dict:
@@ -45,15 +46,18 @@ def build_runner_kwargs(row: dict, settings: dict, node_exe: str, pi_cli: str, *
                         figures: bool, model_supports_images: bool) -> dict:
     llm = settings["llm"]
     figures_on = figures and model_supports_images
+    # 「完整」精读 (PLAN 15.4.11) adds depth.md and 3x the time; 「标准」 is the VRA run as it was.
+    full = (settings.get("report") or {}).get("depth") == "full"
+    extra_files = ([DEPTH_MD] if full else []) + ([FIGURES_MD] if figures_on else [])
     return {
         "provider": llm["provider"],
         "model": llm["model"],
         "api_key": llm.get("api_key") or None,
         "thinking": llm.get("thinking") or "low",
-        "timeout": pi_timeout_seconds(row.get("duration_s") or 0.0),
+        "timeout": pi_timeout_seconds(row.get("duration_s") or 0.0) * (3 if full else 1),
         "tools": "read,write,edit,powershell",
-        "extra_prompt": WINDOWS_PROMPT + (FIGURES_PROMPT if figures_on else ""),
-        "extra_files": [FIGURES_MD] if figures_on else None,
+        "extra_prompt": WINDOWS_PROMPT + (FIGURES_PROMPT if figures_on else "") + (DEPTH_PROMPT if full else ""),
+        "extra_files": extra_files or None,
         "command_prefix": [node_exe, pi_cli],
     }
 

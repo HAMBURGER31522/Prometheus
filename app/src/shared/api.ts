@@ -207,6 +207,8 @@ export interface Settings {
   asr: { backend: "local" | "cloud" | "custom"; custom: { base_url: string; api_key: string; model: string } };
   network: { proxy: string; youtube_cookies_file: string };
   figures_default: boolean;
+  /** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was. */
+  report: { depth: "full" | "standard" };
 }
 
 export const itemTitle = (item: ItemRow) => item.report_title || item.source_title || item.video_id;

@@ -31,7 +31,10 @@ DEFAULTS = {
     "asr": {"backend": "local", "custom": {"base_url": "", "api_key": "", "model": ""}},
     "network": {"proxy": "", "youtube_cookies_file": ""},
     "figures_default": True,
+    # 「精读详细程度」(PLAN 15.4.11): full = 完整（默认）, standard = VRA as it was.
+    "report": {"depth": "full"},
 }
+REPORT_DEPTHS = ("full", "standard")
 
 
 def _copy(value):

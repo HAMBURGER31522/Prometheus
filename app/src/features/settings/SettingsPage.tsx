@@ -199,6 +199,36 @@ export function SettingsPage() {
         </section>
 
         <section className="section card">
+          <h2>精读</h2>
+          <div className="choices" role="radiogroup" aria-label="精读详细程度">
+            <label className="choice">
+              <input
+                type="radio"
+                name="report-depth"
+                checked={settings.report.depth === "full"}
+                onChange={() => update({ report: { depth: "full" } })}
+              />
+              <span>
+                <b>完整</b>
+                <small>来源里每个有实质内容的点都写到、讲清楚，可以补充背景解释；篇幅更长，更费 token。</small>
+              </span>
+            </label>
+            <label className="choice">
+              <input
+                type="radio"
+                name="report-depth"
+                checked={settings.report.depth === "standard"}
+                onChange={() => update({ report: { depth: "standard" } })}
+              />
+              <span>
+                <b>标准</b>
+                <small>VRA 原样：按信息量取舍，更短、更省。</small>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <section className="section card">
           <h2>其他</h2>
           <label className="switch-label field">
             <button
