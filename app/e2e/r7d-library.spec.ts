@@ -182,3 +182,17 @@ test("已有标签的文章不显示「补全标签和摘要」", async ({ page 
   await expect(page.getByRole("menuitem", { name: "删除" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "补全标签和摘要" })).toHaveCount(0);
 });
+
+test("拖完一篇以后，点另一篇照常打开", async ({ page, request }) => {
+  await request.post(`${API}/api/categories`, { headers: AUTH, data: { name: "拖进来" } });
+  await page.goto("/");
+  await openTab(page, "知识库");
+  await categoryButton(page, UNCATEGORIZED).click();
+  const cards = page.getByRole("list", { name: "条目" }).getByRole("button");
+  await expect(cards).toHaveCount(await countIn(request, UNCATEGORIZED));
+  await cards.first().dragTo(categoryButton(page, "拖进来"));
+  await expect(categoryButton(page, "拖进来")).toContainText("1");
+  const title = await itemTitles(page).first().innerText();
+  await cards.first().click();
+  await expect(page.getByRole("toolbar", { name: "阅读" }).getByTestId("reader-title")).toHaveText(title);
+});
