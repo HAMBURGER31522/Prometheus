@@ -211,6 +211,20 @@ export interface Settings {
   report: { depth: "full" | "standard" };
 }
 
+/** coverage.json of a 完整 report (PLAN 15.4.11): what was written, skipped with a reason, or left out. */
+export interface CoveragePoint {
+  id: string;
+  text: string;
+  start_ms: number;
+  end_ms: number;
+}
+export interface Coverage {
+  points_total: number;
+  written: number;
+  skipped: (CoveragePoint & { reason: string; duplicate_of?: string })[];
+  uncovered: CoveragePoint[];
+}
+
 export const itemTitle = (item: ItemRow) => item.report_title || item.source_title || item.video_id;
 
 export const itemTags = (item: ItemRow): string[] => {

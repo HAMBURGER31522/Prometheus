@@ -60,6 +60,19 @@ def test_content_endpoints_serve_fake_artifacts(client):
     assert f"[00:00:00] {first}" in txt.text
 
 
+def test_the_coverage_of_a_full_report_is_served_and_missing_is_404(client):
+    """「要点 10/11」 in the reader (PLAN 15.4.11) reads work/coverage.json, kept by the cleanup."""
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
+    coverage = client.get(f"/api/items/{item_id}/coverage")
+    assert coverage.status_code == 200
+    body = coverage.json()
+    assert (body["points_total"], body["written"]) == (12, 10)
+    assert body["skipped"][0]["reason"] == "广告推广" and body["uncovered"][0]["start_ms"] == 125_000
+    missing = client.get("/api/items/" + "0" * 32 + "/coverage")
+    assert missing.status_code == 404 and missing.json()["code"] == "COVERAGE_NOT_READY"
+
+
 def test_fake_item_appears_in_category_counts(client):
     item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
     wait_for_status(client, item_id, "done")
