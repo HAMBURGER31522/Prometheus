@@ -339,6 +339,24 @@ function ItemMenu({ item, library }: { item: ItemRow; library: Library }) {
     go({ type: "item", itemId: item.id });
     await library.refresh();
   };
+  const [filling, setFilling] = useState(false);
+  const missingTags = itemTags(item).length === 0;
+  const fillTags = async () => {
+    setOpen(false);
+    setFilling(true);
+    await api.fillTags(item.id);
+  };
+  // Done when tags arrive; failed when the rerun's stages come and go without them.
+  const sawRun = useRef(false);
+  useEffect(() => {
+    if (!missingTags) setFilling(false);
+    if (!filling) return;
+    if (item.stage) sawRun.current = true;
+    else if (sawRun.current) {
+      sawRun.current = false;
+      setFilling(false);
+    }
+  }, [missingTags, filling, item.stage]);
   const remove = async () => {
     setOpen(false);
     if (!window.confirm(`删除「${itemTitle(item)}」及其知识库文件夹？`)) return;
@@ -368,6 +386,11 @@ function ItemMenu({ item, library }: { item: ItemRow; library: Library }) {
             </button>
           ))}
           {others.length > 0 && <div className="menu-sep" role="separator" />}
+          {missingTags && (
+            <button type="button" role="menuitem" disabled={filling} onClick={fillTags}>
+              {filling ? "正在补全标签和摘要…" : "补全标签和摘要"}
+            </button>
+          )}
           <button type="button" role="menuitem" className="danger" onClick={remove}>
             删除
           </button>

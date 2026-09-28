@@ -73,6 +73,8 @@ export const api = {
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, figures === undefined ? {} : { figures }),
   regenerateMindmap: (id: string) =>
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "mindmap" }),
+  /** 「补全标签和摘要」(PLAN 15.4.10): classify + publish again, the category stays. */
+  fillTags: (id: string) => json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "tags" }),
   queue: () => json<ItemRow[]>("GET", "/api/queue"),
 
   categories: () => json<CategoryRow[]>("GET", "/api/categories"),
