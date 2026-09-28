@@ -120,6 +120,16 @@ async def regenerate_item(request: Request, item_id: str):
             return JSONResponse({"code": "NOT_DONE"}, status_code=409)
         state.queue.enqueue_mindmap(item_id)
         return {"queued": True}
+    if body.get("only") == "tags":
+        # 「补全标签和摘要」(PLAN 15.4.10): classify + publish again; the category stays.
+        state = request.app.state
+        row = items_store.get_item(state.data_dir, item_id)
+        if row is None:
+            return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
+        if row["status"] != "done":
+            return JSONResponse({"code": "NOT_DONE"}, status_code=409)
+        state.queue.enqueue_tags(item_id)
+        return {"queued": True}
     changes = {"figures": 1 if body["figures"] else 0} if "figures" in body else {}
     # Also finished items: 「重新生成」 for a missing library folder or other figures (PLAN 15.2).
     return _requeue(request, item_id, allowed=(*RETRYABLE, "done"), **changes)

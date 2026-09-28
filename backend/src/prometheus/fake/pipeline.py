@@ -132,7 +132,9 @@ def build_impls(data_dir):
         items_store.update_item(data_dir, ctx.item_id, mindmap_status="ok")
 
     def classify(ctx):
-        category_id = categories_store.ensure_category(data_dir, "未分类")
+        # Like the real stage: only the first completion files the item (15.4.10).
+        row = items_store.get_item(data_dir, ctx.item_id)
+        category_id = row.get("category_id") or categories_store.ensure_category(data_dir, "未分类")
         items_store.update_item(
             data_dir, ctx.item_id, category_id=category_id,
             tags='["示例"]', description="假流水线生成的示例条目。",
