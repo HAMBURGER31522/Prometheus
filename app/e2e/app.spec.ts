@@ -98,8 +98,7 @@ test("⑧ 自定义提供商可选 OpenAI / Anthropic 协议", async ({ page }) 
   await openTab(page, "设置");
   await page.getByRole("button", { name: "新增配置" }).click();
   const editor = page.getByRole("region", { name: "编辑模型配置" });
-  await editor.getByRole("combobox", { name: "类型" }).click();
-  await page.getByRole("option", { name: "自定义" }).click();
+  await editor.getByRole("button", { name: "自定义", exact: true }).click();
   await editor.getByRole("combobox", { name: "接口协议" }).click();
   await expect(page.getByRole("listbox", { name: "接口协议" }).getByRole("option")).toHaveText(["OpenAI 兼容", "Anthropic"]);
 });

@@ -167,6 +167,14 @@ export interface ModelProfile {
   thinking: string;
 }
 
+/** What Pi's bundled catalogue (source "pi") or the models.dev snapshot knows about a profile's model (PLAN 15.4.10). */
+export interface ModelInfo {
+  source: "pi" | "models.dev" | null;
+  context_window: number | null;
+  max_tokens: number | null;
+  thinking_level_map: Record<string, string | null> | null;
+}
+
 export interface Settings {
   /** The saved model profiles (PLAN 15.4.8); `llm` is the active one, derived by the backend. */
   llm_profiles: { active: string; items: ModelProfile[] };
