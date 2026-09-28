@@ -250,3 +250,5 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 - **字幕合并的实测**（预览数据，只读，函数 `subtitle/paragraphs.group_segments`）：卡巴拉 104 分钟，3895 段变为 453 段，中位数 14.0 秒，98% 在 10–15 秒；英文样本 19 分钟，872 段变为 94 段，中位数 11.7 秒，88% 在 10–15 秒；两篇的文字都一字不差。
 - **英英释义**：最多 3 条，优先选与第一条中文释义词性相同的；旧词库（没有 `definition` 列）在查词结果里标 `needs_update`，浮窗提示更新，更新前照常显示中文释义。
 - **报告自带目录隐藏以后**，原来点目录链接的端到端测试改为：往正文插一个指向第 3 章的链接去点，验证页内跳转仍在报告内（防白页的保护不变）。
+- **眼睛图标显示完整 Key**（用户 2026-09-28 选定，参考 CC Switch）：平时 `GET /api/settings` 仍只返回掩码；点眼睛时前端调用 `POST /api/settings/reveal-key`（`{"profile_id"}` 或 `{"target": "asr"}`，和其他接口一样要求 token），把完整 Key 填进框里显示。Key 只在本机的后端和界面之间传递。
+- **DeepSeek / 智谱的 Key 页面**（用户 2026-09-28 追加，按官方文档核对）：DeepSeek `https://platform.deepseek.com/api_keys`（api-docs.deepseek.com）；智谱 `https://bigmodel.cn/usercenter/proj-mgmt/apikeys`（docs.bigmodel.cn 快速开始）。CC Switch 里智谱的链接带邀请码，没有采用。
