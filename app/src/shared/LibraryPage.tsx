@@ -292,13 +292,17 @@ function useItemDrag(onDrop: (itemId: string, categoryId: number) => void) {
     const finish = (up: PointerEvent) => {
       stop();
       if (!moved) return;
+      // Only the click this very release makes (it fires before any timer) is swallowed; a drop
+      // on a category makes no click on a card, and the next real click must still open one.
       suppressClick.current = true;
+      setTimeout(() => {
+        suppressClick.current = false;
+      }, 0);
       const target = categoryAt(up.clientX, up.clientY);
       if (target !== null) onDrop(row.id, target);
     };
     const cancel = (key: KeyboardEvent) => {
       if (key.key !== "Escape") return;
-      if (moved) suppressClick.current = true;
       stop();
     };
     window.addEventListener("pointermove", move);
