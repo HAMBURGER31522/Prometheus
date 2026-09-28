@@ -32,7 +32,7 @@ DEFAULTS = {
     "network": {"proxy": "", "youtube_cookies_file": ""},
     "figures_default": True,
     # 「精读详细程度」(PLAN 15.4.11): full = 完整（默认）, standard = VRA as it was.
-    "report": {"depth": "full"},
+    "report": {"depth": "full", "review": True},
 }
 REPORT_DEPTHS = ("full", "standard")
 

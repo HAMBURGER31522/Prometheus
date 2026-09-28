@@ -33,6 +33,8 @@ async def put_settings(request: Request):
         return JSONResponse({"code": "INVALID_ASR_BACKEND"}, status_code=422)
     if (body.get("report") or {}).get("depth", "full") not in store.REPORT_DEPTHS:
         return JSONResponse({"code": "INVALID_REPORT_DEPTH"}, status_code=422)
+    if not isinstance((body.get("report") or {}).get("review", True), bool):
+        return JSONResponse({"code": "INVALID_REPORT_REVIEW"}, status_code=422)
     protocols = [((body.get("llm") or {}).get("custom") or {}).get("protocol", "openai")]
     protocols += [p.get("protocol", "openai") for p in (body.get("llm_profiles") or {}).get("items", [])]
     if any(protocol not in pi_models.PROTOCOL_APIS for protocol in protocols):

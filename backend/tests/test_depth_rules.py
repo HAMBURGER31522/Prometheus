@@ -2,7 +2,7 @@
 
 import re
 
-from prometheus.report.workspace import DEPTH_MD
+from prometheus.report.full import DEPTH_MD
 
 RULES = DEPTH_MD.read_text(encoding="utf-8")
 

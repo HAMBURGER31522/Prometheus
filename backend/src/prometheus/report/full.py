@@ -75,19 +75,11 @@ def run_keypoints(work, units: list, ask) -> dict:
 
 # ---------- step 3: the plan ----------
 
-def _usable(plan: dict, ledger: dict) -> dict:
+def _usable(plan: dict) -> dict:
     """The chapters the writers can work from: a title and readable time ranges."""
-    owned = planning.assign(plan, ledger)
-    chapters = []
-    for chapter in plan.get("chapters") or []:
-        if not isinstance(chapter, dict) or not chapter.get("id") or not str(chapter.get("title") or "").strip():
-            continue
-        if planning.chapter_ranges(chapter) is None:
-            continue
-        target = chapter.get("target_chars")
-        if isinstance(target, bool) or not isinstance(target, int) or target <= 0:
-            chapter = {**chapter, "target_chars": 100 * max(1, len(owned.get(chapter["id"], [])))}
-        chapters.append(chapter)
+    chapters = [chapter for chapter in plan.get("chapters") or []
+                if isinstance(chapter, dict) and chapter.get("id") and str(chapter.get("title") or "").strip()
+                and planning.chapter_ranges(chapter) is not None]
     return {**plan, "chapters": chapters}
 
 
@@ -114,7 +106,7 @@ def run_plan(work, ledger: dict, run_pi, *, figures: bool, input_json: dict) -> 
                   "然后写回 plan.json：\n" + "".join(f"- {problem}\n" for problem in problems))
     if plan is None:
         raise PiRunError("规划失败：两次写出的 plan.json 都不是合法的 JSON")
-    plan = _usable(plan, ledger)
+    plan = _usable(plan)
     if not plan["chapters"]:
         raise PiRunError("规划失败：plan.json 里没有可用的章节")
     _write_json(work / "plan.json", plan)
@@ -151,7 +143,7 @@ def _chapter_frames(work: Path, space: Path, chapter: dict) -> None:
 
 
 def _lost(check: dict) -> int:
-    return len(check["missing"]) + len(check["weak"])
+    return len(check["missing"]) + len(check["weak"]) + len(check["thin"])
 
 
 def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -> tuple:
@@ -192,12 +184,16 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
         _chapter_frames(work, space, chapter)
     mine = chapter_write.chapter_units(chapter, owned, points, units)
     spoken = "".join(unit.get("canonical_text", "") for unit in mine)
+    index = {unit["unit_id"]: position for position, unit in enumerate(units)}
+    sources = {point_id: "".join(unit.get("canonical_text", "") for unit in
+                                 units[index[points[point_id]["units"][0]]:index[points[point_id]["units"][1]] + 1])
+               for point_id in owned}
 
     def write(prompt: str) -> str:
         return run_pi(space, prompt, filename).read_text(encoding="utf-8")
 
     def recheck(fragment: str) -> dict:
-        return chapter_checks.check_chapter(fragment, owned, points, spoken)
+        return chapter_checks.check_chapter(fragment, owned, points, spoken, sources=sources)
 
     progress("写作", number, total)
     fragment = write(base)

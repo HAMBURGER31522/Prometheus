@@ -10,7 +10,7 @@ _ITEM_FIELDS = {
     "platform", "video_id", "source_url", "source_title", "uploader", "duration_s",
     "report_title", "category_id", "figures", "status", "stage", "mindmap_status",
     "error_code", "error_message", "started_at", "finished_at",
-    "library_path", "tags", "description", "transcript_source", "notice", "subtitle_status",
+    "library_path", "tags", "description", "transcript_source", "notice", "subtitle_status", "stage_detail",
 }
 
 

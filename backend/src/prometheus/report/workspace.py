@@ -1,20 +1,20 @@
-"""Report workspace assembly and PiRunner wiring (PLAN 8.6)."""
+"""Report workspace assembly and PiRunner wiring (PLAN 8.6), and the stages of 完整精读 (15.4.11)."""
 
 import asyncio
 import json
 import os
+import time
 from pathlib import Path
 
 from prometheus import paths
 from prometheus.llm import one_shot
 from prometheus.report import full, pi_run
+from prometheus.report.chunks import load_units
+from prometheus.report.full import FIGURES_MD
 from prometheus.report.timing import pi_timeout_seconds
 from video_report_agent.pi import PiRunner
 
 PLATFORM_LABELS = {"bilibili": "Bilibili", "youtube": "YouTube"}
-FIGURES_MD = Path(__file__).parents[1] / "figures" / "figures.md"
-# 「完整」精读的附加规则 (PLAN 15.4.11).
-DEPTH_MD = Path(__file__).with_name("depth.md")
 
 WINDOWS_PROMPT = (
     "本机为 Windows，命令工具是 PowerShell；运行 Python 用"
@@ -22,7 +22,6 @@ WINDOWS_PROMPT = (
     "报告一律用简体中文撰写，专有名词和术语可以保留原文。"
 )
 FIGURES_PROMPT = "另读 figures.md，按其中规则使用 frames/ 里的候选帧。"
-DEPTH_PROMPT = "本任务的用户要求完整精读：另读 depth.md，按其中规则写；它优先于 standard.md 和 SKILL.md 里与它冲突的默认取舍。"
 
 
 def build_input_json(row: dict) -> dict:
@@ -48,17 +47,16 @@ def build_runner_kwargs(row: dict, settings: dict, node_exe: str, pi_cli: str, *
                         figures: bool, model_supports_images: bool) -> dict:
     llm = settings["llm"]
     figures_on = figures and model_supports_images
-    # 「完整」精读 (PLAN 15.4.11) adds depth.md and 3x the time; 「标准」 is the VRA run as it was.
-    full = (settings.get("report") or {}).get("depth") == "full"
-    extra_files = ([DEPTH_MD] if full else []) + ([FIGURES_MD] if figures_on else [])
+    # 「标准」精读: the VRA run as it was. 「完整」 goes chapter by chapter instead (run_full_report_stage).
+    extra_files = [FIGURES_MD] if figures_on else []
     return {
         "provider": llm["provider"],
         "model": llm["model"],
         "api_key": llm.get("api_key") or None,
         "thinking": llm.get("thinking") or "low",
-        "timeout": pi_timeout_seconds(row.get("duration_s") or 0.0) * (3 if full else 1),
+        "timeout": pi_timeout_seconds(row.get("duration_s") or 0.0),
         "tools": "read,write,edit,powershell",
-        "extra_prompt": WINDOWS_PROMPT + (FIGURES_PROMPT if figures_on else "") + (DEPTH_PROMPT if full else ""),
+        "extra_prompt": WINDOWS_PROMPT + (FIGURES_PROMPT if figures_on else ""),
         "extra_files": extra_files or None,
         "command_prefix": [node_exe, pi_cli],
     }
@@ -82,19 +80,79 @@ def run_report_stage(data_dir, item_id: str, row: dict, settings: dict, *,
     return asyncio.run(runner.run(work))
 
 
-# ---- 完整精读 stages (PLAN 15.4.11). Stubs. ----
+# ---- 完整精读 (PLAN 15.4.11): 提取要点, 规划, then the report chapter by chapter ----
 
-def pi_runner(data_dir, settings, node_exe, pi_cli, *, deadline):
-    return lambda workspace, prompt, expect: None
-
-
-def run_keypoints_stage(data_dir, item_id, settings, *, node_exe, pi_cli):
-    return None
+def full_depth(settings: dict) -> bool:
+    return (settings.get("report") or {}).get("depth", "full") == "full"
 
 
-def run_plan_stage(data_dir, item_id, row, settings, *, node_exe, pi_cli, figures):
-    return None
+def review_on(settings: dict) -> bool:
+    return (settings.get("report") or {}).get("review", True) is not False
 
 
-def run_full_report_stage(data_dir, item_id, row, settings, *, node_exe, pi_cli, figures, progress):
-    return None
+def _llm(settings: dict) -> dict:
+    llm = settings["llm"]
+    return {"provider": llm["provider"], "model": llm["model"], "thinking": llm.get("thinking") or "medium",
+            "api_key": llm.get("api_key") or ""}
+
+
+def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
+    """ask(prompt) -> reply: one-shot calls (key points, the review) with the configured model."""
+    llm = _llm(settings)
+
+    def ask(prompt: str) -> str:
+        return one_shot.run_one_shot(
+            work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
+            thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+        )
+
+    return ask
+
+
+def pi_runner(data_dir, settings: dict, node_exe: str, pi_cli: str, *, deadline: float):
+    """run_pi(workspace, prompt, expect) for report/full.py: each run gets what is left of its stage's time."""
+    llm = _llm(settings)
+
+    def run(workspace, prompt: str, expect: str):
+        left = deadline - time.monotonic()
+        if left <= 0:
+            raise pi_run.PiRunError("Pi generation timed out: the stage's time is used up")
+        return pi_run.run_task(workspace, prompt, expect=expect, llm=llm, prefix=[node_exe, pi_cli],
+                               agent_dir=paths.pi_config_dir(data_dir), timeout=left)
+
+    return run
+
+
+def run_keypoints_stage(data_dir, item_id: str, settings: dict, *, node_exe: str, pi_cli: str) -> None:
+    work = paths.work_dir(data_dir, item_id)
+    units = load_units(work / "canonical-transcript.jsonl")
+    full.run_keypoints(work, units, model_ask(data_dir, work, settings, node_exe, pi_cli))
+
+
+def _planned(data_dir, work, row: dict, settings: dict, node_exe: str, pi_cli: str, *, figures: bool, seconds: float):
+    """The ledger and the plan, both kept from their own stages unless their inputs changed."""
+    ask = model_ask(data_dir, work, settings, node_exe, pi_cli)
+    units = load_units(work / "canonical-transcript.jsonl")
+    ledger = full.run_keypoints(work, units, ask)
+    run_pi = pi_runner(data_dir, settings, node_exe, pi_cli, deadline=time.monotonic() + seconds)
+    plan, problems = full.run_plan(work, ledger, run_pi, figures=figures, input_json=build_input_json(row))
+    return units, ledger, plan, problems, ask, run_pi
+
+
+def run_plan_stage(data_dir, item_id: str, row: dict, settings: dict, *, node_exe: str, pi_cli: str,
+                   figures: bool) -> None:
+    _planned(data_dir, paths.work_dir(data_dir, item_id), row, settings, node_exe, pi_cli, figures=figures,
+             seconds=pi_timeout_seconds(row.get("duration_s") or 0.0))
+
+
+def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, node_exe: str, pi_cli: str,
+                          figures: bool, progress):
+    """Chapters, checks, review, assembly: work/report.html for finalize. 3x the time (15.4.11)."""
+    work = paths.work_dir(data_dir, item_id)
+    units, ledger, plan, problems, ask, run_pi = _planned(
+        data_dir, work, row, settings, node_exe, pi_cli, figures=figures,
+        seconds=3 * pi_timeout_seconds(row.get("duration_s") or 0.0))
+    chapters = full.write_chapters(work, plan, ledger, units, run_pi, ask, figures=figures,
+                                   review=review_on(settings), progress=progress)
+    full.finish(work, plan, problems, ledger, chapters, build_input_json(row))
+    return work / "report.html"

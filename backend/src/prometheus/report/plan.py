@@ -26,7 +26,7 @@ def plan_prompt(*, figures: bool) -> str:
         + "\n写出 plan.json：\n"
         '{"title": "主标题", "subtitle": "副标题，没有新角度就留空", "lead": "导语：一段话", '
         '"profile": "mechanism|procedure|evidence|argument|narrative", '
-        '"chapters": [{"id": "c1", "title": "章节标题", "ranges": [["00:00:00", "00:07:13"]], "target_chars": 1800}], '
+        '"chapters": [{"id": "c1", "title": "章节标题", "ranges": [["00:00:00", "00:07:13"]]}], '
         '"moves": {"K045": "c3"}, "glossary": [{"term": "术语", "chapter": "c1"}], '
         '"skips": [{"point": "K012", "reason": "重复", "duplicate_of": "K003"}]}\n'
         "规则：\n"
@@ -34,7 +34,6 @@ def plan_prompt(*, figures: bool) -> str:
         "需要放到别的章时写进 moves；\n"
         f"- 不写的要点放进 skips，理由只能是：{'、'.join(PLAN_SKIPS)}；「重复」要写 duplicate_of，"
         "指向保留下来的那一条；跳过的要点不能超过四分之一；\n"
-        "- target_chars 按要点条数估算，每条 60–150 字；\n"
         "- glossary 列出需要解释的术语，以及在哪一章第一次解释。\n"
     )
 
@@ -130,9 +129,6 @@ def validate_plan(plan: dict, ledger: dict) -> list:
             problems.append(f"章节 {cid or number} 没有标题")
         if chapter_ranges(chapter) is None:
             problems.append(f"章节 {cid or number} 的时间区间写法不对（应为 [[\"00:00:00\", \"00:07:13\"]]）")
-        target = chapter.get("target_chars")
-        if isinstance(target, bool) or not isinstance(target, int) or target <= 0:
-            problems.append(f"章节 {cid or number} 的 target_chars 应是正整数")
     by_id = {point["id"]: point for point in ledger["points"]}
     for point_id, chapter_id in (plan.get("moves") or {}).items():
         if point_id not in by_id:

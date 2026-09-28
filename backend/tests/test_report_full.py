@@ -6,7 +6,6 @@ import json
 import re
 
 import pytest
-
 from prometheus.report import full
 from prometheus.report.pi_run import PiRunError
 
@@ -123,7 +122,7 @@ def test_a_plan_still_wrong_after_the_redo_is_kept_with_its_problems(tmp_path):
     lazy = {**GOOD_PLAN, "chapters": GOOD_PLAN["chapters"][:1]}  # 06:00–12:00 has no chapter
     pi = Pi(plans=(lazy, lazy))
     ledger = full.run_keypoints(tmp_path, make_units(), Model())
-    plan, problems = full.run_plan(tmp_path, ledger, pi, figures=False, input_json=INPUT)
+    _plan, problems = full.run_plan(tmp_path, ledger, pi, figures=False, input_json=INPUT)
     assert len(pi.runs("plan.json")) == 2 and any("没有归属章节" in problem for problem in problems)
 
 
@@ -135,7 +134,7 @@ def test_an_unreadable_plan_fails_the_report(tmp_path):
 
 
 def test_every_chapter_is_its_own_run_and_the_report_is_assembled(tmp_path):
-    _ledger, _plan, chapters, coverage, pi, _model = pipeline(tmp_path)
+    _ledger, _plan, _chapters, coverage, pi, _model = pipeline(tmp_path)
     assert len(pi.runs("ch-01.html")) >= 1 and len(pi.runs("ch-02.html")) >= 1
     assert "K001" in pi.runs("ch-01.html")[0] and "K013" not in pi.runs("ch-01.html")[0]
     html = (tmp_path / "report.html").read_text(encoding="utf-8")
@@ -159,7 +158,7 @@ def test_a_chapter_that_misses_a_point_is_revised_at_most_twice_and_the_miss_is_
 
 def test_a_fixed_chapter_is_not_revised(tmp_path):
     pi = Pi(chapter=lambda prompt, attempt: section(prompt, leave_out=("K003",) if attempt == 1 else ()))
-    _ledger, _plan, chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
+    _ledger, _plan, _chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
     assert len(pi.runs("ch-01.html")) == 2 and coverage["uncovered"] == []
 
 
@@ -195,10 +194,10 @@ def test_progress_names_the_step_and_the_chapter(tmp_path):
 
 
 def test_finished_chapters_are_reused_when_the_run_is_retried(tmp_path):
-    _ledger, _plan, _chapters, _coverage, pi, _model = pipeline(tmp_path)
+    pipeline(tmp_path)
     again = Pi()
     ledger = full.run_keypoints(tmp_path, make_units(), Model())
-    plan, problems = full.run_plan(tmp_path, ledger, again, figures=False, input_json=INPUT)
+    plan, _problems = full.run_plan(tmp_path, ledger, again, figures=False, input_json=INPUT)
     chapters = full.write_chapters(tmp_path, plan, ledger, make_units(), again, Model(), figures=False,
                                    review=True, progress=lambda *args: None, workers=1)
     assert again.calls == [] and len(chapters) == 2

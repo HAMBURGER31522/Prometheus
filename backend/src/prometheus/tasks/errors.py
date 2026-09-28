@@ -12,7 +12,7 @@ import re
 from prometheus import paths
 
 SITE_STAGES = ("resolve", "download")  # yt-dlp talks to the video site
-MODEL_STAGES = ("report", "classify", "subtitle_fix", "mindmap")  # Pi calls the model
+MODEL_STAGES = ("keypoints", "plan", "report", "classify", "subtitle_fix", "mindmap")  # Pi calls the model
 
 # code -> (reason, what to do). Rows that failed before 15.4.10 carry older codes and get neither.
 REASONS = {

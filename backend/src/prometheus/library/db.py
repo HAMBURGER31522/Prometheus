@@ -4,7 +4,7 @@ import sqlite3
 
 from prometheus import paths
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 SCHEMA_V1 = """
@@ -50,6 +50,8 @@ _ADDED_COLUMNS = (
     ("notice", "TEXT"),              # e.g. 「必剪不可用，已改用本地转写」
     # Version 4 (PLAN 15.4.6): subtitle correction ok | failed (NULL until it ran).
     ("subtitle_status", "TEXT"),
+    # Version 5 (PLAN 15.4.11): where a long stage is, e.g. 「写作（第 3/10 章）」; cleared with each stage.
+    ("stage_detail", "TEXT"),
 )
 
 

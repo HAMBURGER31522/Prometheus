@@ -5,7 +5,10 @@ feedback is a concrete list, never "write more").
   coverage; the ledger itself was the first);
 - a marked point is really there: its wording shows up in the marking elements (character bigrams);
 - the chapter does not paste the spoken transcript (runs of 30+ identical characters);
-- the chapter is not far below a floor set by its points.
+- every point gets enough words for what the video says about it. The bar lives only here (never
+  in a prompt or in the feedback: a stated minimum becomes the finish line, D-44); it grows with the
+  point's own source, so long and short videos need no separate numbers, and the feedback names the
+  steps of depth.md to add instead of a count.
 """
 
 import re
@@ -15,10 +18,12 @@ from prometheus.report.evaluation import parse_html
 GROUNDING_MIN = 0.3      # share of a point's bigrams found in the text that marks it
 COPY_RUN = 30            # identical characters that count as pasted
 COPY_MAX = 0.15          # pasted share of the chapter that asks for a rewrite
-MIN_CHARS = {"数字": 15, "人名书名": 15}
-MIN_CHARS_DEFAULT = 30   # half the 60–150 per point that depth.md asks for
+THIN_BASE = 24           # the bar for a point the video only mentions (to calibrate, D-44)
+THIN_RATIO = 1.0         # the bar per unit of what the video says about the point (to calibrate, D-44)
+SOURCE_WORD = 1.5        # an English word of the source counts as this many characters of Chinese
 _NOT_WORDY = re.compile(r"[^一-鿿A-Za-z0-9]")
 _CJK = re.compile(r"[一-鿿]")
+_WORD = re.compile(r"[A-Za-z0-9]+")
 
 
 def _norm(text: str) -> str:
@@ -69,11 +74,30 @@ def _copy_ratio(fragment_text: str, transcript: str) -> float:
     return sum(copied) / len(body)
 
 
+def _size(text: str, *, word: float = 1.0) -> float:
+    return len(_CJK.findall(text or "")) + word * len(_WORD.findall(text or ""))
+
+
 def point_chars(fragment: str) -> dict:
-    return {}
+    """{point id: how much text explains it}: an element's own text (not that of marked elements
+    inside it), shared equally by the points it marks."""
+    sizes: dict = {}
+    for node in parse_html(fragment).walk():
+        ids = (node.attrs.get("data-points") or "").split()
+        if not ids:
+            continue
+        own = _size(node.text(lambda inner: bool(inner.attrs.get("data-points"))))
+        for point_id in ids:
+            sizes[point_id] = sizes.get(point_id, 0.0) + own / len(ids)
+    return sizes
+
+
+def _bar(source: str) -> float:
+    return max(THIN_BASE, THIN_RATIO * _size(source, word=SOURCE_WORD))
 
 
 def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, sources=None) -> dict:
+    """`sources`: {point id: the text of the units it rests on}; without it there is no length check."""
     marking = _marking(fragment)
     root = parse_html(fragment)
     text = root.text(lambda node: node.tag == "h2")
@@ -81,7 +105,9 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
     weak = [point_id for point_id in owned if point_id in marking and not _grounded(points[point_id], marking[point_id])]
     copy_ratio = _copy_ratio(text, transcript)
     chars = len(_CJK.findall(text))
-    floor = sum(MIN_CHARS.get(points[point_id]["type"], MIN_CHARS_DEFAULT) for point_id in owned)
+    sizes = point_chars(fragment)
+    thin = [point_id for point_id in owned if sources and point_id in marking and point_id not in weak
+            and sizes.get(point_id, 0.0) < _bar(sources.get(point_id, ""))]
     problems = []
     for point_id in missing:
         point = points[point_id]
@@ -92,9 +118,11 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
                         "把这个要点真正写出来、讲清楚")
     if copy_ratio > COPY_MAX:
         problems.append(f"本章约 {copy_ratio:.0%} 的文字是照抄转写的口语：改写成完整、通顺的书面语")
-    if chars < floor:
-        problems.append(f"本章只有 {chars} 字，低于按要点估算的下限 {floor} 字：每个要点都要讲清是什么、为什么、怎么用")
-    return {"missing": missing, "weak": weak, "thin": [], "copy_ratio": copy_ratio, "chars": chars, "floor": floor,
+    for point_id in thin:
+        problems.append(f"要点 {point_id} 讲得太简略，比视频里讲的少（{points[point_id]['text']}）：按 depth.md 的四步补全——"
+                        "一句话说清是什么；类比到读者熟悉的东西；展开原理、理由、条件和例子；"
+                        "最后说所以呢：它对读者意味着什么、和前后要点是什么关系。讲到零基础读者能自己复述为止")
+    return {"missing": missing, "weak": weak, "thin": thin, "copy_ratio": copy_ratio, "chars": chars,
             "problems": problems}
 
 

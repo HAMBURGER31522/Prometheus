@@ -18,7 +18,7 @@ from prometheus.library import items as items_store
 from prometheus.tasks import runner
 from prometheus.tasks.stages import build_real_impls
 
-STAGES = ("report", "finalize", "publish")
+STAGES = ("keypoints", "plan", "report", "finalize", "publish")
 
 
 def main(argv=None, impls=None) -> int:

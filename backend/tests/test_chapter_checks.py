@@ -49,7 +49,7 @@ def test_text_pasted_from_the_transcript_is_measured():
 
 
 def test_a_point_explained_too_briefly_for_what_the_video_says_is_sent_back_without_a_number():
-    brief = GOOD.replace("萃取指热水把咖啡粉里的可溶物质溶解出来的过程，溶出太少偏酸，太多偏苦。", "萃取就是溶出可溶物质。")
+    brief = GOOD.replace("萃取指热水把咖啡粉里的可溶物质溶解出来的过程，溶出太少偏酸，太多偏苦。", "萃取指热水把咖啡粉里的可溶物质溶解出来。")
     result = checks.check_chapter(brief, ["K001", "K002"], POINTS, TRANSCRIPT, sources=SOURCES)
     assert result["thin"] == ["K002"]
     problem = next(problem for problem in result["problems"] if "K002" in problem)
