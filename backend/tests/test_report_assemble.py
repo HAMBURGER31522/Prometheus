@@ -33,6 +33,7 @@ def test_an_empty_subtitle_leaves_no_empty_line_and_the_guidance_comments_go():
 
 def test_chapters_come_in_order_with_ids_and_a_nav_links_them():
     html = assemble.assemble(TEMPLATE, PLAN, FRAGMENTS, INPUT, sources="")
+    assert "第一章正文" in html and "第二章正文" in html
     assert html.index("第一章正文") < html.index("第二章正文")
     assert '<section id="s1">' in html and '<section id="s2">' in html
     assert '<a href="#s1">水温</a>' in html and '<a href="#s2">研磨</a>' in html
