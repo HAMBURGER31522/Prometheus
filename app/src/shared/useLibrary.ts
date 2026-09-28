@@ -20,9 +20,8 @@ export function useLibrary(pollMs = 4000): Library {
   const refresh = useCallback(async () => {
     const [cats, rows] = await Promise.all([api.categories(), api.items()]);
     const done = rows.filter((row) => row.status === "done");
-    // Categories with finished items first, 未分类 last; empty ones stay out of the way.
+    // Every category, empty ones too (hiding them left no way to move an item back, 15.4.10); 未分类 last.
     const shown = cats
-      .filter((cat) => done.some((row) => row.category_id === cat.id))
       .sort((a, b) => Number(a.name === UNCATEGORIZED) - Number(b.name === UNCATEGORIZED) || a.name.localeCompare(b.name, "zh-CN"));
     setCategories(shown);
     setItems(done.sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? "")));

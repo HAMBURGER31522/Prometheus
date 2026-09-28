@@ -77,7 +77,9 @@ export const api = {
 
   categories: () => json<CategoryRow[]>("GET", "/api/categories"),
   renameCategory: (id: number, name: string) => json<unknown>("PATCH", `/api/categories/${id}`, { name }),
-  deleteCategory: (id: number) => json<void>("DELETE", `/api/categories/${id}`),
+  createCategory: (name: string) => json<CategoryRow>("POST", "/api/categories", { name }),
+  deleteCategory: (id: number, moveItems = false) =>
+    json<void>("DELETE", `/api/categories/${id}${moveItems ? "?move_items=1" : ""}`),
   mergeCategory: (id: number, intoId: number) =>
     json<unknown>("POST", `/api/categories/${id}/merge`, { into_id: intoId }),
 
