@@ -225,3 +225,28 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 - 字幕：Whisper 和必剪的分段太碎（卡巴拉的中位数 1.3 秒，英文样本 0.7 秒），逐行阅读很累。改为合并成 10–15 秒一段，在纠错和翻译之前合并，这样译文按整句翻译。代价：导出的 SRT 每条 10–15 秒，给播放器当字幕会偏长。
 - 精读加宽：模板固定 860px，改为随窗口变宽，最宽 1280px；隐藏报告自带的左侧目录，由工具栏的「目录」按钮代替。
 - 查词：用 ECDICT 自带的英文释义（WordNet 来源），离线、不花 token；剑桥、牛津没有免费接口，只提供在浏览器打开的按钮。
+
+**D-43 R7d 的实现选择（2026-09-27/28，执行 agent 与两个子 agent 决定，规格见 PLAN 15.4.10）**
+- **拖拽用指针事件，不用 HTML5 拖放。** 实测 Chromium 不会从 `<button>` 上开始 HTML5 拖放（文章卡片原来是按钮）；而且 Tauri 2 在 Windows 上默认接管窗口的拖放（为了拖文件进窗口），网页里的 HTML5 拖放会失效。改成：按下卡片移动超过 6px 后出现跟随鼠标的小标签，松开时看鼠标下面是哪个分类；Esc 取消。文章卡片改为 `div role="button"`，键盘 Enter / 空格照样打开。
+- **补全标签和摘要**：复用「重新生成导图」的机制，只重跑 classify + publish，条目始终是 done；归类阶段只在条目第一次完成时定分类，所以这里只会更新标签和摘要。缓存里的报告副本清理后，从知识库的精读.html 读取。失败不另外提示，条目仍然没有标签，按钮留着可以再点。
+- **模型参数**（设置子 agent）：
+  - 同一个模型 id 在 Pi 自带目录里有多条时，优先用与配置协议相同的 API 那一条，其次是接口地址所属站点的那一条，最后按文件名取第一条；`compat` 只从协议相同的条目复制。
+  - models.dev 快照 `backend/src/prometheus/llm/model-limits.json`（2289 个模型，由 `scripts/update-model-limits.py` 从 models.dev 生成）；同一模型在多家的上下文和输出上限不同时，取多数一致的一组，平局取较小的。
+  - DeepSeek / 智谱的思考档位按实际运行的 models.json 判断，其次是 Pi 自己的目录。选了模型不支持的档位时，显示并保存成 Pi 实际会用的档位（向上取最近的，没有就向下），例如 deepseek-flash 和 kimi-k3 上「中」会变成「高」。
+  - 「高级」里的上下文和最大输出只在用户改动时保存；换模型或换供应商后清空，重新按目录填。
+  - **后端每次启动时按当前配置重写一次自定义供应商**（执行 agent 补）。否则已安装的版本要在设置里点一次「保存」才会生效，在那之前仍按 128k 上下文、16k 输出运行。
+- **Key 输入框留空 = 保留原 Key**（模型配置与自定义转写都一样），代价是不能在页面上清空 Key。
+- **获取模型列表**：接口地址已经以 `/v1` 结尾时，不再重试 `/v1/models`，避免对中转多发一次请求。403 的正文提到 Cloudflare，或者响应头 `server: cloudflare` 且正文不是 JSON，判为「请求被 Cloudflare 拦截」；JSON 格式的 403 仍判为「Key 无效或无权限」。
+- **常用供应商**（2026-09-27 按各平台官方文档核对，不含返利链接，单测会拒绝 `aff=`、`invite`、`utm_`、`ref=`、`/i/` 这类链接）：
+  - Kimi：`https://api.moonshot.cn/v1`，OpenAI 协议，kimi-k3。
+  - 通义千问：`https://dashscope.aliyuncs.com/compatible-mode/v1`，OpenAI 协议，qwen3.8-max。
+  - MiniMax：`https://api.minimax.cn/anthropic`，Anthropic 协议，MiniMax-M3。
+  - 豆包（火山方舟）：`https://ark.cn-beijing.volces.com/api/v3`，OpenAI 协议，doubao-seed-2-1-pro-260628。
+  - 硅基流动：`https://api.siliconflow.cn/v1`，OpenAI 协议，deepseek-ai/DeepSeek-V4-Flash。
+  - OpenRouter：`https://openrouter.ai/api/v1`，OpenAI 协议，anthropic/claude-sonnet-5。
+  - Anthropic：`https://api.anthropic.com`，Anthropic 协议，claude-sonnet-5。没有用官方推荐的 claude-opus-5-5，因为随包的 Pi（模型目录日期 2026-09-04）还不认识它，会发出旧式的思考参数，而 4.6 之后的模型已经不接受。手动填 opus-5-5 也会遇到同样的问题，需要升级 Pi。
+  - OpenAI：`https://api.openai.com/v1`，OpenAI 协议，gpt-6-astra。没有用 gpt-6-sol，因为按 OpenAI 的说明，它在 Chat Completions 接口上只有 reasoning_effort 为 none 时才能调用函数，而本项目的 OpenAI 协议走的正是 Chat Completions。
+- **字幕纠错分批**：原来固定每批 120 段（翻译 60 段）。合并成 10–15 秒的段落后，每段 50–150 字，按段数分批会让一次请求变得很大，所以改为「最多 120 段且约 2500 字」（翻译为最多 60 段且约 1250 字），与 15.4.6「每次最多 120 段（约 2500 字）」的本意一致。
+- **字幕合并的实测**（预览数据，只读，函数 `subtitle/paragraphs.group_segments`）：卡巴拉 104 分钟，3895 段变为 453 段，中位数 14.0 秒，98% 在 10–15 秒；英文样本 19 分钟，872 段变为 94 段，中位数 11.7 秒，88% 在 10–15 秒；两篇的文字都一字不差。
+- **英英释义**：最多 3 条，优先选与第一条中文释义词性相同的；旧词库（没有 `definition` 列）在查词结果里标 `needs_update`，浮窗提示更新，更新前照常显示中文释义。
+- **报告自带目录隐藏以后**，原来点目录链接的端到端测试改为：往正文插一个指向第 3 章的链接去点，验证页内跳转仍在报告内（防白页的保护不变）。
