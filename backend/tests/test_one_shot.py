@@ -3,7 +3,8 @@
 import json
 from pathlib import Path
 
-from prometheus.llm.one_shot import ONE_SHOT_FLAGS, run_one_shot
+import pytest
+from prometheus.llm.one_shot import ONE_SHOT_FLAGS, OneShotError, run_one_shot
 
 LONG_PROMPT = "讲解要点。" * 2000  # > 9000 chars
 
@@ -51,3 +52,26 @@ def test_command_carries_all_no_flags_and_model_args(tmp_path):
     assert argv[argv.index("--model") + 1] == "glm-5.3-flash"
     assert argv[argv.index("--thinking") + 1] == "high"
     assert argv[argv.index("--api-key") + 1] == "sk-y"
+
+
+# Pi's print mode writes the provider's error message to stderr and exits 1 (dist/modes/print-mode.js).
+FAILING_JS = """const body = JSON.stringify({message: "You exceeded your current quota. " + "x".repeat(400),
+  type: "insufficient_quota", param: null, code: "insufficient_quota"});
+console.error("429: " + body);
+process.exit(1);
+"""
+
+
+def test_a_failed_call_keeps_the_whole_error_text(tmp_path):
+    # The console's 「详情」 shows the original error in full (PLAN 15.4.10), so nothing is cut.
+    script = tmp_path / "failing-pi-cli.js"
+    script.write_text(FAILING_JS, encoding="utf-8")
+    with pytest.raises(OneShotError) as caught:
+        run_one_shot(
+            tmp_path, prompt="短提示", provider="openai", model="gpt-x", api_key="sk-z",
+            thinking="low", node_exe="node.exe", pi_cli=str(script), agent_dir=tmp_path / "agent3",
+        )
+    message = str(caught.value)
+    assert message.startswith("一次性文本调用失败（exit 1）：429: {")
+    assert message.rstrip().endswith('"code":"insufficient_quota"}')
+    assert "x" * 400 in message

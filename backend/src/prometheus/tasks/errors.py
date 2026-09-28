@@ -13,6 +13,18 @@ GUIDANCE = {
 }
 
 
+def classify(stage, text: str, code=None) -> str:
+    return "UNCLASSIFIED"
+
+
+def details(exc: BaseException) -> str:
+    return ""
+
+
+def explain(data_dir, code):
+    return ("", "")
+
+
 def describe(exc: BaseException) -> tuple[str, str]:
     code = getattr(exc, "code", None) or getattr(exc, "category", None)
     detail = str(exc).strip()

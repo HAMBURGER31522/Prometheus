@@ -20,6 +20,7 @@ from prometheus.subtitle import paragraphs as subtitle_paragraphs
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
 DICTIONARY_SAMPLE = FIXTURES / "ecdict.sample.csv"  # installed instead of the 23 MB ECDICT (PLAN 15.4.9)
+RISK_CONTROL_VIDEO = "BV412RiskCtl"
 
 
 def _fixture(name: str) -> Path:
