@@ -2,7 +2,7 @@
 // levels, saved keys never shown, the model list says why it failed, 「高级」 limits.
 import { type Page, expect, test } from "@playwright/test";
 
-import { API, AUTH, openTab } from "./helpers";
+import { API, AUTH, openTab, settle } from "./helpers";
 
 const lastOpened = (page: Page) =>
   page.evaluate(() => (window as unknown as { __lastOpenedExternal?: string }).__lastOpenedExternal);
@@ -29,6 +29,7 @@ test("设置里的下拉框只有一层边框：外框与按钮边界重合", as
   const editor = await newProfile(page);
   const button = editor.getByRole("combobox", { name: "思考强度" });
   const wrapper = button.locator("xpath=..");
+  await settle(page); // measured mid-animation, the two boxes can differ for a frame
   const inner = await button.boundingBox();
   const outer = await wrapper.boundingBox();
   for (const side of ["x", "y", "width", "height"] as const) {

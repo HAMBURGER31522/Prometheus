@@ -253,7 +253,8 @@ def test_the_eye_reveals_a_profiles_saved_key_and_only_that_one(client):
     assert response.status_code == 200
     assert response.json() == {"api_key": "sk-gpt-2222"}
     assert client.post("/api/settings/reveal-key", json={"profile_id": "nope"}, headers=AUTH).status_code == 404
-    assert client.post("/api/settings/reveal-key", json={"profile_id": "gpt"}).status_code == 401
+    wrong = {"Authorization": "Bearer wrong-token"}
+    assert client.post("/api/settings/reveal-key", json={"profile_id": "gpt"}, headers=wrong).status_code == 401
 
 
 def test_the_eye_reveals_the_custom_transcription_key(client):
