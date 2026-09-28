@@ -276,16 +276,23 @@ function useItemDrag(onDrop: (itemId: string, categoryId: number) => void) {
 
   const start = (event: ReactPointerEvent, row: ItemRow) => {
     if (event.button !== 0) return;
+    // A press on a card starts no text selection: sweeping across the page would select it.
+    event.preventDefault();
     const origin = { x: event.clientX, y: event.clientY };
     let moved = false;
     const stop = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("keydown", cancel);
+      delete document.documentElement.dataset.dragging;
       setState(null);
     };
     const move = (next: PointerEvent) => {
       if (!moved && Math.hypot(next.clientX - origin.x, next.clientY - origin.y) < 6) return;
+      if (!moved) {
+        document.documentElement.dataset.dragging = "";
+        window.getSelection()?.removeAllRanges();
+      }
       moved = true;
       setState({ id: row.id, title: itemTitle(row), x: next.clientX, y: next.clientY, target: categoryAt(next.clientX, next.clientY) });
     };
