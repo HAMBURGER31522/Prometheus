@@ -11,6 +11,8 @@ from video_report_agent.pi import PiRunner
 
 PLATFORM_LABELS = {"bilibili": "Bilibili", "youtube": "YouTube"}
 FIGURES_MD = Path(__file__).parents[1] / "figures" / "figures.md"
+# 「完整」精读的附加规则 (PLAN 15.4.11).
+DEPTH_MD = Path(__file__).with_name("depth.md")
 
 WINDOWS_PROMPT = (
     "本机为 Windows，命令工具是 PowerShell；运行 Python 用"

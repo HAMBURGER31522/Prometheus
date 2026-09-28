@@ -78,3 +78,27 @@ def test_finalize_inserts_missing_placeholder_after_h1(tmp_path):
 
 def test_extract_report_title():
     assert extract_report_title("<html><body><h1>标题 <b>加粗</b></h1></body></html>") == "标题 加粗"
+
+
+def test_finalize_styles_supplement_boxes_with_the_template_colours(tmp_path):
+    """「补充说明（非视频内容）」boxes (PLAN 15.4.11) get a style from the template's variables."""
+    html = TEMPLATE.split("<figure")[0] + (
+        '<aside class="supplement"><p class="supplement-label">补充说明（非视频内容）</p><p>背景。</p></aside>'
+        "</body></html>")
+    work = _work(tmp_path, html=html)
+    final = tmp_path / "report" / "report.html"
+    finalize_report(work / "report.html", final, work)
+    out = final.read_text(encoding="utf-8")
+    assert '<style id="prometheus-supplement">' in out
+    assert "aside.supplement" in out and "var(--muted)" in out
+    assert "#" not in out.split('<style id="prometheus-supplement">')[1].split("</style>")[0]
+
+
+def test_finalize_adds_no_supplement_style_without_supplements(tmp_path):
+    html = TEMPLATE.split("<figure")[0] + "</body></html>"
+    work = _work(tmp_path, html=html)
+    final = tmp_path / "report" / "report.html"
+    finalize_report(work / "report.html", final, work)
+    out = final.read_text(encoding="utf-8")
+    assert "prometheus-supplement" not in out
+    assert "{{VIDEO_DESCRIPTION}}" not in out

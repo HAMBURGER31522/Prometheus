@@ -101,3 +101,32 @@ def test_report_stage_runs_pi_and_writes_input_json(tmp_path, monkeypatch):
     assert payload["platform"] == "Bilibili" and payload["report_mode"] == "standard"
     assert seen["command_prefix"] == ["node.exe", "cli.js"]
     assert seen["agent_dir"] == paths.pi_config_dir(data_dir)
+
+
+FULL = {**SETTINGS, "report": {"depth": "full"}}
+STANDARD = {**SETTINGS, "report": {"depth": "standard"}}
+
+
+def test_full_depth_hands_the_agent_depth_md_and_more_time():
+    """「完整」精读 (PLAN 15.4.11): the extra rules file, a line pointing at it, 3× the time."""
+    kwargs = build_runner_kwargs(ROW, FULL, "n", "c", figures=False, model_supports_images=False)
+    names = [Path(path).name for path in kwargs["extra_files"] or []]
+    assert names == ["depth.md"]
+    assert all(Path(path).is_file() for path in kwargs["extra_files"] or [])
+    assert "depth.md" in kwargs["extra_prompt"]
+    assert kwargs["timeout"] == 3 * (1800 + 600 * 1)
+
+
+def test_full_depth_keeps_figures_alongside():
+    kwargs = build_runner_kwargs(ROW, FULL, "n", "c", figures=True, model_supports_images=True)
+    assert sorted(Path(path).name for path in kwargs["extra_files"] or []) == ["depth.md", "figures.md"]
+    assert "figures.md" in kwargs["extra_prompt"] and "depth.md" in kwargs["extra_prompt"]
+
+
+def test_standard_depth_is_the_vra_run_unchanged():
+    standard = build_runner_kwargs(ROW, STANDARD, "n", "c", figures=False, model_supports_images=False)
+    before = build_runner_kwargs(ROW, SETTINGS, "n", "c", figures=False, model_supports_images=False)
+    assert standard == before
+    assert not standard["extra_files"]
+    assert "depth.md" not in standard["extra_prompt"]
+    assert standard["timeout"] == 1800 + 600 * 1
