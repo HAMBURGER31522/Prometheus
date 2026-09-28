@@ -32,6 +32,11 @@ describe("常用供应商 (PLAN 15.4.10)", () => {
     }
   });
 
+  it("DeepSeek and 智谱 also open their official key pages (user 2026-09-28)", () => {
+    expect(byLabel("DeepSeek").key_url).toBe("https://platform.deepseek.com/api_keys");
+    expect(byLabel("智谱").key_url).toBe("https://bigmodel.cn/usercenter/proj-mgmt/apikeys");
+  });
+
   it("recognises a saved profile's platform by its address", () => {
     expect(presetOf({ kind: "custom", base_url: "https://api.moonshot.cn/v1/" }).label).toBe("Kimi");
     expect(presetOf({ kind: "custom", base_url: "https://api.justwoker.icu/v1" }).label).toBe("自定义");

@@ -241,3 +241,25 @@ def _no_network(monkeypatch):
         raise AssertionError("a test tried to reach a real model endpoint")
 
     monkeypatch.setattr(model_list, "_fetch_json", refuse, raising=False)
+
+
+def test_the_eye_reveals_a_profiles_saved_key_and_only_that_one(client):
+    """「显示 API Key」(PLAN 15.4.10, user 2026-09-28): the full key comes back only when asked for."""
+    body = client.get("/api/settings", headers=AUTH).json()
+    body["llm_profiles"] = {"active": "claude", "items": [CLAUDE, GPT]}
+    client.put("/api/settings", json=body, headers=AUTH)
+    assert client.get("/api/settings", headers=AUTH).json()["llm_profiles"]["items"][1]["api_key"] == "****2222"
+    response = client.post("/api/settings/reveal-key", json={"profile_id": "gpt"}, headers=AUTH)
+    assert response.status_code == 200
+    assert response.json() == {"api_key": "sk-gpt-2222"}
+    assert client.post("/api/settings/reveal-key", json={"profile_id": "nope"}, headers=AUTH).status_code == 404
+    assert client.post("/api/settings/reveal-key", json={"profile_id": "gpt"}).status_code == 401
+
+
+def test_the_eye_reveals_the_custom_transcription_key(client):
+    body = client.get("/api/settings", headers=AUTH).json()
+    body["asr"]["custom"] = {"base_url": "https://asr.example.com/v1", "api_key": "sk-asr-7777", "model": "whisper-1"}
+    client.put("/api/settings", json=body, headers=AUTH)
+    response = client.post("/api/settings/reveal-key", json={"target": "asr"}, headers=AUTH)
+    assert response.status_code == 200
+    assert response.json() == {"api_key": "sk-asr-7777"}
