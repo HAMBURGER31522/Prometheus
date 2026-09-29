@@ -92,3 +92,21 @@ test("目录里没有的模型选了「超高」「最高」：提示去「高�
   await pick(page, editor, "思考强度", "超高");
   await expect(hint).toBeVisible();
 });
+
+test("Codex 官方登录后能获取模型列表，思考强度按所选模型支持的档位变灰", async ({ page }) => {
+  const editor = await newProfile(page);
+  await pick(page, editor, "Agent", "Codex CLI");
+  await editor.getByRole("radio", { name: "官方登录" }).check();
+  await editor.getByTestId("codex-login").getByRole("button", { name: "登录 ChatGPT 账户" }).click();
+  await expect(editor.getByTestId("codex-login")).toContainText("已登录");
+  await editor.getByRole("button", { name: "获取模型列表" }).click();
+  const list = page.getByRole("listbox", { name: "模型列表" });
+  await expect(list.getByRole("option", { name: /gpt-6-astra/ })).toBeVisible();
+  await list.getByRole("option", { name: /gpt-5\.5/ }).click();
+  await editor.getByRole("combobox", { name: "思考强度" }).click();
+  const levels = page.getByRole("listbox", { name: "思考强度" });
+  await expect(levels.getByRole("option", { name: "中", exact: true })).not.toHaveAttribute("aria-disabled", "true");
+  await expect(levels.getByRole("option", { name: "最高", exact: true })).toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Escape");
+  await expect(editor.getByText("gpt-5.5 在 Codex 里支持：低、中")).toBeVisible();
+});
