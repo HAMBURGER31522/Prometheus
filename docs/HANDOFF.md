@@ -135,3 +135,5 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **评测**：`uv run python scripts/report-eval/run.py acceptance-output/r7-data --items <ID> --label <名字> [--report <ID>=<HTML>]`，结果在 `acceptance-output/report-eval/`（不入库）。旧报告备份在 `old/`，第 1 层（只加规则）的英文报告在 `l1/`。
 - **费用**：中转站没有提示缓存，Agent 每一轮都重发全部上下文。预算 60–80 美元，超出前停下来问用户。到开跑英文完整流程之前，累计约 6.8 美元（基线评测、第 1 层重写和评测）。
 - **用户的工作习惯**：需要用户定的事用弹窗问（AskUserQuestion），附推荐项；改规格要先问、得到同意再写进 PLAN；回答要说清楚改了什么、为什么。
+- **README 要用的耗时数据**（用户 2026-09-29 要求）：`docs/report-eval.md` 的「耗时」一节，gpt-6-luna（ChatGPT 订阅经本机 CPA）在「最高」「超高」下各视频长度的实测时间。R8 重写 README 时写进去。
+- **当前模型**：预览数据的配置已切回 justwoker 中转（claude-opus-4-8，「中」）；CPA 的 gpt-6-luna 配置保留但不用（用户 2026-09-29：先别用 Codex 订阅）。模型目录已从 pi.dev 更新过。
