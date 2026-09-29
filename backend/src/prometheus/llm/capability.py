@@ -36,8 +36,11 @@ def pi_model_listing(node_exe, pi_cli, data_dir, llm: dict) -> str:
         "PI_API_KEY": key,
         f"{provider.upper().replace('-', '_')}_API_KEY": key,
     }
+    from prometheus.agents import contain
+
+    folder = paths.pi_config_dir(data_dir)
     listing = subprocess.run(
-        [str(node_exe), str(pi_cli), "--offline", "--list-models"],
+        [*contain.prefix([folder], temp=folder / "tmp"), str(node_exe), str(pi_cli), "--offline", "--list-models"],
         capture_output=True, env=env, timeout=60, check=False,
     )
     return listing.stdout.decode("utf-8", "replace")

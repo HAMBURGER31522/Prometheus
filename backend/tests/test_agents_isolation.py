@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 import pytest
-from prometheus.agents import commands, fake_api, runs
+from prometheus.agents import commands, contain, fake_api, runs
 
 pytestmark = pytest.mark.agents
 TOOLS = Path(os.environ.get("PROMETHEUS_TOOLS") or "E:/tools/Prometheus-Desktop")
@@ -111,15 +111,20 @@ def test_without_the_isolation_the_same_call_does_leak(home, agent_id, monkeypat
         return {**real_env(env, **kwargs), name: str(folder)}
 
     monkeypatch.setattr(commands, f"{agent_id}_env", users_own)
+    monkeypatch.setattr(contain, "prefix", lambda writable, *, temp: [])  # no file protection either
     if agent_id == "claude":  # --bare would still skip CLAUDE.md and hooks: take it out for the control
         real = commands.claude_command
         monkeypatch.setattr(commands, "claude_command",
                             lambda exe, **kwargs: [part for part in real(exe, **kwargs) if part != "--bare"])
     else:  # --ignore-user-config would still skip config.toml
         real = commands.codex_command
-        monkeypatch.setattr(commands, "codex_command",
-                            lambda exe, **kwargs: [part for part in real(exe, **kwargs)
-                                                   if part not in ("--ignore-user-config", "project_doc_max_bytes=0")])
+
+        def users_config(exe, **kwargs):
+            command = [part for part in real(exe, **kwargs) if part != "--ignore-user-config"]
+            at = command.index("project_doc_max_bytes=0")
+            return command[:at - 1] + command[at + 1:]  # the setting and its 「-c」
+
+        monkeypatch.setattr(commands, "codex_command", users_config)
     work = home["root"] / "work"
     work.mkdir()
     with fake_api.FakeModelApi() as api:

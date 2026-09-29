@@ -16,6 +16,11 @@ CLAUDE = {"id": "claude", "access": "key", "base_url": "https://relay.example"}
 CODEX = {"id": "codex", "access": "key", "base_url": "https://relay.example/v1"}
 
 
+def _started(call) -> str:
+    """The program behind the protection prefix (agents/contain.py)."""
+    return call["command"][call["command"].index("--") + 1]
+
+
 def _stream(name: str) -> bytes:
     return (FIXTURES / f"{name}.jsonl").read_bytes()
 
@@ -49,7 +54,7 @@ def test_claude_code_answers_from_its_result_event(started, tmp_path):
     (tmp_path / "work").mkdir()
     assert _one_shot(CLAUDE, tmp_path) == "可用" and len(calls) == 1
     call = calls[0]
-    assert call["command"][0] == str(commands.executable(tmp_path / "tools", "claude"))
+    assert _started(call) == str(commands.executable(tmp_path / "tools", "claude"))
     assert call["input"] == "回复两个字：可用" and call["cwd"] == tmp_path / "work"
     assert call["env"]["CLAUDE_CONFIG_DIR"] == str(tmp_path / "config" / "claude")
     assert call["env"]["CLAUDE_CODE_MAX_RETRIES"] == "3"  # as Pi: three tries of its own before ours
@@ -62,7 +67,7 @@ def test_codex_answers_with_its_last_message(started, tmp_path):
     (tmp_path / "work").mkdir()
     assert _one_shot(CODEX, tmp_path) == "可用" and len(calls) == 1
     call = calls[0]
-    assert call["command"][0] == str(commands.executable(tmp_path / "tools", "codex"))
+    assert _started(call) == str(commands.executable(tmp_path / "tools", "codex"))
     configs = [call["command"][i + 1] for i, part in enumerate(call["command"]) if part == "-c"]
     assert "model_providers.prometheus.request_max_retries=3" in configs
     assert "model_providers.prometheus.stream_max_retries=3" in configs
@@ -118,7 +123,7 @@ def test_a_task_gets_the_same_rules_and_skill_as_pi_and_leaves_its_file(started,
     if agent is CLAUDE:
         assert command[command.index("--tools") + 1] == "Read,Edit,PowerShell"
     else:
-        assert command[command.index("--sandbox") + 1] == "workspace-write"
+        assert command[command.index("--sandbox") + 1] == "danger-full-access"  # contained instead
     assert (workspace / "agent.events.jsonl").read_bytes() == _stream(stream)
 
 

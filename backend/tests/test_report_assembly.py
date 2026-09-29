@@ -99,7 +99,9 @@ def test_report_stage_runs_pi_and_writes_input_json(tmp_path, monkeypatch):
     assert report.is_file()
     payload = json.loads((work / "input.json").read_text(encoding="utf-8"))
     assert payload["platform"] == "Bilibili" and payload["report_mode"] == "standard"
-    assert seen["command_prefix"] == ["node.exe", "cli.js"]
+    # Pi behind the protection prefix (PLAN 15.4.13)
+    assert seen["command_prefix"][1:3] == ["-m", "prometheus.agents.contain"]
+    assert seen["command_prefix"][-2:] == ["node.exe", "cli.js"]
     assert seen["agent_dir"] == paths.pi_config_dir(data_dir)
 
 

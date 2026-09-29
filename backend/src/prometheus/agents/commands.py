@@ -24,7 +24,8 @@ CODEX_EFFORT = {"off": "none"}
 # On by default in Codex, missing in Pi: a plugin marketplace it downloads, web search, sub-agents…
 CODEX_OFF = ("plugins", "remote_plugin", "plugin_sharing", "apps", "browser_use", "browser_use_external",
              "computer_use", "goals", "hooks", "image_generation", "multi_agent", "skill_search", "tool_suggest",
-             "sleep_tool", "in_app_updates", "realtime_conversation")
+             "sleep_tool", "in_app_updates", "realtime_conversation",
+             "unbounded_connection_retries")  # else an unreachable endpoint is tried forever
 KEY_VARIABLE = "PROMETHEUS_AGENT_KEY"
 # Pi tries a failed request three times itself; the stage's relay retry comes on top (report/workspace.py).
 RETRIES = 3
@@ -63,10 +64,13 @@ def claude_env(env: dict, *, config_root, base_url: str, api_key: str) -> dict:
 
 
 def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, base_url, images=()) -> list:
-    """`base_url` None: the app's own ChatGPT login instead of an endpoint and a key."""
+    """`base_url` None: the app's own ChatGPT login instead of an endpoint and a key. A task that
+    writes runs without Codex's own sandbox: on Windows it refuses every command when there is no
+    window to ask in, and every run is contained instead (contain.py, user 2026-09-29)."""
     command = [str(exe), "exec", "--json", "--model", model, "--ephemeral", "--ignore-user-config", "--ignore-rules",
-               "--skip-git-repo-check", "--sandbox", "workspace-write" if write else "read-only", "-C", str(workspace)]
-    settings = [f"model_reasoning_effort={json.dumps(CODEX_EFFORT.get(thinking, thinking))}", "project_doc_max_bytes=0",
+               "--skip-git-repo-check", "--sandbox", "danger-full-access" if write else "read-only", "-C", str(workspace)]
+    settings = [f"model_reasoning_effort={json.dumps(CODEX_EFFORT.get(thinking, thinking))}", 'approval_policy="never"',
+                "project_doc_max_bytes=0",
                 "skills.include_instructions=false", 'web_search="disabled"', "check_for_update_on_startup=false"]
     if base_url:
         settings += ['model_provider="prometheus"', 'model_providers.prometheus.name="prometheus"',

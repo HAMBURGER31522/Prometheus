@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from prometheus import paths
-from prometheus.agents import runs
+from prometheus.agents import contain, runs
 from prometheus.llm import one_shot
 from prometheus.report import full, patch, pi_run, viewpoints
 from prometheus.report.chunks import load_units
@@ -79,6 +79,9 @@ def run_report_stage(data_dir, item_id: str, row: dict, settings: dict, *,
         figures=figures, model_supports_images=model_supports_images,
     )
     kwargs["agent_dir"] = paths.pi_config_dir(data_dir)
+    # run contained: writable only in the item's work folder and Pi's own folder (PLAN 15.4.13)
+    kwargs["command_prefix"] = [*contain.prefix([work, kwargs["agent_dir"]], temp=kwargs["agent_dir"] / "tmp"),
+                                *kwargs["command_prefix"]]
     runner = PiRunner(**kwargs)
     return asyncio.run(runner.run(work))
 

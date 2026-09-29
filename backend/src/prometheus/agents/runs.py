@@ -14,7 +14,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from prometheus.agents import commands
+from prometheus.agents import commands, contain
 from prometheus.report import pi_run
 
 NAMES = {"claude": "Claude Code", "codex": "Codex CLI"}
@@ -81,6 +81,9 @@ def _start(agent: dict, *, prompt: str, model: str, api_key: str, thinking: str,
         command = commands.codex_command(exe, model=model, thinking=thinking, workspace=cwd, write=write,
                                          base_url=None if signed_in else agent["base_url"], images=files)
         env = commands.codex_env(os.environ, config_root=config_root, api_key=None if signed_in else api_key)
+    own = Path(config_root) / agent_id
+    writable = [cwd, own] if write else [own]  # everything else stays out of reach (contain.py)
+    command = [*contain.prefix(writable, temp=own / "tmp"), *command]
     try:
         return subprocess.run(command, input=prompt.encode("utf-8"), capture_output=True, cwd=str(cwd), env=env,
                               timeout=timeout, check=False)

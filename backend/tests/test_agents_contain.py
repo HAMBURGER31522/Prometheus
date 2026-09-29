@@ -30,7 +30,7 @@ def _folders(tmp_path):
 def _contained(tmp_path, script: str, **kwargs):
     inside, _outside, temp, _canary = _folders(tmp_path)
     return subprocess.run([*contain.prefix([inside], temp=temp), POWERSHELL, "-NoProfile", "-Command", script],
-                          capture_output=True, cwd=inside, **kwargs)
+                          capture_output=True, cwd=inside, check=False, **kwargs)
 
 
 def test_the_prefix_names_the_writable_folders_and_the_temp_folder(tmp_path):
@@ -46,7 +46,7 @@ def test_a_contained_program_writes_in_its_folder_but_cannot_delete_or_write_any
               f"Set-Content -LiteralPath '{outside / 'written.txt'}' -Value bad -ErrorAction SilentlyContinue; "
               f"Set-Content -LiteralPath (Join-Path $env:TEMP 'scratch.txt') -Value ok; exit 7")
     result = subprocess.run([*contain.prefix([inside], temp=temp), POWERSHELL, "-NoProfile", "-Command", script],
-                            capture_output=True, cwd=inside, timeout=120)
+                            capture_output=True, cwd=inside, timeout=120, check=False)
     assert result.returncode == 7
     assert (inside / "ch-01.html").is_file() and (temp / "scratch.txt").is_file()
     assert canary.read_text(encoding="utf-8") == "do not delete"
@@ -55,7 +55,7 @@ def test_a_contained_program_writes_in_its_folder_but_cannot_delete_or_write_any
 
 def test_stdin_and_stdout_pass_through(tmp_path):
     result = _contained(tmp_path, "$text = [Console]::In.ReadToEnd(); Write-Output ('got ' + $text.Trim())",
-                        input="你好".encode("utf-8"), timeout=120)
+                        input="你好".encode(), timeout=120)
     assert result.returncode == 0 and "got 你好" in result.stdout.decode("utf-8", "replace")
 
 
@@ -73,7 +73,7 @@ def test_the_program_ends_when_its_launcher_is_stopped(tmp_path):
     launcher.kill()
     launcher.wait()
     time.sleep(1.5)
-    alive = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+    alive = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True, check=False).stdout
     assert str(pid) not in alive
 
 

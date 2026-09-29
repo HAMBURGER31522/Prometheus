@@ -41,7 +41,8 @@ def test_capability_query_uses_the_data_dir_config_and_the_key(tmp_path, monkeyp
     monkeypatch.setattr(capability.subprocess, "run", fake_run, raising=False)
     llm = {"provider": "deepseek", "model": "deepseek-flash", "api_key": "sk-key"}
     assert capability.query_supports_images("node.exe", "cli.js", tmp_path, llm) is True
-    assert seen["command"][:4] == ["node.exe", "cli.js", "--offline", "--list-models"]
+    pi = seen["command"][seen["command"].index("--") + 1:]  # after the protection prefix (PLAN 15.4.13)
+    assert pi[:4] == ["node.exe", "cli.js", "--offline", "--list-models"]
     assert seen["env"]["PI_CODING_AGENT_DIR"] == str(paths.pi_config_dir(tmp_path))
     assert seen["env"]["PI_API_KEY"] == "sk-key"
     assert seen["env"]["DEEPSEEK_API_KEY"] == "sk-key"

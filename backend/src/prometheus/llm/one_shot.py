@@ -26,8 +26,11 @@ def run_one_shot(work_dir, *, prompt: str, provider: str, model: str, api_key: s
         return runs.one_shot(agent, prompt=prompt, model=model, api_key=api_key, thinking=thinking,
                              work_dir=Path(work_dir), config_root=Path(agent_dir).parent,
                              tools_root=commands.tools_root(pi_cli), files=list(files))
+    from prometheus.agents import contain
+
+    # run contained: writable only in Pi's own folder (PLAN 15.4.13)
     command = [
-        node_exe, pi_cli, "-p", *ONE_SHOT_FLAGS,
+        *contain.prefix([agent_dir], temp=Path(agent_dir) / "tmp"), node_exe, pi_cli, "-p", *ONE_SHOT_FLAGS,
         "--provider", provider, "--model", model,
         "--thinking", thinking, "--api-key", api_key,
         *(f"@{path}" for path in files),  # images to look at (pi -p @screenshot.png), after the options

@@ -110,7 +110,11 @@ def run_task(workspace, prompt: str, *, expect: str, llm: dict, prefix: list, ag
                          timeout=timeout)
     env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir), "VIDEO_REPORT_PYTHON": sys.executable,
            "PYTHONUTF8": "1"}
-    asyncio.run(_run(pi_command(prefix, workspace, llm), workspace, prompt, env, timeout))
+    from prometheus.agents import contain
+
+    # run contained: writable only in the workspace and Pi's own folder (PLAN 15.4.13)
+    command = [*contain.prefix([workspace, agent_dir], temp=Path(agent_dir) / "tmp"), *pi_command(prefix, workspace, llm)]
+    asyncio.run(_run(command, workspace, prompt, env, timeout))
     target = workspace / expect
     if not target.is_file():
         raise PiRunError(f"Pi 结束了，但没有写出 {expect}")
