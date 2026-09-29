@@ -265,7 +265,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
             fragment, check, transcript, ask,
             lambda fixes: write(chapter_write.revision_prompt(base, fixes, filename, fragment)), recheck)
         (space / filename).write_bytes(fragment.encode("utf-8"))
-    links = {"points": 0, "links": 0, "kept": 0, "dropped": 0, "unsourced": 0}
+    links = dict.fromkeys(viewpoints.STATS, 0)
     if verify_links is not None:  # the editor's links, opened one by one (15.4.11a-4)
         fragment, links = viewpoints.verify(fragment, verify_links)
         (space / filename).write_bytes(fragment.encode("utf-8"))
@@ -348,7 +348,7 @@ def finish(work, plan: dict, plan_problems: list, ledger: dict, chapters: list, 
         "chapters": [],
         "problems": {"ledger": ledger["problems"], "unassigned_spans": ledger["uncovered"], "plan": plan_problems},
         "viewpoints": {name: sum((chapter.get("links") or {}).get(name, 0) for chapter in chapters)
-                       for name in ("points", "links", "kept", "dropped", "unsourced")},
+                       for name in viewpoints.STATS},
     }
     for chapter, result in zip(plan["chapters"], chapters):
         minutes = _minutes(chapter)

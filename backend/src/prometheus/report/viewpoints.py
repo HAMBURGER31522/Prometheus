@@ -2,8 +2,9 @@
 
 Where the video is contested, the editor gives its own view with a confidence and sources. The
 writer cannot browse, so a link it gives comes from memory: every one is opened, and kept only when
-the page answers and is about what the link says (shared words between the point, the link's name
-and the page). A point left without a source says so and drops a level of confidence.
+the page answers and is about what the link says: the page's title names the source, or the point
+and the link's name share words with the page (a one-word source like 「Golem」 next to a Chinese point
+can share only one). A point left without a source says so and drops a level of confidence.
 """
 
 import html as html_lib
@@ -14,6 +15,7 @@ LEVELS = ("高", "中", "低")
 UNSOURCED = "（没有可核实的来源）"
 USER_AGENT = "Mozilla/5.0 (Prometheus link check)"
 MIN_SHARED = 2
+STATS = ("points", "links", "kept", "dropped", "unsourced", "unreachable", "unrelated")
 _ASIDE = re.compile(r'<aside class="viewpoint">.*?</aside>', re.DOTALL)
 _ITEM = re.compile(r"<li\b[^>]*>.*?</li>", re.DOTALL)
 _LINK = re.compile(r'<a\b[^>]*\bhref="([^"]+)"[^>]*>(.*?)</a>', re.DOTALL)
@@ -25,13 +27,13 @@ _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.DOTALL | re.IGNORECASE)
 
 
 def open_page(url: str, *, proxy: str = "") -> str:
-    """The page's title and text (the first 200 KB); raises when it does not open."""
+    """The page's title, a newline, then its text (the first 200 KB); raises when it does not open."""
     handlers = [urllib.request.ProxyHandler({"http": proxy, "https": proxy})] if proxy.strip() else []
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.build_opener(*handlers).open(request, timeout=10) as response:
         body = response.read(200_000).decode("utf-8", "replace")
     title = _TITLE.search(body)
-    return (title.group(1) if title else "") + " " + _TAG.sub(" ", body)
+    return html_lib.unescape(title.group(1)).strip() + "\n" + _TAG.sub(" ", body) if title else _TAG.sub(" ", body)
 
 
 def _tokens(text: str) -> set:
@@ -42,6 +44,10 @@ def _tokens(text: str) -> set:
 
 
 def _related(point: str, name: str, page: str) -> bool:
+    title = page.split("\n", 1)[0].strip().lower()
+    source = html_lib.unescape(_TAG.sub("", name)).strip().lower()
+    if source and title and (source in title or title.split(" - ")[0].strip() in source):
+        return True
     return len(_tokens(point + " " + name) & _tokens(page)) >= MIN_SHARED
 
 
@@ -59,6 +65,7 @@ def _check_item(item: str, fetch, stats: dict) -> str:
         if page is not None and _related(point, name, page):
             kept += 1
         else:
+            stats["unreachable" if page is None else "unrelated"] += 1
             item = item.replace(f'href="{url}"', "\0", 1)
             item = re.sub(r'<a\b[^>]*\0[^>]*>.*?</a>[、，,]?', "", item, count=1, flags=re.DOTALL)
     stats["kept"] += kept
@@ -71,10 +78,11 @@ def _check_item(item: str, fetch, stats: dict) -> str:
 
 
 def verify(fragment: str, fetch) -> tuple:
-    """(fragment with only verified links, {points, links, kept, dropped, unsourced})."""
-    stats = {"points": 0, "links": 0, "kept": 0, "dropped": 0, "unsourced": 0}
+    """(fragment with only verified links, {points, links, kept, dropped (unreachable + unrelated), unsourced})."""
+    stats = {"points": 0, "links": 0, "kept": 0, "dropped": 0, "unsourced": 0, "unreachable": 0, "unrelated": 0}
 
     def fix_box(match: re.Match) -> str:
         return _ITEM.sub(lambda item: _check_item(item.group(0), fetch, stats), match.group(0))
 
     return _ASIDE.sub(fix_box, fragment), stats
+

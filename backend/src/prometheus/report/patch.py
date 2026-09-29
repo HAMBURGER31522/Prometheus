@@ -73,11 +73,11 @@ def _patch_one(work: Path, chapter: dict, total: int, owned: list, points: dict,
     number, fragment = chapter["number"], chapter["fragment"]
     filename = f"ch-{number:02d}.html"
     depth = DEPTH_MD.read_text(encoding="utf-8")
-    key = _digest(fragment, owned, depth, verify_links is not None)
+    key = _digest(fragment, owned, depth)
     record = work / "patch" / f"ch-{number:02d}.json"
     done = _read_json(record)
-    if isinstance(done, dict) and done.get("key") == key:
-        return done
+    if isinstance(done, dict) and done.get("key") == key and "unverified" in done:
+        return _verified(done, verify_links)
     index = {unit["unit_id"]: position for position, unit in enumerate(units)}
     sources = {point_id: _source(points[point_id], units, index) for point_id in owned}
     mine = chapter_write.chapter_units({"ranges": chapter["ranges"]}, owned, points, units) if chapter["ranges"] else []
@@ -107,13 +107,19 @@ def _patch_one(work: Path, chapter: dict, total: int, owned: list, points: dict,
             write(chapter_write.targeted_prompt(depth, fragment, failing, filename)), check)
     progress("编者观点", number, total)
     fragment, check = keep_if_not_worse(write(chapter_write.viewpoint_prompt(depth, fragment, filename)), check)
-    links = {"points": 0, "links": 0, "kept": 0, "dropped": 0, "unsourced": 0}
+    result = {"key": key, "number": number, "title": chapter["title"], "points": owned, "original": chapter["fragment"],
+              "unverified": fragment, "check": check, "targeted": bool(failing)}
+    _write_json(record, result)
+    return _verified(result, verify_links)
+
+
+def _verified(result: dict, verify_links) -> dict:
+    """The links are checked afresh on every patch, from the draft kept before verification: a fixed
+    verifier or a page that went away needs no model call (15.4.11a-4)."""
+    fragment, links = result["unverified"], dict.fromkeys(viewpoints.STATS, 0)
     if verify_links is not None:
         fragment, links = viewpoints.verify(fragment, verify_links)
-    result = {"key": key, "number": number, "title": chapter["title"], "points": owned, "original": chapter["fragment"],
-              "fragment": fragment, "check": check, "targeted": bool(failing), "links": links}
-    _write_json(record, result)
-    return result
+    return {**result, "fragment": fragment, "links": links}
 
 
 def patch_report(work, html: str, ledger: dict, units: list, run_pi, *, skipped, verify_links, progress,
@@ -156,7 +162,7 @@ def patch_report(work, html: str, ledger: dict, units: list, run_pi, *, skipped,
                      "missing": r["check"]["missing"], "weak": r["check"]["weak"], "thin": r["check"]["thin"],
                      "incomplete": r["check"].get("incomplete", {}), "links": r["links"]} for r in results],
         "viewpoints": {name: sum(r["links"].get(name, 0) for r in results)
-                       for name in ("points", "links", "kept", "dropped", "unsourced")},
+                       for name in viewpoints.STATS},
     }
     _write_json(work / "coverage.json", coverage)
     return coverage
