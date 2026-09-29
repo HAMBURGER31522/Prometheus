@@ -12,7 +12,7 @@ KEEP = frozenset({
     "asr.json", "asr-task.json", "canonical-transcript.jsonl", "input.json",
     "run.trace.jsonl", "source.info.json", "transcript-manifest.json", "transcript.md",
     "segments.json", "segments.raw.json", "segments.fine.json", "mindmap.json",
-    "coverage.json",  # 完整精读's 「要点 142/146」 in the reader (PLAN 15.4.11)
+    "coverage.json", "keypoints.json",  # 完整精读: 「要点 142/146」 in the reader, and E14 measures against the ledger
 })
 
 
