@@ -25,7 +25,9 @@ from prometheus.report.markdown_export import report_to_markdown
 
 QUESTIONS_PER_BLOCK = 4
 GRADES = ("正确", "部分正确", "未提及", "错误")
-FAITHFUL = ("有依据", "部分有依据", "无依据")
+# 讲解性补充: an analogy, a gloss or a link the ELI5 rules ask for, not written as the speaker's words
+# (user 2026-09-29); only 无依据 — words put in the speaker's mouth, or against the source — is made up.
+FAITHFUL = ("有依据", "部分有依据", "讲解性补充", "无依据")
 CONTRADICTION = ("矛盾", "不矛盾")
 # The components the Standard template defines (assets/report-template.html) plus plain HTML ones.
 COMPONENT_TAGS = ("figure", "img", "svg", "table")
@@ -459,7 +461,9 @@ def faithfulness_prompt(items: list, texts: dict) -> str:
     return (
         "下面每一条是精读报告里的一句话，后面附着它依据的视频原文。判断这句话能不能由原文支持：\n"
         "- 有依据：原文说了这个意思；\n- 部分有依据：有一部分原文没有说，或者比原文说得更具体；\n"
-        "- 无依据：原文没有这个意思，或者与原文矛盾。\n"
+        "- 讲解性补充：报告作者为了讲清楚而加的类比、术语解释、承上启下的「所以呢」，原文没有，"
+        "但没有写成讲者的话，也不与原文矛盾；\n"
+        "- 无依据：把原文没有的内容写成讲者说的、讲者的观点或视频里的事实，或者与原文矛盾。\n"
         '只输出 JSON：{"verdicts": {"1": "有依据"}}\n\n' + numbered + "\n"
     )
 

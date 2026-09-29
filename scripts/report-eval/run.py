@@ -75,7 +75,7 @@ def summary(result: dict) -> str:
         (f"- 闭卷问答：{qa['score']:.1%}（正确 {qa['correct']}、部分正确 {qa['partial']}、未提及 {qa['missing']}、"
          f"错误 {qa['wrong']}，共 {qa['total']} 题）"),
         (f"- 忠实度抽检：{faithful['sampled']} 句，有依据 {faithful['有依据']}、部分有依据 {faithful['部分有依据']}、"
-         f"无依据 {faithful['无依据']}"),
+         f"讲解性补充 {faithful.get('讲解性补充', 0)}、无依据 {faithful['无依据']}"),
         f"- 补充说明：{supplements['checked']} 条，与视频矛盾 {supplements['矛盾']} 条",
         f"- 要点覆盖：{'无（没有要点账本）' if points is None else f'{points:.1%}（跳过 {skipped} 条不计）'}",
         (f"- 时间覆盖：{time['share']:.1%}，最长漏写 {time['longest_gap_min']:.1f} 分钟（跳过的 {time['excluded']} 个单元不计）"
