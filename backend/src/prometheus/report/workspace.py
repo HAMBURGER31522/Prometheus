@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 
@@ -79,11 +80,46 @@ def run_report_stage(data_dir, item_id: str, row: dict, settings: dict, *,
         figures=figures, model_supports_images=model_supports_images,
     )
     kwargs["agent_dir"] = paths.pi_config_dir(data_dir)
+    if runs.agent_of(settings["llm"])["id"] != "pi":
+        return _standard_on_agent(work, settings, kwargs, node_exe, pi_cli)
     # run contained: writable only in the item's work folder and Pi's own folder (PLAN 15.4.13)
     kwargs["command_prefix"] = [*contain.prefix([work, kwargs["agent_dir"]], temp=kwargs["agent_dir"] / "tmp"),
                                 *kwargs["command_prefix"]]
     runner = PiRunner(**kwargs)
     return asyncio.run(runner.run(work))
+
+
+# VRA's PiRunner request for the standard report (vendor/video-report-agent pi.py), for the Agents it
+# cannot start; the staged skill and the checks afterwards are the same (PLAN 15.4.13).
+STANDARD_TEMPLATE = "report-template.html"
+STANDARD_PROMPT = (
+    "读取 transcript.md 和 input.json，按照 video-report skill 生成完整报告，写入 report.html。"
+    f"读取 assets/{STANDARD_TEMPLATE} 作为本次唯一模板，"
+    "原样保留其中的 {{VIDEO_DESCRIPTION}} 占位符一次，"
+    "放在题头之后、正文之前；不要读取、改写或自行生成视频简介，运行时会按原始元数据填充。"
+    "本任务 report_mode=standard，是任务自身保存的不可变输入；不根据当前配置或视频内容重新选择模式。"
+    "本次只读取 modes/standard.md 这一份模式文件，不读取另一模式。"
+    "Profile 只指导内容关系表达，不覆盖所选模式的展开程度。"
+    "只使用当前模式的模板、样式与组件，不读取或混入另一模式的视觉资源。"
+)
+
+
+def _standard_on_agent(work: Path, settings: dict, kwargs: dict, node_exe: str, pi_cli: str) -> Path:
+    """The 「标准」 report through Codex CLI or Claude Code: VRA's workspace, request and checks."""
+    from video_report_agent.report_content import fill_video_description
+
+    pi_run.stage_skill(work)
+    (work / "assets").mkdir(exist_ok=True)
+    for extra in kwargs.get("extra_files") or []:
+        shutil.copy2(extra, work / Path(extra).name)
+    report = pi_run.run_task(work, STANDARD_PROMPT + (kwargs.get("extra_prompt") or ""), expect="report.html",
+                             llm=_llm(settings), prefix=[node_exe, pi_cli], agent_dir=kwargs["agent_dir"],
+                             timeout=kwargs["timeout"])
+    fill_video_description(report, work)
+    html = report.read_text(encoding="utf-8").lower()
+    if "<html" not in html or "</html>" not in html or "<body" not in html:
+        raise runs.AgentRunError("report.html is not a complete HTML document")
+    return report
 
 
 # ---- 完整精读 (PLAN 15.4.11): 提取要点, 规划, then the report chapter by chapter ----
