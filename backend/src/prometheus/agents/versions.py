@@ -16,6 +16,10 @@ class UnknownAgent(KeyError):
     pass
 
 
+class UpdateError(RuntimeError):
+    pass
+
+
 def _row(agent: dict, version, latest) -> dict:
     return {"id": agent["id"], "name": agent["name"], "installed": version is not None, "version": version,
             "latest": latest}
@@ -75,8 +79,17 @@ def _version(package_json: Path):
 class LocalAgents:
     """What is installed on this machine; checking and updating arrive with the adapters (15.4.13 step 2)."""
 
-    def __init__(self, get_runtime):
+    def __init__(self, get_runtime, *, npm=None, selfcheck=None, busy=None):
         self.get_runtime = get_runtime
+
+    def check(self) -> list:
+        return self.rows()
+
+    def install(self, agent_id: str) -> list:
+        return self.rows()
+
+    def update_all(self) -> list:
+        return self.rows()
 
     def _pi_cli(self):
         try:
