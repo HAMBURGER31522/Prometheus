@@ -90,7 +90,7 @@ def test_an_entry_for_another_api_gives_its_numbers_but_not_its_compat(tmp_path,
 
 
 def test_models_dev_fills_in_the_limits_pi_does_not_know(tmp_path, pi_cli):
-    entry = written(data_dir_with(tmp_path, DOUBAO), pi_cli)
+    entry = written(data_dir_with(tmp_path, {**DOUBAO, "thinking": "medium"}), pi_cli)
     assert (entry.get("contextWindow"), entry.get("maxTokens")) == (256000, 256000)
     assert "thinkingLevelMap" not in entry and "compat" not in entry
 
@@ -99,11 +99,32 @@ def test_the_fields_follow_the_model_and_an_unknown_model_gets_none(tmp_path, pi
     data_dir = data_dir_with(tmp_path, RELAY)
     assert written(data_dir, pi_cli).get("contextWindow") == 1000000
     settings = store.load(data_dir)
-    settings["llm_profiles"]["items"][0]["model"] = UNKNOWN
+    settings["llm_profiles"]["items"][0].update(model=UNKNOWN, thinking="medium")
     store.save(data_dir, settings)
     entry = written(data_dir, pi_cli)
     assert entry["id"] == UNKNOWN
     assert set(entry) == {"id", "name", "reasoning", "input"}
+
+
+def test_a_model_the_catalogue_lacks_gets_xhigh_and_max_as_chosen(tmp_path, pi_cli):
+    """User 2026-09-29: the catalogue always lags the vendors; Pi runs xhigh / max only for a model
+    whose thinkingLevelMap names them, so for an unknown one the level is declared as it is."""
+    for thinking in ("max", "xhigh"):
+        entry = written(data_dir_with(tmp_path / thinking, {**RELAY, "model": UNKNOWN, "thinking": thinking}), pi_cli)
+        assert entry["thinkingLevelMap"] == {"xhigh": "xhigh", "max": "max"}
+    doubao = written(data_dir_with(tmp_path / "doubao", DOUBAO), pi_cli)  # models.dev knows only its limits
+    assert doubao["thinkingLevelMap"] == {"xhigh": "xhigh", "max": "max"} and doubao["contextWindow"] == 256000
+
+
+def test_a_model_the_catalogue_knows_keeps_the_catalogues_levels(tmp_path, pi_cli):
+    """A guard, not red: what the catalogue says about a known model is not overwritten."""
+    relay = written(data_dir_with(tmp_path / "relay", RELAY), pi_cli)  # claude-opus-4-8, Pi's own entry
+    assert relay["thinkingLevelMap"] == {"xhigh": "xhigh", "max": "max"}
+    known = {**OPENAI, "thinking": "max"}
+    data_dir = data_dir_with(tmp_path / "known", known)
+    source, fields = pi_models.model_fields(data_dir, known, pi_cli=pi_cli)
+    assert source == "pi"
+    assert written(data_dir, pi_cli).get("thinkingLevelMap") == fields.get("thinkingLevelMap")
 
 
 def test_the_profiles_own_numbers_take_precedence(tmp_path, pi_cli):

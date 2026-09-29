@@ -45,3 +45,27 @@ test("「讲清楚审校」在完整模式下默认开、可以关；标准模�
   await depth(page).getByRole("radio", { name: /完整/ }).check();
   await expect(review).toHaveAttribute("aria-checked", "true");
 });
+
+test("「更新模型目录」：点了以后显示目录日期", async ({ page }) => {
+  await page.goto("/");
+  await openTab(page, "设置");
+  const catalogue = page.getByTestId("model-catalogue");
+  await expect(catalogue).toContainText("模型目录");
+  await page.getByRole("button", { name: "更新模型目录" }).click();
+  await expect(catalogue).toContainText(/已更新.*\d{4}-\d{2}-\d{2}/);
+});
+
+test("目录里没有的模型选了「最高」，设置页说明会原样发给接口", async ({ page }) => {
+  await page.goto("/");
+  await openTab(page, "设置");
+  await page.getByRole("button", { name: "新增配置" }).click();
+  const editor = page.getByRole("region", { name: "编辑模型配置" });
+  await editor.getByRole("button", { name: "自定义", exact: true }).click();
+  await editor.getByRole("combobox", { name: "模型" }).fill("fake-model-a");
+  await expect(editor.getByText("会把所选档位原样发给接口")).toHaveCount(0);
+  await editor.getByRole("combobox", { name: "思考强度" }).click();
+  await page.getByRole("listbox", { name: "思考强度" }).getByRole("option", { name: "最高" }).click();
+  await expect(
+    editor.getByText("这个模型不在模型目录里：会把所选档位原样发给接口，接口不支持时任务会失败并写明原因"),
+  ).toBeVisible();
+});

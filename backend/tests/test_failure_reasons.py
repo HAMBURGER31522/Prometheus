@@ -188,6 +188,12 @@ SAMPLES = [
     # 完整精读's key points (one-shot calls) and plan (a Pi run) call the model too (PLAN 15.4.11)
     ("keypoints", "EXTERNAL_API_FAILURE", "一次性文本调用失败（exit 1）：503 status code (no body)", "MODEL_BUSY"),
     ("plan", "EXTERNAL_MODEL_FAILURE", '429 {"type":"error","error":{"type":"rate_limit_error"}}', "MODEL_RATE_LIMITED"),
+    # OpenAI's "Unsupported value" error (the wording its API uses for a parameter a model does not
+    # accept, e.g. temperature); a thinking level passed through for a model the catalogue lacks
+    ("report", "EXTERNAL_MODEL_FAILURE", (
+        "400 Unsupported value: 'reasoning_effort' does not support 'max' with this model. "
+        "Supported values are: 'low', 'medium', and 'high'."
+    ), "MODEL_THINKING_UNSUPPORTED"),
     # ---- 本机 (transcribe/local.py; downloader/http.py 'unable to write data: <OSError>'; Windows OSError) ----
     ("transcribe", "CUDA_UNAVAILABLE", "尚未安装本地转写组件，请先在设置里启用本地转写。", "ASR_COMPONENTS_MISSING"),
     ("transcribe", "ASR_FAILURE", "本地转写进程异常结束（exit 3221225477），请查看 asr-worker.log。",
