@@ -214,3 +214,66 @@ def test_the_frame_ledger_looks_through_the_configured_model_with_the_frames_att
     frame = tmp_path / "f_000030.jpg"
     assert seen["look"]("看图", [frame]) == "{}"
     assert seen["call"]["files"] == [frame] and seen["call"]["prompt"] == "看图"
+
+
+def _relay(fails: list, *, error):
+    """A call that fails with the given errors first, then answers."""
+    calls = []
+
+    def call(*args, **kwargs):
+        calls.append(kwargs)
+        if len(calls) <= len(fails):
+            raise error(fails[len(calls) - 1])
+        return "ok"
+
+    return call, calls
+
+
+def test_a_run_the_relay_broke_is_tried_again_after_a_wait(data_dir, monkeypatch, tmp_path):
+    """English run 2026-09-28: timeouts, 429 and connection errors for minutes; Pi's own retries
+    (2, 4, 8 s) were not enough and a whole chapter failed."""
+    waits = []
+    monkeypatch.setattr(workspace_mod.time, "sleep", waits.append)
+    task, calls = _relay(["Request timed out.", '429 {"error":{"message":"rate limited"}}'], error=PiRunError)
+    monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
+    run = workspace_mod.pi_runner(data_dir, store.load(data_dir), "n", "c", deadline=time.monotonic() + 3600)
+    assert run(tmp_path, "任务", "ch-07.html") == "ok"
+    assert len(calls) == 3 and waits == [workspace_mod.RELAY_WAIT_S] * 2
+
+
+def test_other_failures_and_a_third_relay_failure_are_not_hidden(data_dir, monkeypatch, tmp_path):
+    monkeypatch.setattr(workspace_mod.time, "sleep", lambda seconds: None)
+    task, calls = _relay(["Pi 结束了，但没有写出 ch-07.html"], error=PiRunError)
+    monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
+    run = workspace_mod.pi_runner(data_dir, store.load(data_dir), "n", "c", deadline=time.monotonic() + 3600)
+    with pytest.raises(PiRunError, match="没有写出"):
+        run(tmp_path, "任务", "ch-07.html")
+    assert len(calls) == 1
+    task, calls = _relay(["Connection error."] * 3, error=PiRunError)
+    monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
+    with pytest.raises(PiRunError, match="Connection error"):
+        run(tmp_path, "任务", "ch-07.html")
+    assert len(calls) == 3
+
+
+def test_no_wait_past_the_stages_time(data_dir, monkeypatch, tmp_path):
+    monkeypatch.setattr(workspace_mod.time, "sleep", lambda seconds: None)
+    task, calls = _relay(["Request timed out."], error=PiRunError)
+    monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
+    run = workspace_mod.pi_runner(data_dir, store.load(data_dir), "n", "c", deadline=time.monotonic() + 30)
+    with pytest.raises(PiRunError, match="timed out"):
+        run(tmp_path, "任务", "ch-07.html")
+    assert len(calls) == 1
+
+
+def test_one_shot_calls_the_relay_broke_are_tried_again_too(data_dir, monkeypatch, tmp_path):
+    from prometheus.llm.one_shot import OneShotError
+
+    waits = []
+    monkeypatch.setattr(workspace_mod.time, "sleep", waits.append)
+    shot, calls = _relay(["一次性文本调用失败（exit 1）：503 status code (no body)"], error=OneShotError)
+    monkeypatch.setattr(workspace_mod.one_shot, "run_one_shot", lambda work_dir, **kwargs: shot(**kwargs))
+    settings = store.load(data_dir)
+    assert workspace_mod.model_ask(data_dir, tmp_path, settings, "n", "c")("问题") == "ok"
+    assert workspace_mod.model_look(data_dir, tmp_path, settings, "n", "c")("看图", []) == "ok"
+    assert len(calls) == 3 and waits == [workspace_mod.RELAY_WAIT_S]
