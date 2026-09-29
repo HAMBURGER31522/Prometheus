@@ -238,10 +238,21 @@ def test_a_run_the_relay_broke_is_tried_again_after_a_wait(data_dir, monkeypatch
     monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
     run = workspace_mod.pi_runner(data_dir, store.load(data_dir), "n", "c", deadline=time.monotonic() + 3600)
     assert run(tmp_path, "任务", "ch-07.html") == "ok"
-    assert len(calls) == 3 and waits == [workspace_mod.RELAY_WAIT_S] * 2
+    assert len(calls) == 3 and waits == [10, 20]
 
 
-def test_other_failures_and_a_third_relay_failure_are_not_hidden(data_dir, monkeypatch, tmp_path):
+def test_ten_tries_with_waits_doubling_from_ten_seconds_up_to_two_minutes(data_dir, monkeypatch, tmp_path):
+    """User 2026-09-29: ten chances, from 10 s and growing, like the official clients' backoff."""
+    waits = []
+    monkeypatch.setattr(workspace_mod.time, "sleep", waits.append)
+    task, calls = _relay(["unexpected EOF"] * 10, error=PiRunError)
+    monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
+    run = workspace_mod.pi_runner(data_dir, store.load(data_dir), "n", "c", deadline=time.monotonic() + 36000)
+    assert run(tmp_path, "任务", "ch-07.html") == "ok"
+    assert len(calls) == 11 and waits == [10, 20, 40, 80, 120, 120, 120, 120, 120, 120]
+
+
+def test_other_failures_and_an_eleventh_relay_failure_are_not_hidden(data_dir, monkeypatch, tmp_path):
     monkeypatch.setattr(workspace_mod.time, "sleep", lambda seconds: None)
     task, calls = _relay(["Pi 结束了，但没有写出 ch-07.html"], error=PiRunError)
     monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
@@ -249,11 +260,11 @@ def test_other_failures_and_a_third_relay_failure_are_not_hidden(data_dir, monke
     with pytest.raises(PiRunError, match="没有写出"):
         run(tmp_path, "任务", "ch-07.html")
     assert len(calls) == 1
-    task, calls = _relay(["Connection error."] * 3, error=PiRunError)
+    task, calls = _relay(["Connection error."] * 11, error=PiRunError)
     monkeypatch.setattr(workspace_mod.pi_run, "run_task", lambda workspace, prompt, **kwargs: task(**kwargs))
     with pytest.raises(PiRunError, match="Connection error"):
         run(tmp_path, "任务", "ch-07.html")
-    assert len(calls) == 3
+    assert len(calls) == 11
 
 
 def test_no_wait_past_the_stages_time(data_dir, monkeypatch, tmp_path):
@@ -276,4 +287,4 @@ def test_one_shot_calls_the_relay_broke_are_tried_again_too(data_dir, monkeypatc
     settings = store.load(data_dir)
     assert workspace_mod.model_ask(data_dir, tmp_path, settings, "n", "c")("问题") == "ok"
     assert workspace_mod.model_look(data_dir, tmp_path, settings, "n", "c")("看图", []) == "ok"
-    assert len(calls) == 3 and waits == [workspace_mod.RELAY_WAIT_S]
+    assert len(calls) == 3 and waits == [10]
