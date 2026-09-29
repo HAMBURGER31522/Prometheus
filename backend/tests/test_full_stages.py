@@ -313,3 +313,21 @@ def test_the_time_limit_grows_with_the_thinking_level(data_dir, monkeypatch, thi
     report, plan = seen
     assert times * 1800 - 10 < report <= times * 1800
     assert max(1, times / 3) * 1800 - 10 < plan <= max(1, times / 3) * 1800
+
+
+def test_the_chapter_report_opens_the_editors_links_through_the_proxy(data_dir, monkeypatch):
+    ctx = _ctx(data_dir)
+    settings = store.load(data_dir)
+    settings["network"]["proxy"] = "http://127.0.0.1:7890"
+    store.save(data_dir, settings)
+    seen = {}
+    monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
+    monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
+    monkeypatch.setattr(workspace_mod.full, "write_chapters", lambda *args, **kwargs: seen.update(kwargs) or [])
+    monkeypatch.setattr(workspace_mod.full, "finish", lambda *args: {})
+    monkeypatch.setattr(workspace_mod.viewpoints, "open_page", lambda url, *, proxy="": seen.setdefault("opened", (url, proxy)) and "页面")
+    row = items_store.get_item(data_dir, ctx.item_id)
+    workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="n", pi_cli="c",
+                                        figures=False, progress=lambda *args: None)
+    assert seen["verify_links"]("https://en.wikipedia.org/wiki/X") == "页面"
+    assert seen["opened"] == ("https://en.wikipedia.org/wiki/X", "http://127.0.0.1:7890")

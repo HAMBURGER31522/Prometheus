@@ -273,7 +273,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
 
 
 def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, figures: bool, review: bool,
-                   progress, workers: int = 3, look=None) -> list:
+                   progress, workers: int = 3, look=None, verify_links=None) -> list:
     """`look(prompt, files) -> reply`: a call that sees images, for the frame ledger (多配图 ①)."""
     work = Path(work)
     points = {point["id"]: point for point in ledger["points"]}

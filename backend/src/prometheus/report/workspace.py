@@ -9,7 +9,7 @@ from pathlib import Path
 
 from prometheus import paths
 from prometheus.llm import one_shot
-from prometheus.report import full, pi_run
+from prometheus.report import full, pi_run, viewpoints
 from prometheus.report.chunks import load_units
 from prometheus.report.full import FIGURES_MD
 from prometheus.report.timing import pi_timeout_seconds

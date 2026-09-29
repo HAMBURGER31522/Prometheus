@@ -318,3 +318,27 @@ def test_the_review_keeps_what_was_asked_and_how_it_was_judged(tmp_path):
     assert details["questions"] == [{"quote": "咖啡豆的烘焙和萃取之0", "question": "烘焙到什么程度？",
                                      "verdict": {"kind": "原文有答案", "answer": "中深烘"}}]
     assert details["pictures"] == [] and "judge_reply" in details
+
+
+def test_the_editors_links_are_verified_and_counted_in_the_coverage(tmp_path):
+    """PLAN 15.4.11a-4: a dead link in the editor's view is dropped before assembly."""
+    box = ('<aside class="viewpoint"><p class="viewpoint-label">编者观点（非视频内容）</p><ul>'
+           '<li>编者的判断。<span class="confidence">置信度：中</span>依据：'
+           '<a href="https://en.wikipedia.org/wiki/Coffee_roasting">Coffee roasting (Wikipedia)</a>、'
+           '<a href="https://example.org/gone">Gone</a></li></ul></aside>')
+    pi = Pi(chapter=lambda prompt, attempt: section(prompt).replace("</section>", box + "</section>"))
+    units, model = make_units(), Model()
+    ledger = full.run_keypoints(tmp_path, units, model)
+    plan, problems = full.run_plan(tmp_path, ledger, pi, figures=False, input_json=INPUT)
+
+    def open_page(url):
+        if "gone" in url:
+            raise OSError("404")
+        return "Coffee roasting - Wikipedia"
+
+    chapters = full.write_chapters(tmp_path, plan, ledger, units, pi, model, figures=False, review=False,
+                                   progress=lambda *args: None, workers=1, verify_links=open_page)
+    coverage = full.finish(tmp_path, plan, problems, ledger, chapters, INPUT)
+    html = (tmp_path / "report.html").read_text(encoding="utf-8")
+    assert "example.org/gone" not in html and "Coffee_roasting" in html
+    assert coverage["viewpoints"] == {"points": 2, "links": 4, "kept": 2, "dropped": 2, "unsourced": 0}
