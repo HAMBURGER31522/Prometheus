@@ -513,9 +513,12 @@ def pi_events_offsets(folder) -> dict:
     return {path: path.stat().st_size for path in _event_logs(folder)}
 
 
+def number(value) -> int:
+    return int(value or 0)
+
+
 def _usage(event: dict):
     """(input, output, cacheRead, cacheWrite, replies) of one recorded event, or None."""
-    number = lambda value: int(value or 0)
     if event.get("type") == "message_end" and (event.get("message") or {}).get("role") == "assistant":  # Pi
         usage = event["message"].get("usage") or {}
         return (number(usage.get("input")), number(usage.get("output")), number(usage.get("cacheRead")),
