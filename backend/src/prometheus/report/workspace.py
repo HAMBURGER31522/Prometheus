@@ -91,10 +91,12 @@ def review_on(settings: dict) -> bool:
     return (settings.get("report") or {}).get("review", True) is not False
 
 
-# The relay can break for minutes (timeouts, 429, connection errors); Pi's own retries wait 2, 4 and
-# 8 seconds. A call it broke is run again after a longer wait, at most twice (English run, D-44).
-RELAY_RETRIES = 2
-RELAY_WAIT_S = 60
+# The relay can break for minutes (timeouts, 429, connection errors, streams cut); Pi's own retries
+# wait 2, 4 and 8 seconds. A call it broke is run again up to ten times, waiting 10 s and doubling up
+# to 2 minutes (user 2026-09-29), never past the stage's time (English runs, D-44).
+RELAY_RETRIES = 10
+RELAY_FIRST_WAIT_S = 10
+RELAY_LONGEST_WAIT_S = 120
 _RELAY_FAILURES = ("MODEL_TIMEOUT", "MODEL_RATE_LIMITED", "MODEL_BUSY")
 
 
@@ -105,9 +107,10 @@ def _patient(call, deadline=None):
         except (pi_run.PiRunError, one_shot.OneShotError) as exc:
             if attempt == RELAY_RETRIES or errors.classify("report", str(exc)) not in _RELAY_FAILURES:
                 raise
-            if deadline is not None and deadline - time.monotonic() < RELAY_WAIT_S * 2:
+            wait = min(RELAY_FIRST_WAIT_S * 2 ** attempt, RELAY_LONGEST_WAIT_S)
+            if deadline is not None and deadline - time.monotonic() < wait + 60:  # room for the retry itself
                 raise
-            time.sleep(RELAY_WAIT_S)
+            time.sleep(wait)
 
 
 def _llm(settings: dict) -> dict:
