@@ -110,3 +110,19 @@ def test_a_relative_data_dir_still_gives_pi_an_absolute_config_dir(tmp_path, mon
     assert Path(seen["agent_dir"]).is_absolute()
     assert Path(seen["work"]).is_absolute()
     assert Path(seen["agent_dir"]) == paths.pi_config_dir(data_dir.resolve())
+
+
+def test_the_grader_thinks_at_xhigh_unless_told_otherwise(tmp_path, monkeypatch):
+    """User 2026-09-29: 「低」 made the same report score 12–15 points apart between two runs."""
+    data_dir, _item_id = data_dir_with_item(tmp_path)
+    runner = load_runner()
+    seen = []
+
+    def fake_model_ask(data_dir_arg, work, thinking):
+        seen.append(thinking)
+        return runner.fake_ask
+
+    monkeypatch.setattr(runner, "model_ask", fake_model_ask)
+    assert runner.main([str(data_dir), "--out", str(tmp_path / "out")]) == 0
+    assert runner.main([str(data_dir), "--out", str(tmp_path / "out"), "--thinking", "high"]) == 0
+    assert seen == ["xhigh", "high"]
