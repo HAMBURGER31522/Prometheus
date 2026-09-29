@@ -2,10 +2,11 @@
 isolation tests: the Anthropic Messages API (Claude Code, and Pi on the Anthropic protocol) and the
 OpenAI Responses API (Codex CLI), streaming as the real ones do. It never goes online.
 
-It answers 「可用」. When the prompt carries ``WRITE:<absolute path>`` and the request offers a tool
-that can write a file (Pi's ``write``, Claude Code's ``Edit`` or ``PowerShell``, Codex's
-``exec_command``), it first calls that tool to write 「ok」 there, then answers. Every request it saw
-is kept in memory, bodies and the key it came with, for the checks.
+It answers 「可用」. Lines in the prompt make it act first, one tool call per turn, with whatever tool
+the Agent offers (Pi's ``write`` / ``powershell``, Claude Code's ``Edit`` / ``PowerShell``, Codex's
+``exec_command``): ``DELETE:<path>`` and ``OUTSIDE:<path>`` try to delete that file and to write one
+there (the file protection must stop both), then ``WRITE:<path>`` writes 「ok」 there. Every request
+it saw is kept in memory, bodies and the key it came with, for the checks.
 """
 
 import json
@@ -28,34 +29,43 @@ def _strings(value):
             yield from _strings(item)
 
 
-def _target(body) -> str | None:
-    """The path a request asks to be written, from any text in it."""
+def _marked(body, marker: str) -> list:
+    found = {}
     for text in _strings(body):
-        if match := re.search(r"WRITE:([^\r\n\"]+)", text):
-            return match.group(1).strip()
-    return None
+        for match in re.finditer(rf"{marker}:([^\r\n\"]+)", text):
+            found[match.group(1).strip()] = True
+    return list(found)
 
 
-def _anthropic_write(body: dict, path: str):
-    """(tool name, input) for the first tool offered that can write `path`; None when none can."""
+def _plan(body) -> list:
+    """The steps the prompt asks for: ("shell", command) then ("write", path)."""
+    # .NET calls rather than Remove-Item: Codex refuses commands that look destructive by their wording,
+    # a guess, not a protection; these it runs, so only the file protection can stop them.
+    tries = ([f"[System.IO.File]::Delete('{path}')" for path in _marked(body, "DELETE")]
+             + [f"[System.IO.File]::WriteAllText('{path}', 'bad')" for path in _marked(body, "OUTSIDE")])
+    steps = [("shell", "; ".join(tries))] if tries else []
+    return steps + [("write", path) for path in _marked(body, "WRITE")[:1]]
+
+
+def _anthropic_call(body: dict, step):
+    """(tool name, input) for a step with the tools offered; None when none fits."""
     names = {tool.get("name") for tool in body.get("tools") or []}
-    if "write" in names:
-        return "write", {"path": path, "content": "ok"}
-    if "Edit" in names:
-        return "Edit", {"file_path": path, "old_string": "", "new_string": "ok"}
-    for name in ("PowerShell", "powershell"):
-        if name in names:
-            return name, {"command": f"Set-Content -LiteralPath '{path}' -Value 'ok'", "description": "write the file"}
-    return None
+    shell = next((name for name in ("powershell", "PowerShell") if name in names), None)
+    kind, value = step
+    if kind == "write" and "write" in names:
+        return "write", {"path": value, "content": "ok"}
+    if kind == "write" and "Edit" in names:
+        return "Edit", {"file_path": value, "old_string": "", "new_string": "ok"}
+    command = value if kind == "shell" else f"Set-Content -LiteralPath '{value}' -Value 'ok'"
+    return (shell, {"command": command, "description": "run"}) if shell else None
 
 
-def _anthropic_done(body: dict) -> bool:
-    return any(isinstance(block, dict) and block.get("type") == "tool_result"
-               for message in body.get("messages") or [] for block in message.get("content") or []
-               if isinstance(message.get("content"), list))
+def _anthropic_turn(body: dict) -> int:
+    return sum(1 for message in body.get("messages") or [] if isinstance(message.get("content"), list)
+               for block in message["content"] if isinstance(block, dict) and block.get("type") == "tool_result")
 
 
-def _anthropic_events(model: str, tool=None) -> list:
+def _anthropic_events(model: str, tool=None, turn: int = 0) -> list:
     start = {"type": "message_start", "message": {
         "id": "msg_fake", "type": "message", "role": "assistant", "model": model, "content": [], "stop_reason": None,
         "usage": {"input_tokens": 10, "output_tokens": 1}}}
@@ -63,7 +73,7 @@ def _anthropic_events(model: str, tool=None) -> list:
         name, arguments = tool
         blocks = [
             {"type": "content_block_start", "index": 0,
-             "content_block": {"type": "tool_use", "id": "toolu_fake", "name": name, "input": {}}},
+             "content_block": {"type": "tool_use", "id": f"toolu_fake_{turn}", "name": name, "input": {}}},
             {"type": "content_block_delta", "index": 0,
              "delta": {"type": "input_json_delta", "partial_json": json.dumps(arguments, ensure_ascii=False)}},
             {"type": "content_block_stop", "index": 0},
@@ -80,14 +90,19 @@ def _anthropic_events(model: str, tool=None) -> list:
             {"type": "message_stop"}]
 
 
-def _responses_done(body: dict) -> bool:
-    return any(isinstance(item, dict) and item.get("type") == "function_call_output" for item in body.get("input") or [])
+def _responses_turn(body: dict) -> int:
+    return sum(1 for item in body.get("input") or [] if isinstance(item, dict) and item.get("type") == "function_call_output")
 
 
-def _responses_events(model: str, path=None) -> list:
-    if path:
-        item = {"id": "fc_fake", "type": "function_call", "status": "completed", "call_id": "call_fake",
-                "name": "exec_command", "arguments": json.dumps({"cmd": f"Set-Content -LiteralPath '{path}' -Value 'ok'"})}
+def _responses_command(step) -> str:
+    kind, value = step
+    return value if kind == "shell" else f"Set-Content -LiteralPath '{value}' -Value 'ok'"
+
+
+def _responses_events(model: str, command=None, turn: int = 0) -> list:
+    if command:
+        item = {"id": f"fc_fake_{turn}", "type": "function_call", "status": "completed", "call_id": f"call_fake_{turn}",
+                "name": "exec_command", "arguments": json.dumps({"cmd": command})}
         added = {**item, "status": "in_progress", "arguments": ""}
     else:
         item = {"id": "msg_fake", "type": "message", "role": "assistant", "status": "completed",
@@ -99,7 +114,7 @@ def _responses_events(model: str, path=None) -> list:
                           "input_tokens_details": {"cached_tokens": 0}, "output_tokens_details": {"reasoning_tokens": 0}}}
     events = [{"type": "response.created", "response": {**response, "status": "in_progress", "output": []}},
               {"type": "response.output_item.added", "output_index": 0, "item": added}]
-    if not path:
+    if not command:
         events.append({"type": "response.output_text.delta", "item_id": "msg_fake", "output_index": 0,
                        "content_index": 0, "delta": ANSWER})
     return [*events, {"type": "response.output_item.done", "output_index": 0, "item": item},
@@ -165,16 +180,18 @@ class FakeModelApi:
                 api.requests.append({"path": path, "body": body})
                 api.keys.append(key)
                 model = body.get("model", "fake") if isinstance(body, dict) else "fake"
-                target = _target(body)
+                plan = _plan(body)
                 if path.endswith("/messages/count_tokens"):
                     self._send(200, {"input_tokens": 10})
                 elif path.endswith("/messages"):
-                    tool = _anthropic_write(body, target) if target and not _anthropic_done(body) else None
-                    self._send(200, events=_anthropic_events(model, tool))
+                    turn = _anthropic_turn(body)
+                    tool = _anthropic_call(body, plan[turn]) if turn < len(plan) else None
+                    self._send(200, events=_anthropic_events(model, tool, turn))
                 elif path.endswith("/responses"):
-                    names = {tool.get("name") for tool in body.get("tools") or []}
-                    write = target if target and "exec_command" in names and not _responses_done(body) else None
-                    self._send(200, events=_responses_events(model, write))
+                    turn = _responses_turn(body)
+                    shell = "exec_command" in {tool.get("name") for tool in body.get("tools") or []}
+                    command = _responses_command(plan[turn]) if shell and turn < len(plan) else None
+                    self._send(200, events=_responses_events(model, command, turn))
                 else:
                     self._send(404, {"error": {"message": f"no fake for {path}"}})
 
