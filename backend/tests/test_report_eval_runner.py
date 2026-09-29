@@ -51,6 +51,7 @@ def test_a_fake_run_writes_questions_results_and_a_summary(tmp_path):
     assert result["qa"]["total"] >= 1
     summary = (out / "summary-old.md").read_text(encoding="utf-8")
     assert "手冲咖啡" in summary and "闭卷问答" in summary and "估算" in summary
+    assert "讲解性补充" in summary
 
 
 def test_another_report_of_the_item_meets_the_same_questions(tmp_path):

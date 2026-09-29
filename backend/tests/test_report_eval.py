@@ -75,6 +75,15 @@ def test_chapter_density_is_characters_per_minute_of_source():
 
 # ---------- faithfulness ----------
 
+def test_faithfulness_tells_explanation_from_words_put_in_the_speakers_mouth():
+    """User 2026-09-29: the ELI5 rules put analogies and inline glosses in the body; they are not
+    made up as long as they are not written as the speaker's words. Only the latter is 无依据."""
+    items = [{"text": "好比解题时手边的工具各有各的按键。", "units": ["unit-000001"]}]
+    prompt = ev.faithfulness_prompt(items, {"unit-000001": "工具之间来回切换很耗精力。"})
+    assert "讲解性补充" in prompt and "类比" in prompt and "讲者" in prompt
+    reply = json.dumps({"verdicts": {"1": "讲解性补充", "2": "无依据", "3": "乱判"}}, ensure_ascii=False)
+    assert ev.parse_verdicts(reply, 3, ev.FAITHFUL) == ["讲解性补充", "无依据", None]
+
 def test_sentences_leave_out_supplements_titles_and_scraps():
     sentences = ev.report_sentences(REPORT, units())
     texts = [sentence["text"] for sentence in sentences]
@@ -178,7 +187,8 @@ def test_a_whole_evaluation_with_a_fake_model(tmp_path):
     questions_file = tmp_path / "questions.json"
     result = ev.evaluate_report(units(), REPORT, questions_file, fake_ask, points=["K001", "K002", "K004"])
     assert result.get("qa", {}).get("score") == 1.0 and result.get("qa", {}).get("total") == 1
-    assert result.get("faithfulness") == {"sampled": 5, "有依据": 5, "部分有依据": 0, "无依据": 0, "ungraded": 0}
+    assert result.get("faithfulness") == {"sampled": 5, "有依据": 5, "部分有依据": 0, "讲解性补充": 0, "无依据": 0,
+                                          "ungraded": 0}
     assert result.get("supplements") == {"checked": 1, "矛盾": 0, "不矛盾": 1, "ungraded": 0}
     assert result.get("points_coverage") == 1.0
     assert result.get("components", {}).get("total") == 6
