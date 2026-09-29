@@ -130,6 +130,8 @@ _RULES = [
         "unexpected EOF",  # a Go proxy (CLIProxyAPI) cutting a long stream
         "forcibly closed by the remote host",  # WSAECONNRESET: its upstream proxy dropped the connection
         "ENOTFOUND", "EAI_AGAIN", "getaddrinfo",
+        # Codex CLI and Claude Code (PLAN 15.4.13): an endpoint that is down or cuts the stream
+        "stream disconnected", "Connection failed", "Connection refused", "ECONNREFUSED",
     ), None),
 ]
 _COMPILED = [
