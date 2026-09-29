@@ -500,15 +500,43 @@ PRICE_CACHE_READ, PRICE_CACHE_WRITE = 0.5, 6.25
 IMAGE_TOKENS = 1000  # a 960-pixel-wide frame is about 700 tokens (width x height / 750); rounded up
 
 
+EVENT_LOGS = ("pi.events.jsonl", "agent.events.jsonl")  # Pi's, and Codex CLI's / Claude Code's (15.4.13)
+
+
+def _event_logs(folder):
+    for name in EVENT_LOGS:
+        yield from Path(folder).rglob(name)
+
+
 def pi_events_offsets(folder) -> dict:
-    """{pi.events.jsonl: its size now}: what pi_usage should skip later (earlier runs' records)."""
-    return {path: path.stat().st_size for path in Path(folder).rglob("pi.events.jsonl")}
+    """{event log: its size now}: what pi_usage should skip later (earlier runs' records)."""
+    return {path: path.stat().st_size for path in _event_logs(folder)}
+
+
+def _usage(event: dict):
+    """(input, output, cacheRead, cacheWrite, replies) of one recorded event, or None."""
+    number = lambda value: int(value or 0)
+    if event.get("type") == "message_end" and (event.get("message") or {}).get("role") == "assistant":  # Pi
+        usage = event["message"].get("usage") or {}
+        return (number(usage.get("input")), number(usage.get("output")), number(usage.get("cacheRead")),
+                number(usage.get("cacheWrite")), 1)
+    if event.get("type") == "result" and isinstance(event.get("usage"), dict):  # Claude Code, per run
+        usage = event["usage"]
+        return (number(usage.get("input_tokens")), number(usage.get("output_tokens")),
+                number(usage.get("cache_read_input_tokens")), number(usage.get("cache_creation_input_tokens")),
+                number(event.get("num_turns")) or 1)
+    if event.get("type") == "turn.completed" and isinstance(event.get("usage"), dict):  # Codex: input includes cached
+        usage = event["usage"]
+        cached = number(usage.get("cached_input_tokens"))
+        return number(usage.get("input_tokens")) - cached, number(usage.get("output_tokens")), cached, 0, 1
+    return None
 
 
 def pi_usage(folder, since=None) -> dict:
-    """Tokens of every Pi reply recorded under `folder` after the offsets in `since`: Pi's own usage."""
+    """Tokens of every model reply recorded under `folder` after the offsets in `since`: Pi's events, and
+    Codex CLI's and Claude Code's (agent.events.jsonl)."""
     total = {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "replies": 0}
-    for path in Path(folder).rglob("pi.events.jsonl"):
+    for path in _event_logs(folder):
         with path.open("rb") as handle:
             handle.seek((since or {}).get(path, 0))
             for line in handle:
@@ -516,13 +544,11 @@ def pi_usage(folder, since=None) -> dict:
                     event = json.loads(line)
                 except ValueError:
                     continue
-                message = event.get("message") or {}
-                if event.get("type") != "message_end" or message.get("role") != "assistant":
+                found = _usage(event) if isinstance(event, dict) else None
+                if found is None:
                     continue
-                usage = message.get("usage") or {}
-                for key in ("input", "output", "cacheRead", "cacheWrite"):
-                    total[key] += int(usage.get(key) or 0)
-                total["replies"] += 1
+                for key, value in zip(("input", "output", "cacheRead", "cacheWrite", "replies"), found, strict=True):
+                    total[key] += value
     total["usd"] = (total["input"] * PRICE_IN + total["output"] * PRICE_OUT + total["cacheRead"] * PRICE_CACHE_READ
                     + total["cacheWrite"] * PRICE_CACHE_WRITE) / 1_000_000
     return total
