@@ -182,19 +182,28 @@ def _planned(data_dir, work, row: dict, settings: dict, node_exe: str, pi_cli: s
     return units, ledger, plan, problems, ask, run_pi
 
 
+# The writing stage's time is the 2.1 formula times this, by thinking level (PLAN 15.4.11, user
+# 2026-09-29: at xhigh Kabbalah ran out of 3x at its sixth chapter); planning gets a third of it.
+TIME_TIMES = {"high": 4, "xhigh": 6, "max": 8}
+
+
+def _times(settings: dict) -> float:
+    return TIME_TIMES.get(_llm(settings)["thinking"], 3)
+
+
 def run_plan_stage(data_dir, item_id: str, row: dict, settings: dict, *, node_exe: str, pi_cli: str,
                    figures: bool) -> None:
     _planned(data_dir, paths.work_dir(data_dir, item_id), row, settings, node_exe, pi_cli, figures=figures,
-             seconds=pi_timeout_seconds(row.get("duration_s") or 0.0))
+             seconds=max(1.0, _times(settings) / 3) * pi_timeout_seconds(row.get("duration_s") or 0.0))
 
 
 def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, node_exe: str, pi_cli: str,
                           figures: bool, progress):
-    """Chapters, checks, review, assembly: work/report.html for finalize. 3x the time (15.4.11)."""
+    """Chapters, checks, review, assembly: work/report.html for finalize (15.4.11)."""
     work = paths.work_dir(data_dir, item_id)
     units, ledger, plan, problems, ask, run_pi = _planned(
         data_dir, work, row, settings, node_exe, pi_cli, figures=figures,
-        seconds=3 * pi_timeout_seconds(row.get("duration_s") or 0.0))
+        seconds=_times(settings) * pi_timeout_seconds(row.get("duration_s") or 0.0))
     chapters = full.write_chapters(work, plan, ledger, units, run_pi, ask, figures=figures,
                                    review=review_on(settings), progress=progress,
                                    look=model_look(data_dir, work, settings, node_exe, pi_cli))
