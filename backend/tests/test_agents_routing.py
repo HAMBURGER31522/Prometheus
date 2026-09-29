@@ -135,3 +135,46 @@ def test_the_model_test_button_asks_the_agent(client, agent_calls):
     answer = client.post("/api/settings/test-model").json()
     assert agent_calls["one_shot"] and agent_calls["one_shot"][0]["agent"]["id"] == "claude"
     assert answer["ok"] is True and agent_calls["pi"] == []
+
+
+def _standard_item(data_dir):
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
+                                      source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/")
+    work = paths.work_dir(data_dir, item_id)
+    work.mkdir(parents=True, exist_ok=True)
+    (work / "transcript.md").write_text("# 转写\n\n[00:00] 你好。\n", encoding="utf-8")
+    return item_id, work
+
+
+def test_the_standard_report_on_another_agent_gets_vras_workspace_and_prompt(data_dir, monkeypatch):
+    """VRA's PiRunner only starts Pi: the other Agents get the same staged skill and the same request."""
+    item_id, work = _standard_item(data_dir)
+    seen = {}
+
+    def fake_task(agent, workspace, prompt, **kwargs):
+        seen.update(agent=agent, workspace=workspace, prompt=prompt, **kwargs)
+        (workspace / "report.html").write_text("<html><body><h1>报告</h1></body></html>", encoding="utf-8")
+        return workspace / "report.html"
+
+    monkeypatch.setattr(runs, "task", fake_task)
+    monkeypatch.setattr(workspace_mod, "PiRunner", lambda **kwargs: pytest.fail("PiRunner started for Claude Code"))
+    report = workspace_mod.run_report_stage(data_dir, item_id, items_store.get_item(data_dir, item_id),
+                                            store.load(data_dir), node_exe="node.exe", pi_cli="cli.js")
+    assert report == work / "report.html" and seen["agent"]["id"] == "claude" and seen["expect"] == "report.html"
+    assert "video-report skill" in seen["prompt"] and "report-template.html" in seen["prompt"]
+    assert (work / "SKILL.md").is_file() and (work / "modes" / "standard.md").is_file()
+    assert (work / "assets" / "report-template.html").is_file() and not (work / "modes" / "brief.md").exists()
+
+
+def test_an_incomplete_page_from_another_agent_fails_as_it_does_for_pi(data_dir, monkeypatch):
+    item_id, _work = _standard_item(data_dir)
+
+    def half_page(agent, workspace, prompt, **kwargs):
+        (workspace / "report.html").write_text("<h1>只写了一半", encoding="utf-8")
+        return workspace / "report.html"
+
+    monkeypatch.setattr(runs, "task", half_page)
+    monkeypatch.setattr(workspace_mod, "PiRunner", lambda **kwargs: pytest.fail("PiRunner started for Claude Code"))
+    with pytest.raises(runs.AgentRunError, match="complete HTML"):
+        workspace_mod.run_report_stage(data_dir, item_id, items_store.get_item(data_dir, item_id),
+                                       store.load(data_dir), node_exe="node.exe", pi_cli="cli.js")
