@@ -112,4 +112,14 @@ def revision_prompt(base: str, problems: list, filename: str, draft: str = "") -
 
 
 def targeted_prompt(depth: str, draft: str, failing: list, filename: str) -> str:
-    return ""
+    """One small run for the points still failing after two rounds (PLAN 15.4.11a-3): the rules of
+    depth.md, the draft and each point's own source; the draft is edited in place, not rewritten."""
+    listed = "\n".join(f"- {item['id']}：{item['text']}\n  问题：{item['problem']}\n  原文：{item['source']}"
+                        for item in failing)
+    return (
+        f"{depth}\n\n## 这一章现在的稿子（{filename}）\n{draft}\n\n"
+        "## 只补这几条要点\n"
+        f"下面这几条要点检查了两轮仍然没写到、没写清或漏了其中几项。对照它们的原文，用 edit 在 {filename} 里"
+        "只改讲到它们的段落（或在合适的位置补一段），每条都用 data-points 标出；其余内容保持不变。\n"
+        f"{listed}\n"
+    )

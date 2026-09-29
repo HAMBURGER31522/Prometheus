@@ -168,7 +168,16 @@ def _frame_ledger(work: Path, space: Path, number: int, kept: list, look):
 
 
 def _lost(check: dict) -> int:
-    return len(check["missing"]) + len(check["weak"]) + len(check["thin"]) + len(check["unused_frames"])
+    return (len(check["missing"]) + len(check["weak"]) + len(check["thin"]) + len(check["unused_frames"])
+            + sum(len(items) for items in check.get("incomplete", {}).values()))
+
+
+def _failing(check: dict, points: dict, sources: dict) -> list:
+    """The points a targeted run should fix, each with what is wrong and its full source."""
+    ids = list(dict.fromkeys(check["missing"] + check["weak"] + check["thin"] + list(check.get("incomplete", {}))))
+    return [{"id": point_id, "text": points[point_id]["text"], "source": sources.get(point_id, ""),
+             "problem": "；".join(problem for problem in check["problems"] if f"要点 {point_id} " in problem)}
+            for point_id in ids]
 
 
 def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -> tuple:
@@ -237,6 +246,16 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
         rounds += 1
         fragment = write(chapter_write.revision_prompt(base, check["problems"], filename, fragment))
         check = recheck(fragment)
+    targeted = False
+    failing = _failing(check, points, sources)
+    if failing:  # still failing after two rounds: one small run for just these points (15.4.11a-3)
+        targeted = True
+        patched = write(chapter_write.targeted_prompt(DEPTH_MD.read_text(encoding="utf-8"), fragment, failing, filename))
+        again = recheck(patched)
+        if _lost(again) <= _lost(check):
+            fragment, check = patched, again
+        else:
+            (space / filename).write_bytes(fragment.encode("utf-8"))
     stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False}
     details = None
     if review:
@@ -247,7 +266,8 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
             lambda fixes: write(chapter_write.revision_prompt(base, fixes, filename, fragment)), recheck)
         (space / filename).write_bytes(fragment.encode("utf-8"))
     result = {"key": key, "number": number, "id": chapter["id"], "title": chapter["title"], "points": owned,
-              "fragment": fragment, "check": check, "rounds": rounds, "review": stats, "review_details": details}
+              "fragment": fragment, "check": check, "rounds": rounds, "targeted": targeted, "review": stats,
+              "review_details": details}
     _write_json(record, result)
     return result
 

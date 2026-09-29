@@ -24,6 +24,8 @@ SOURCE_WORD = 1.5        # an English word of the source counts as this many cha
 _NOT_WORDY = re.compile(r"[^一-鿿A-Za-z0-9]")
 _CJK = re.compile(r"[一-鿿]")
 _WORD = re.compile(r"[A-Za-z0-9]+")
+ITEM_MIN = 0.25          # an item of a list or a layer of a reason found in the text that marks it
+_ITEM_SPLIT = re.compile(r"[；;、]|一是|二是|三是|四是|五是|其一|其二|其三|第一|第二|第三|第四|首先|其次|再次|最后")
 _FRAME_USED = re.compile(r"""src=["']frames/([^"']+)["']""")
 _FRAME_DECLINED = re.compile(r"<!--\s*不用\s*(f_\d+\.jpg)\s*[：:]\s*\S")
 
@@ -80,6 +82,22 @@ def _size(text: str, *, word: float = 1.0) -> float:
     return len(_CJK.findall(text or "")) + word * len(_WORD.findall(text or ""))
 
 
+def point_items(text: str) -> list:
+    """The items of a point that lists things or gives layered reasons (PLAN 15.4.11a-2, user
+    2026-09-29), without a lead-in like 「有两个原因：」; [] when there is only one."""
+    text = text or ""
+    colon = re.search(r"[：:]", text)
+    body = text[colon.end():] if colon else text
+    pieces = [piece.strip("，,。：:（）() ") for piece in _ITEM_SPLIT.split(body)]
+    pieces = [piece for piece in pieces if len(_CJK.findall(piece)) >= 4]
+    return pieces if len(pieces) >= 2 else []
+
+
+def _item_found(item: str, text: str) -> bool:
+    wanted = set(_bigrams(item))
+    return not wanted or len(wanted & set(_bigrams(text))) / len(wanted) >= ITEM_MIN
+
+
 def point_chars(fragment: str) -> dict:
     """{point id: how much text explains it}: an element's own text (not that of marked elements
     inside it), shared equally by the points it marks."""
@@ -131,6 +149,15 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
         problems.append(f"要点 {point_id} 讲得太简略，比视频里讲的少（{points[point_id]['text']}）：按 depth.md 的四步补全——"
                         "一句话说清是什么；类比到读者熟悉的东西；展开原理、理由、条件和例子；"
                         "最后说所以呢：它对读者意味着什么、和前后要点是什么关系。讲到零基础读者能自己复述为止")
+    incomplete = {}
+    for point_id in owned:
+        if point_id in marking and point_id not in weak:
+            left_out = [item for item in point_items(points[point_id]["text"]) if not _item_found(item, marking[point_id])]
+            if left_out:
+                incomplete[point_id] = left_out
+    for point_id, left_out in incomplete.items():
+        problems.append(f"要点 {point_id} 漏了这几项（{points[point_id]['text']}）：「" + "」「".join(left_out)
+                        + "」——原文列举的每一项、每一层原因都要写出来，用 data-points 标在写到它们的地方")
     unused = unused_frames(fragment, frames)
     by_file = {frame["file"]: frame for frame in frames or []}
     for file in unused:
@@ -138,8 +165,8 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
         problems.append(f"候选帧 {file}（{frame['label']}，{frame['kind']}：{frame['what']}）没有用上：在讲到它的段落后面配上这张图，"
                         f"图注写画面里的关键信息；如果它和已用的图是同一个画面，或者正文已经完整写出了它的信息，"
                         f"就在片段里写一行 <!-- 不用 {file}：理由 -->")
-    return {"missing": missing, "weak": weak, "thin": thin, "unused_frames": unused, "copy_ratio": copy_ratio,
-            "chars": chars, "problems": problems}
+    return {"missing": missing, "weak": weak, "thin": thin, "incomplete": incomplete, "unused_frames": unused,
+            "copy_ratio": copy_ratio, "chars": chars, "problems": problems}
 
 
 def feedback_prompt(problems: list, filename: str, draft: str = "") -> str:
@@ -155,7 +182,3 @@ def feedback_prompt(problems: list, filename: str, draft: str = "") -> str:
         f"{filename} 里是这一章的上一稿，检查出下面这些问题。先读它，在原稿基础上逐条改正，其余内容保持不变，"
         f"然后把整章写回 {filename}（可以用 edit 局部修改）：\n{listed}"
     )
-
-
-def point_items(text: str) -> list:
-    return []

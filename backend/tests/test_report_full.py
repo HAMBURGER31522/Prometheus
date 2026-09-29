@@ -75,7 +75,9 @@ class Pi:
             (workspace / expect).write_text(text, encoding="utf-8")
         else:
             attempt = sum(1 for name, _ in self.calls if name == expect)
-            (workspace / expect).write_text(self.chapter(prompt, attempt), encoding="utf-8")
+            first = next(text for name, text in self.calls if name == expect)
+            (workspace / expect).write_text(self.chapter(prompt if "只补" not in prompt else first, attempt),
+                                            encoding="utf-8")
         return workspace / expect
 
     def runs(self, expect):
