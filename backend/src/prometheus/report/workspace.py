@@ -12,6 +12,7 @@ from prometheus.report import full, pi_run
 from prometheus.report.chunks import load_units
 from prometheus.report.full import FIGURES_MD
 from prometheus.report.timing import pi_timeout_seconds
+from prometheus.tasks import errors
 from video_report_agent.pi import PiRunner
 
 PLATFORM_LABELS = {"bilibili": "Bilibili", "youtube": "YouTube"}
@@ -90,6 +91,25 @@ def review_on(settings: dict) -> bool:
     return (settings.get("report") or {}).get("review", True) is not False
 
 
+# The relay can break for minutes (timeouts, 429, connection errors); Pi's own retries wait 2, 4 and
+# 8 seconds. A call it broke is run again after a longer wait, at most twice (English run, D-44).
+RELAY_RETRIES = 2
+RELAY_WAIT_S = 60
+_RELAY_FAILURES = ("MODEL_TIMEOUT", "MODEL_RATE_LIMITED", "MODEL_BUSY")
+
+
+def _patient(call, deadline=None):
+    for attempt in range(RELAY_RETRIES + 1):
+        try:
+            return call()
+        except (pi_run.PiRunError, one_shot.OneShotError) as exc:
+            if attempt == RELAY_RETRIES or errors.classify("report", str(exc)) not in _RELAY_FAILURES:
+                raise
+            if deadline is not None and deadline - time.monotonic() < RELAY_WAIT_S * 2:
+                raise
+            time.sleep(RELAY_WAIT_S)
+
+
 def _llm(settings: dict) -> dict:
     llm = settings["llm"]
     return {"provider": llm["provider"], "model": llm["model"], "thinking": llm.get("thinking") or "medium",
@@ -101,10 +121,10 @@ def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
     llm = _llm(settings)
 
     def ask(prompt: str) -> str:
-        return one_shot.run_one_shot(
+        return _patient(lambda: one_shot.run_one_shot(
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
-        )
+        ))
 
     return ask
 
@@ -114,11 +134,11 @@ def model_look(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
     llm = _llm(settings)
 
     def look(prompt: str, files: list) -> str:
-        return one_shot.run_one_shot(
+        return _patient(lambda: one_shot.run_one_shot(
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
             files=files,
-        )
+        ))
 
     return look
 
@@ -127,12 +147,15 @@ def pi_runner(data_dir, settings: dict, node_exe: str, pi_cli: str, *, deadline:
     """run_pi(workspace, prompt, expect) for report/full.py: each run gets what is left of its stage's time."""
     llm = _llm(settings)
 
-    def run(workspace, prompt: str, expect: str):
+    def once(workspace, prompt: str, expect: str):
         left = deadline - time.monotonic()
         if left <= 0:
             raise pi_run.PiRunError("Pi generation timed out: the stage's time is used up")
         return pi_run.run_task(workspace, prompt, expect=expect, llm=llm, prefix=[node_exe, pi_cli],
                                agent_dir=paths.pi_config_dir(data_dir), timeout=left)
+
+    def run(workspace, prompt: str, expect: str):
+        return _patient(lambda: once(workspace, prompt, expect), deadline)
 
     return run
 
