@@ -60,6 +60,10 @@ export const api = {
     (await json<{ api_key: string }>("POST", "/api/settings/reveal-key", target)).api_key,
   listModels: async (profile: ModelProfile) =>
     (await json<{ models: string[] }>("POST", "/api/settings/models", { profile })).models,
+  /** The model catalogue fetched from pi.dev (PLAN 15.4.12): when, and 「更新模型目录」. */
+  modelCatalogue: () => json<{ updated_at: string | null }>("GET", "/api/settings/model-catalogue"),
+  refreshModelCatalogue: () =>
+    json<{ updated_at: string | null; providers: number; failed: string[] }>("POST", "/api/settings/model-catalogue/refresh"),
   modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url">) =>
     json<ModelInfo>("POST", "/api/settings/model-info", { profile }),
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),

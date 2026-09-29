@@ -234,7 +234,7 @@ def test_anything_else_is_unclassified():
 
 def test_every_reason_has_a_chinese_sentence_and_an_action(tmp_path):
     codes = {expected for *_, expected in SAMPLES} | {"UNCLASSIFIED"}
-    assert len(codes) == 19
+    assert codes == set(errors.REASONS)  # every reason has a real sample
     for code in codes:
         reason, action = errors.explain(tmp_path, code)
         assert reason and action, code

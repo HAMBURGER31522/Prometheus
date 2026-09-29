@@ -91,7 +91,8 @@ def refresh_model_catalogue(request: Request):
     """「更新模型目录」: fetch the catalogue, then write the model's parameters again (PLAN 15.4.12)."""
     state = request.app.state
     proxy = store.load(state.data_dir)["network"].get("proxy", "")
-    result = catalogue_update.refresh(state.data_dir, pi_cli=_pi_cli(state), fetch=state.catalogue_fetch, proxy=proxy)
+    result = catalogue_update.refresh(state.data_dir, pi_cli=_pi_cli(state), fetch=state.catalogue_fetch, proxy=proxy,
+                                      providers=state.catalogue_providers)
     pi_models.refresh_custom_provider(state.data_dir, pi_cli=_pi_cli(state))
     return result
 

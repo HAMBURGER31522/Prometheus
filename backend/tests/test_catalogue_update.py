@@ -112,7 +112,6 @@ def test_the_button_updates_the_catalogue_and_rewrites_models_json(with_pi):
     body = with_pi.get("/api/settings", headers=AUTH).json()
     body["llm_profiles"] = {"active": "cpa", "items": [CPA]}
     assert with_pi.put("/api/settings", json=body, headers=AUTH).status_code == 200
-    assert with_pi.get("/api/settings/model-catalogue", headers=AUTH).json() == {"updated_at": None}
     result = with_pi.post("/api/settings/model-catalogue/refresh", headers=AUTH).json()
     assert result["providers"] == 2 and result["updated_at"]
     assert with_pi.get("/api/settings/model-catalogue", headers=AUTH).json() == {"updated_at": result["updated_at"]}

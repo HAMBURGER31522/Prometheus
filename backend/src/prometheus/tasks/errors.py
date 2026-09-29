@@ -40,6 +40,8 @@ REASONS = {
     "MODEL_CONTEXT_TOO_LONG": ("内容太长，超过了模型能读的上下文长度。",
                                "在「设置 · 模型」换一个上下文更长的模型，再点「重试」。"),
     "MODEL_NOT_FOUND": ("模型名不存在。", "到「设置 · 模型」点「获取模型列表」，选一个列表里有的模型。"),
+    "MODEL_THINKING_UNSUPPORTED": ("这个模型不支持所选的思考强度。",
+                                   "在「设置 · 模型」把思考强度调低一档，保存后点「重试」。"),
     # 本机
     "ASR_COMPONENTS_MISSING": ("本地转写组件还没装。", "到「设置 · 转写」点「安装本地转写组件」，装好后点「重试」。"),
     "DISK_FULL": ("磁盘空间不足。", "清理数据目录所在的磁盘，腾出空间后点「重试」。"),
@@ -102,6 +104,11 @@ _RULES = [
     ("MODEL_NO_BALANCE", MODEL_STAGES, (), (
         _status("402"), "insufficient_quota", "Insufficient Balance", "credit balance is too low",
         "exceeded your current quota", "billing", "欠费", "余额不足",
+    ), None),
+    # a thinking level passed through for a model the catalogue lacks (PLAN 15.4.12)
+    ("MODEL_THINKING_UNSUPPORTED", MODEL_STAGES, (), (
+        r"(?:unsupported|not supported|does not support|invalid)[^\n]{0,80}reasoning[_. ]?effort",
+        r"reasoning[_. ]?effort[^\n]{0,80}(?:unsupported|not supported|does not support|invalid)",
     ), None),
     # Pi's fatal 'not found' only: its 'not found for provider ... Using custom model id' is a warning
     ("MODEL_NOT_FOUND", MODEL_STAGES, (), (

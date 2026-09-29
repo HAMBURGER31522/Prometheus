@@ -52,22 +52,22 @@ def due(data_dir, *, now=None) -> bool:
     return (now or datetime.now(UTC)) - datetime.fromisoformat(stamp) >= MAX_AGE
 
 
-def refresh(data_dir, *, pi_cli, fetch=None, proxy: str = "", now=None) -> dict:
-    """Fetch every bundled provider's catalogue; one that fails keeps its last file."""
+def refresh(data_dir, *, pi_cli, fetch=None, proxy: str = "", now=None, providers=None) -> dict:
+    """Fetch every bundled provider's catalogue (or `providers`); one that fails keeps its last file."""
     fetch = fetch or _fetch
     folder = catalogue_folder(data_dir)
     folder.mkdir(parents=True, exist_ok=True)
     fetched, failed = 0, []
-    for file in bundled_providers(pi_cli):
+    for name in providers or [file.stem for file in bundled_providers(pi_cli)]:
         try:
-            catalogue = fetch(URL.format(file.stem), proxy=proxy)
+            catalogue = fetch(URL.format(name), proxy=proxy)
         except (OSError, ValueError):  # urllib's errors are OSErrors; a broken body a ValueError
-            failed.append(file.stem)
+            failed.append(name)
             continue
         if not isinstance(catalogue, dict):
-            failed.append(file.stem)
+            failed.append(name)
             continue
-        (folder / file.name).write_bytes(json.dumps(catalogue, ensure_ascii=False).encode("utf-8"))
+        (folder / f"{name}.json").write_bytes(json.dumps(catalogue, ensure_ascii=False).encode("utf-8"))
         fetched += 1
     if fetched:
         stamp = {"updated_at": (now or datetime.now(UTC)).isoformat()}

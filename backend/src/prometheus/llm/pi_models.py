@@ -74,8 +74,12 @@ def apply_custom_provider(data_dir, custom: dict, *, pi_cli=None) -> None:
     supports_images = bool((custom or {}).get("supports_images", False))
     inputs = ["text", "image"] if supports_images else ["text"]
     protocol = (custom or {}).get("protocol") or "openai"
-    _, fields = model_fields(data_dir, {"kind": "custom", "model": model_id, "protocol": protocol,
+    source, fields = model_fields(data_dir, {"kind": "custom", "model": model_id, "protocol": protocol,
                                         "base_url": (custom or {}).get("base_url", "")}, pi_cli=pi_cli)
+    if source != "pi" and active.get("thinking") in ("xhigh", "max"):
+        # Pi runs xhigh / max only for a model whose map names them; the catalogue always lags the
+        # vendors, so a model it lacks gets the chosen level as it is (PLAN 15.4.12, user 2026-09-29).
+        fields["thinkingLevelMap"] = {"xhigh": "xhigh", "max": "max"}
     own = {"contextWindow": active["context_window"], "maxTokens": active["max_tokens"]}
     fields.update({name: value for name, value in own.items() if value})
     document.setdefault("providers", {})["custom"] = {

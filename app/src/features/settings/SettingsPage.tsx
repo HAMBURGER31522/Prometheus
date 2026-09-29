@@ -7,17 +7,26 @@ import { ScrollArea } from "../../shared/ScrollArea";
 import { ModelProfiles } from "./ModelProfiles";
 import { SecretInput } from "./SecretInput";
 
+/** 「模型目录：已更新 2026-09-29」 or the bundled one before the first update (PLAN 15.4.12). */
+function catalogueText(updatedAt: string | null): string {
+  return updatedAt
+    ? `模型目录：已更新 ${updatedAt.slice(0, 10)}（每天启动时自动检查一次）`
+    : "模型目录：随安装包自带（新出的模型可能不认识）";
+}
+
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState("");
   const [testing, setTesting] = useState("");
   const [asr, setAsr] = useState<{ state: string; detail: string } | null>(null);
   const [dataDir, setDataDir] = useState<string | null>(null);
+  const [catalogue, setCatalogue] = useState("");
 
   useEffect(() => {
     api.settings().then(setSettings).catch(() => setStatus("读取设置失败"));
     api.dataDir().then((value) => setDataDir(value.data_dir)).catch(() => undefined);
     api.asrStatus().then(setAsr).catch(() => undefined);
+    api.modelCatalogue().then((found) => setCatalogue(catalogueText(found.updated_at))).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -64,6 +73,28 @@ export function SettingsPage() {
         <section className="section card">
           <h2>模型</h2>
           <ModelProfiles profiles={settings.llm_profiles} onChange={(llm_profiles) => update({ llm_profiles })} />
+          <div className="row" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={async () => {
+                setCatalogue("模型目录：正在从 pi.dev 更新…");
+                const result = await api.refreshModelCatalogue().catch(() => null);
+                setCatalogue(
+                  !result
+                    ? "模型目录：更新失败（连不上 pi.dev），继续用原来的目录"
+                    : result.providers
+                      ? catalogueText(result.updated_at)
+                      : "模型目录：这次没有取到任何供应商的目录，继续用原来的目录",
+                );
+              }}
+            >
+              更新模型目录
+            </button>
+            <span className="muted" data-testid="model-catalogue">
+              {catalogue || "模型目录："}
+            </span>
+          </div>
           <div className="row" style={{ marginTop: 16 }}>
             <button
               type="button"

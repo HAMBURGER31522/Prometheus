@@ -47,6 +47,7 @@ class AppState:
         self._runtime = found_runtime
         # The model catalogue's fetch (PLAN 15.4.12): pi.dev by default; the fake backend never goes online.
         self.catalogue_fetch = (lambda url, proxy="": {}) if self.fake else None
+        self.catalogue_providers = ["anthropic", "deepseek", "openai"] if self.fake else None
         self.catalogue_thread: threading.Thread | None = None
 
     def get_runtime(self) -> runtime_mod.Runtime:
@@ -85,7 +86,8 @@ class AppState:
     def _update_catalogue(self) -> None:
         try:
             proxy = store.load(self.data_dir)["network"].get("proxy", "")
-            catalogue_update.refresh(self.data_dir, pi_cli=self._pi_cli(), fetch=self.catalogue_fetch, proxy=proxy)
+            catalogue_update.refresh(self.data_dir, pi_cli=self._pi_cli(), fetch=self.catalogue_fetch, proxy=proxy,
+                                     providers=self.catalogue_providers)
             pi_models.refresh_custom_provider(self.data_dir, pi_cli=self._pi_cli())
         except Exception as exc:  # noqa: BLE001 - offline or pi.dev down: the catalogue it had stays
             logging.getLogger(__name__).warning("model catalogue update failed: %s", exc)
