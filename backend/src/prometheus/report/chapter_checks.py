@@ -155,3 +155,7 @@ def feedback_prompt(problems: list, filename: str, draft: str = "") -> str:
         f"{filename} 里是这一章的上一稿，检查出下面这些问题。先读它，在原稿基础上逐条改正，其余内容保持不变，"
         f"然后把整章写回 {filename}（可以用 edit 局部修改）：\n{listed}"
     )
+
+
+def point_items(text: str) -> list:
+    return []

@@ -105,6 +105,16 @@ def test_an_hour_long_video_uses_hours_in_the_section_time():
     assert "01:02:00–01:04:00" in text
 
 
+def test_a_targeted_rewrite_gets_only_the_rules_the_draft_and_the_failing_points_sources():
+    """PLAN 15.4.11a-3: points still failing after two rounds get a small run of their own."""
+    failing = [{"id": "K004", "text": "磨得越细萃取越快", "problem": "要点 K004 没有写到", "source": "第6句原话讲得很细"}]
+    text = write.targeted_prompt("【depth 规则】", "<section>上一稿</section>", failing, "ch-02.html")
+    assert "【depth 规则】" in text and "<section>上一稿</section>" in text
+    assert "K004" in text and "第6句原话讲得很细" in text and "要点 K004 没有写到" in text
+    assert "ch-02.html" in text and "edit" in text and "其余" in text
+    assert "=== 附件：SKILL.md" not in text
+
+
 def test_a_revision_starts_from_the_draft_with_the_problems_listed():
     draft = '<section><h2>研磨</h2><p data-points="K003">上一稿的正文。</p></section>'
     text = write.revision_prompt("【本章任务】", ["要点 K004 没有写到"], "ch-02.html", draft)

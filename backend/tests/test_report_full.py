@@ -149,11 +149,20 @@ def test_every_chapter_is_its_own_run_and_the_report_is_assembled(tmp_path):
 def test_a_chapter_that_misses_a_point_is_revised_at_most_twice_and_the_miss_is_recorded(tmp_path):
     pi = Pi(chapter=lambda prompt, attempt: section(prompt, leave_out=("K003",)))
     _ledger, _plan, chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
-    revisions = pi.runs("ch-01.html")[1:]
+    revisions = pi.runs("ch-01.html")[1:3]
     assert len(revisions) == 2 and all("K003" in prompt and "上一稿" in prompt for prompt in revisions)
+    # still missing after two rounds: one targeted run with only the rules, the draft and K003's source
+    [targeted] = pi.runs("ch-01.html")[3:]
+    assert "只补" in targeted and "第2句原话" in targeted and "=== 附件：SKILL.md" not in targeted
     assert [point["id"] for point in coverage["uncovered"]] == ["K003"]
     assert coverage["uncovered"][0]["start_ms"] == 60_000 and coverage["uncovered"][0]["text"]
-    assert chapters[0]["rounds"] == 2
+    assert chapters[0]["rounds"] == 2 and chapters[0]["targeted"] is True
+
+
+def test_a_targeted_run_that_fixes_the_point_is_kept(tmp_path):
+    pi = Pi(chapter=lambda prompt, attempt: section(prompt, leave_out=("K003",) if attempt < 4 else ()))
+    _ledger, _plan, chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
+    assert len(pi.runs("ch-01.html")) == 4 and coverage["uncovered"] == [] and chapters[0]["targeted"] is True
 
 
 def test_a_fixed_chapter_is_not_revised(tmp_path):

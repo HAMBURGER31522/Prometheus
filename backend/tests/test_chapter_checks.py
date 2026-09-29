@@ -91,6 +91,25 @@ def test_a_frame_used_or_declined_with_a_reason_is_fine():
     assert checks.check_chapter(no_reason, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)["unused_frames"] == ["f_000030.jpg"]
 
 
+def test_a_point_is_split_into_its_items_without_the_lead_in():
+    """PLAN 15.4.11a-2: lists and reasons are checked item by item (user 2026-09-29)."""
+    assert checks.point_items("展示图表有两个原因：一是让学习者更清楚接下来会学什么，二是强制系统把推理讲清楚") == [
+        "让学习者更清楚接下来会学什么", "强制系统把推理讲清楚"]
+    assert checks.point_items("教学风格只影响两件事：学习弧线；沿途每一步的讲解") == ["学习弧线", "沿途每一步的讲解"]
+    assert checks.point_items("浅烘豆用九十二到九十六度的水") == []  # one item: nothing to split
+
+
+def test_an_item_left_out_of_a_list_is_named():
+    points = {"K009": {"id": "K009", "type": "理由", "text": "教学风格只影响两件事：一是学习弧线的走向，二是沿途每一步的讲解",
+                       "anchor": "只影响两件事", "start_ms": 0, "end_ms": 30_000}}
+    fragment = '<section><p data-points="K009">主要原因是教学风格：它决定了学习弧线的走向，也就是从现有理解走到目标的路径。</p></section>'
+    result = checks.check_chapter(fragment, ["K009"], points, "")
+    assert result["incomplete"] == {"K009": ["沿途每一步的讲解"]}
+    assert any("K009" in problem and "沿途每一步的讲解" in problem for problem in result["problems"])
+    full = fragment.replace("路径。", "路径；二是沿途每一步的讲解怎么安排。")
+    assert checks.check_chapter(full, ["K009"], points, "")["incomplete"] == {}
+
+
 def test_a_clean_chapter_has_no_problems():
     assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["problems"] == []
 
