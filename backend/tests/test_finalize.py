@@ -94,11 +94,25 @@ def test_finalize_styles_supplement_boxes_with_the_template_colours(tmp_path):
     assert "#" not in out.split('<style id="prometheus-supplement">')[1].split("</style>")[0]
 
 
+def test_finalize_styles_viewpoint_boxes_apart_from_supplements(tmp_path):
+    """「编者观点（非视频内容）」boxes (PLAN 15.4.11a) get their own style from the template's variables."""
+    html = TEMPLATE.split("<figure")[0] + (
+        '<aside class="viewpoint"><p class="viewpoint-label">编者观点（非视频内容）</p>'
+        '<ul><li>判断。<span class="confidence">置信度：中</span></li></ul></aside></body></html>')
+    work = _work(tmp_path, html=html)
+    final = tmp_path / "report" / "report.html"
+    finalize_report(work / "report.html", final, work)
+    out = final.read_text(encoding="utf-8")
+    assert '<style id="prometheus-viewpoint">' in out and "aside.viewpoint" in out
+    assert "#" not in out.split('<style id="prometheus-viewpoint">')[1].split("</style>")[0]
+    assert "prometheus-supplement" not in out
+
+
 def test_finalize_adds_no_supplement_style_without_supplements(tmp_path):
     html = TEMPLATE.split("<figure")[0] + "</body></html>"
     work = _work(tmp_path, html=html)
     final = tmp_path / "report" / "report.html"
     finalize_report(work / "report.html", final, work)
     out = final.read_text(encoding="utf-8")
-    assert "prometheus-supplement" not in out
+    assert "prometheus-supplement" not in out and "prometheus-viewpoint" not in out
     assert "{{VIDEO_DESCRIPTION}}" not in out

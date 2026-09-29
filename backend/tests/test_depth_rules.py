@@ -31,6 +31,18 @@ def test_it_never_names_a_number_of_characters():
     assert not re.search(r"\d+\s*字", RULES)
 
 
+def test_nothing_of_a_point_goes_missing_lists_reasons_names():
+    """PLAN 15.4.11a-1: the omission patterns of the acceptance runs, as rules for any video."""
+    assert "列举要全" in RULES and "原因要全" in RULES and "具体名称照写" in RULES
+
+
+def test_the_editor_may_judge_in_a_box_of_its_own_with_confidence_and_sources():
+    """PLAN 15.4.11a-4: contested points get the editor's own view, never the speaker's words."""
+    assert '<aside class="viewpoint">' in RULES and "编者观点（非视频内容）" in RULES
+    assert "置信度" in RULES and "URL" in RULES
+    assert "不写成讲者" in RULES
+
+
 def test_it_quotes_each_compressing_rule_it_overrides():
     for quoted in ("合并作用相同的例子", "不以篇幅证明完整性", "60 分钟的重复闲聊可以压缩为短报告",
                    "禁止连续出现三段及以上的大段文字", "图中讲清的关系不再在正文重复", "优先删除重复层次"):

@@ -11,6 +11,7 @@ REPORT = """<html><head><style>.paper{}</style></head><body><main class="paper">
 <p data-source-units="unit-000001 unit-000003" data-points="K001 K002">第一句讲的是水温。第二句讲的是研磨粗细！</p>
 <ol class="steps"><li data-source-units="unit-000004">步骤一先称量十五克咖啡粉。</li></ol>
 <aside class="supplement"><p class="supplement-label">补充说明（非视频内容）</p><p>萃取是溶解可溶物质的过程。</p></aside>
+<aside class="viewpoint"><p class="viewpoint-label">编者观点（非视频内容）</p><ul><li>编者认为水温说法偏保守。</li></ul></aside>
 <figure class="report-figure"><img src="data:image/jpeg;base64,AAAA" alt="图"><figcaption>图注。</figcaption></figure>
 </section>
 <section id="s2"><h2><span class="num">2</span><span class="section-title">第二章</span><span class="section-time">00:10–00:20</span></h2>
@@ -90,6 +91,7 @@ def test_sentences_leave_out_supplements_titles_and_scraps():
     assert texts == ["第一句讲的是水温。", "第二句讲的是研磨粗细！", "步骤一先称量十五克咖啡粉。",
                      "这一段没有任何出处标注。", "表格里的内容。"]
     assert not any("萃取" in text for text in texts)
+    assert not any("编者" in text for text in texts)  # the editor's view is not the video's (15.4.11a)
 
 
 def test_a_sentence_brings_its_cited_units_widened_or_its_chapters_range():

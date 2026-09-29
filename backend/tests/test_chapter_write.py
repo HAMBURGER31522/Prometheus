@@ -55,6 +55,7 @@ def test_the_writer_knows_its_place_its_file_its_heading_and_its_length():
     task = text[text.index("## 任务"):]
     assert "900" not in task and not re.search(r"\d+\s*字", task)
     assert "零基础" in task and "四步" in task and "第一次出现" in task
+    assert 'class="viewpoint"' in task and "列举" in task
     assert 'data-points="' in text and "data-source-units" in text
     assert "supplement" in text
 

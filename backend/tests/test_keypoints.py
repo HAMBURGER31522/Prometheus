@@ -27,6 +27,12 @@ def test_the_prompt_carries_the_block_and_asks_for_everything():
     assert "所有" in prompt and "skips" in prompt and "anchor" in prompt
 
 
+def test_the_prompt_asks_for_every_item_every_layer_of_a_reason_and_the_names():
+    """PLAN 15.4.11a: what the three runs dropped — an item of a list, a layer of a reason, a name."""
+    prompt = kp.keypoint_prompt(units(3))
+    assert "每一项" in prompt and "每一层" in prompt and "具体名称" in prompt
+
+
 def test_a_good_point_is_kept_and_bad_ones_say_why():
     block = units(10)
     points, skips, problems = kp.parse_points(reply([
