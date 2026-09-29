@@ -287,3 +287,27 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
   - 还能再省一半的办法（改设计，要用户定）：每章改成一次性调用（不带工具，直接输出整章 HTML），修改也一样。代价是写作时不能用工具算图示的几何位置、也不能自己检查文件。
   - 面向未知的视频（用户 2026-09-28：「面向对象不要面向结果」）：规则里不出现任何评测样本的内容，门槛都随输入缩放（要点的来源长短、章节的时间范围、每小时的候选帧数）。隐藏门槛用英文和卡巴拉校准，罗素只做复核，不参与校准，防止门槛被两篇样本调出来。
   - 不写字数的原因：写明下限，模型会把它当成完成标准，写够就停。原来的「每条约 60–150 字」还同时给了上限，很可能是第 1 层「讲得不够多」的原因之一。改为程序里的隐藏检查：每个要点得到的文字量，和这个要点在视频里的内容量比（门槛随来源放大，长短视频不用分开定）。不够时只点名要点、要求按四步补全，不给数字。门槛用真实样本校准后记在这里。
+
+**D-45 R7f 多 Agent 后端的实现选择（2026-09-29 起，规格见 PLAN 15.4.13）**
+- **设置页的摆法**（用户说「你看着办」）：Agent 和接入方式放在每份配置的最上面，而不是模型后面，因为这两项决定下面哪些格子能填。用户看过截图后认可（acceptance.md）。
+- **实测依据**：Claude Code 2.1.285、Codex 0.159.0 的私有副本装在 `E:\tools\Prometheus-Desktop\agents\`，对着本机的假模型接口（`agents/fake_api.py`，会记下收到的每个请求）逐项试出来，没有调用任何真实中转。
+- **隔离**：
+  - 用户目录里的 CLAUDE.md、AGENTS.md、SessionStart hook、技能、MCP 配置、config.toml 里的指令，在隔离下都没有进入请求，hook 也没执行；不隔离的对照里全部进来了。这些对照作为测试保留（`-m agents`）。
+  - Codex 默认会做很多 Pi 没有的事，都关掉了：自己从网上下载插件市场、网络搜索、子代理、「目标」、自带技能清单（约 8000 字，注入每个请求；配置 `skills.include_instructions=false`），以及对连不上的接口**无限重试**（`unbounded_connection_retries` 默认开，测试时一次一次性调用挂了 20 分钟）。
+  - 从 Claude Code 的终端里启动应用时，环境里带着十几个 `CLAUDE_CODE_*` 变量（会话 ID、消息通道），子进程的环境先去掉继承的 `ANTHROPIC_*`、`CLAUDE*`、`CODEX_*`、`OPENAI_*` 再放入这一次的地址和 Key。
+  - 重试：Claude Code 默认自己重试 10 次，Codex 5 次，都设为和 Pi 一样的 3 次，外面再套阶段的中转重试。
+- **文件保护**（用户 2026-09-29 选定，因为之前被 Codex 删过文件）：
+  - Codex 的 Windows 沙箱在无界面运行时拒绝所有命令，连工作区里也写不了（实测 read-only / workspace-write 都这样；它的受限令牌模式要管理员做一次设置才能写）。
+  - 改为三个 Agent 都以 Windows 低完整性级别运行（`agents/contain.py`，`python -m prometheus.agents.contain --writable … --temp … -- 命令`）：只有本次的工作区、Agent 自己的配置文件夹和临时文件夹标成可写，Windows 拒绝其他一切写入和删除。进程放在「关闭即结束」的作业对象里，启动器被停掉时它也跟着结束。
+  - 不需要管理员：F 盘这类只给当前用户「修改」权限的盘，先用 icacls 给这几个文件夹授予自己完全控制，再设完整性标签。
+  - 诱饵测试（`test_agents_protection.py`）：Pi、Claude Code、Codex 在保护下都删不掉工作区外的文件、写不出去，章节照常写出；不加保护的对照里三个都删掉了。
+  - Codex 自己会拒绝「看起来危险」的命令（拒绝 `Remove-Item`，但同样效果的 `[System.IO.File]::Delete` 照跑），这是按字面猜，不是保护，所以诱饵用 .NET 调用。
+- **三个 Agent 拿到的东西对照**（规格要求写明做不到一样的地方）：
+  - 技能和规则：Pi 用 `--skill` 加载 SKILL.md；另外两个把 SKILL.md 全文和同一段只在工作区里工作的系统提示放进提示词开头。
+  - 工具：Pi 有 read / write / edit / powershell；Claude Code 在 `--bare` 下有 Read / Edit / PowerShell（没有单独的 Write，新文件用 Edit 建）；Codex 对它认识的模型给 shell（`exec_command`）和 view_image，对 gpt-6-astra 用新的写法（工具写在开发者消息里，模型通过一个 exec 工具运行代码），都走同一条命令通道。
+  - Codex 的 `--image` 会把表示「从标准输入读提示」的 `-` 也当成图片，命令末尾用 `--` 隔开。
+- **Codex 的模型列表和思考档位**：来自它的 app-server（`model/list`），每个模型带支持的推理档位；gpt-6-astra 支持 low～max 和一个更高的 ultra，我们的六档里没有 ultra，不提供。没有登录时是它自带的目录，登录后是账户自己的列表。列表缓存 5 分钟，免得输入模型名时反复启动 Codex。
+- **更新**：用随包 node 里的 npm（`npm view` 查最新版，`npm install --prefix` 装进 `<工具目录>\.staging\`），自检通过才换上，失败保留原版本；有任务在跑时不更新。Claude Code 的 npm 有 stable（2.1.280）和 latest（2.1.285）两个标签，跟 latest，因为用户要尽快用上新模型。开发机上的 Pi 没有真的更新到 0.99.1：`verify.ps1` 固定了 Pi 的版本，规格只要求 Pi 的更新和退回在假 npm 上测过。**R8 打包要带上 npm**：现在的运行时只复制 node.exe。
+- **用量**：Claude Code 的 result 事件和 Codex 的 turn.completed 事件记在工作区的 `agent.events.jsonl`，和 Pi 的一起算进 rewrite.py 打印的花费；Codex 的输入数包含缓存命中的部分，分开记。
+- **失败原因**：两个 CLI 的报错都转成「<Agent> 调用失败：<状态码> <原文>」，状态码放在「：」后面，现有的归类规则就能认出 Key 无效、限流等；接口连不上、流被切断的几种说法归到「模型没有回应」，也会触发中转重试。
+- **内存**：Claude Code 一个进程约 0.2–0.4 GB（本机长会话实测 396 MB），3 章同时写约 1 GB；先保持 3 章，真实运行后看情况再调。
