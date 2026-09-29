@@ -16,6 +16,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ANSWER = "可用"
+PAGE = "<!doctype html><html><head><meta charset='utf-8'></head><body><p>ok</p></body></html>"
 
 
 def _strings(value):
@@ -44,7 +45,8 @@ def _plan(body) -> list:
     tries = ([f"[System.IO.File]::Delete('{path}')" for path in _marked(body, "DELETE")]
              + [f"[System.IO.File]::WriteAllText('{path}', 'bad')" for path in _marked(body, "OUTSIDE")])
     steps = [("shell", "; ".join(tries))] if tries else []
-    return steps + [("write", path) for path in _marked(body, "WRITE")[:1]]
+    steps += [("write", path) for path in _marked(body, "WRITE")[:1]]
+    return steps + [("page", path) for path in _marked(body, "HTML")[:1]]
 
 
 def _anthropic_call(body: dict, step):
@@ -52,11 +54,12 @@ def _anthropic_call(body: dict, step):
     names = {tool.get("name") for tool in body.get("tools") or []}
     shell = next((name for name in ("powershell", "PowerShell") if name in names), None)
     kind, value = step
-    if kind == "write" and "write" in names:
-        return "write", {"path": value, "content": "ok"}
-    if kind == "write" and "Edit" in names:
-        return "Edit", {"file_path": value, "old_string": "", "new_string": "ok"}
-    command = value if kind == "shell" else f"Set-Content -LiteralPath '{value}' -Value 'ok'"
+    content = PAGE if kind == "page" else "ok"
+    if kind != "shell" and "write" in names:
+        return "write", {"path": value, "content": content}
+    if kind != "shell" and "Edit" in names:
+        return "Edit", {"file_path": value, "old_string": "", "new_string": content}
+    command = value if kind == "shell" else f"Set-Content -LiteralPath '{value}' -Value \"{content}\""
     return (shell, {"command": command, "description": "run"}) if shell else None
 
 
@@ -96,7 +99,8 @@ def _responses_turn(body: dict) -> int:
 
 def _responses_command(step) -> str:
     kind, value = step
-    return value if kind == "shell" else f"Set-Content -LiteralPath '{value}' -Value 'ok'"
+    content = PAGE if kind == "page" else "ok"
+    return value if kind == "shell" else f"Set-Content -LiteralPath '{value}' -Value \"{content}\""
 
 
 def _responses_events(model: str, command=None, turn: int = 0) -> list:

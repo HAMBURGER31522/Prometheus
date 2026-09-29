@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from prometheus.agents.versions import UnknownAgent
+from prometheus.agents.versions import UnknownAgent, UpdateError
 
 router = APIRouter()
 
@@ -29,7 +29,12 @@ def check_agents(request: Request):
 @router.post("/api/agents/update-all")
 def update_all_agents(request: Request):
     agents = _agents(request)
-    return {"agents": agents.update_all()} if hasattr(agents, "update_all") else _not_ready()
+    if not hasattr(agents, "update_all"):
+        return _not_ready()
+    try:
+        return {"agents": agents.update_all()}
+    except UpdateError as exc:
+        return JSONResponse({"code": "AGENT_UPDATE_FAILED", "detail": str(exc)}, status_code=409)
 
 
 @router.post("/api/agents/{agent_id}/install")
@@ -42,6 +47,8 @@ def install_agent(request: Request, agent_id: str):
         return {"agents": agents.install(agent_id)}
     except UnknownAgent:
         return JSONResponse({"code": "AGENT_NOT_FOUND"}, status_code=404)
+    except UpdateError as exc:
+        return JSONResponse({"code": "AGENT_UPDATE_FAILED", "detail": str(exc)}, status_code=409)
 
 
 @router.get("/api/agents/codex/login")

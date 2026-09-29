@@ -52,7 +52,11 @@ class AppState:
         self.catalogue_providers = ["anthropic", "deepseek", "openai"] if self.fake else None
         self.catalogue_thread: threading.Thread | None = None
         # The Agents' versions and the Codex login (PLAN 15.4.13): simulated in the fake backend.
-        self.agents = FakeAgents() if self.fake else LocalAgents(self.get_runtime)
+        self.agents = FakeAgents() if self.fake else LocalAgents(
+            self.get_runtime, busy=lambda: self.queue is not None and self.queue.busy(), proxy=self._proxy)
+
+    def _proxy(self) -> str:
+        return store.load(self.data_dir)["network"].get("proxy", "") if self.data_dir else ""
 
     def get_runtime(self) -> runtime_mod.Runtime:
         """Resolve node / Pi / ffmpeg on first use (PLAN 15.2-1)."""
