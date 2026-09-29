@@ -127,6 +127,7 @@ _RULES = [
     ), None),
     ("MODEL_TIMEOUT", MODEL_STAGES, (), (
         "timed? ?out", "timeout", "Connection error", "fetch failed", "socket hang up", "ECONNRESET", "ETIMEDOUT",
+        "unexpected EOF",  # a Go proxy (CLIProxyAPI) cutting a long stream
         "ENOTFOUND", "EAI_AGAIN", "getaddrinfo",
     ), None),
 ]
