@@ -31,6 +31,26 @@ def extract_report_title(html: str) -> str:
     return _TAG_RE.sub("", match.group(1)).strip() if match else ""
 
 
+# 「补充说明（非视频内容）」(PLAN 15.4.11): set apart from the video's own words, template colours only.
+_SUPPLEMENT_STYLE_ID = "prometheus-supplement"
+_SUPPLEMENT_STYLE = (
+    f'<style id="{_SUPPLEMENT_STYLE_ID}">aside.supplement{{margin:14px 0 18px;padding:12px 16px;'
+    "border:1px dashed var(--line);border-radius:8px;background:var(--wash);font-size:15px}"
+    "aside.supplement .supplement-label{margin:0 0 6px;font-size:12px;color:var(--muted)}"
+    "aside.supplement p{margin:0 0 6px}aside.supplement p:last-child{margin-bottom:0}</style>"
+)
+
+# 「编者观点（非视频内容）」(PLAN 15.4.11a): the editor's own view, set apart from supplements too.
+_VIEWPOINT_STYLE_ID = "prometheus-viewpoint"
+_VIEWPOINT_STYLE = (
+    f'<style id="{_VIEWPOINT_STYLE_ID}">aside.viewpoint{{margin:14px 0 18px;padding:12px 16px;'
+    "border-left:3px solid var(--accent);border-radius:4px;background:var(--wash);font-size:15px}"
+    "aside.viewpoint .viewpoint-label{margin:0 0 6px;font-size:12px;color:var(--accent)}"
+    "aside.viewpoint ul{margin:0;padding-left:1.2em}aside.viewpoint li{margin:0 0 6px}"
+    "aside.viewpoint .confidence{margin-left:6px;font-size:12px;color:var(--muted)}</style>"
+)
+
+
 def finalize_report(work_report, final_path, work_dir) -> str:
     work_report = Path(work_report)
     final_path = Path(final_path)
@@ -69,6 +89,10 @@ def finalize_report(work_report, final_path, work_dir) -> str:
     html = _FRAME_SRC_RE.sub(_inline, html)
     if '<figure class="report-figure"' in html and "<style>" not in html:
         html = html.replace("</head>", _FIGURE_STYLE + "</head>", 1)
+    if '<aside class="supplement"' in html and _SUPPLEMENT_STYLE_ID not in html:
+        html = html.replace("</head>", _SUPPLEMENT_STYLE + "</head>", 1)
+    if '<aside class="viewpoint"' in html and _VIEWPOINT_STYLE_ID not in html:
+        html = html.replace("</head>", _VIEWPOINT_STYLE + "</head>", 1)
     external = _EXTERNAL_RE.search(html)
     if external:
         raise FinalizeError(

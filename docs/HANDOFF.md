@@ -120,3 +120,23 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **预览数据（acceptance-output/r7-data）已被 R7d 的新后端处理过**：字幕合并成段落（细分段另存 segments.fine.json）、词库更新为带英英释义的版本、settings.json 迁移为多配置格式、当前配置的思考强度按用户要求改为「中」、罗素和卡巴拉已拖回「战争伦理」「神秘学」。改动前的备份在 `tmp/r7d/backup-preview/`（不入库）。
 - **重启预览后端**：先确认 8766 的进程（父进程是 `.venv\Scripts\python.exe -m prometheus.server --port 8766`），`taskkill /PID <父进程> /T /F`，再用第 2 节的命令启动。不要碰 pid 22228。
 - **待用户决定**：导入失败写明原因（规格草案在 PLAN 15.4.10，未提交）；设置页眼睛图标是否显示完整 Key；DeepSeek / 智谱预设要不要也加「获取 API Key」链接；R7e 的四个问题（补充说明框、写作方式、审校默认开、预算）。
+
+## 9. R7e 进行中的注意事项（2026-09-28）
+
+分支 `r7e-report-depth`。规格 PLAN 15.4.11 / E14（用户确认过三轮，后来又加了配图和看大图），实现选择 DECISIONS D-44。R7d 已合并（上一节「待用户决定」的几项都已经定了、做完了）。
+
+- **完整精读的流水线**（`backend/src/prometheus/report/full.py`，阶段 `keypoints`、`plan`、`report`）：要点账本（每 5 分钟一次一次性调用）→ 规划（一次 Pi 运行，不合格重做一次）→ 每章一次 Pi 运行（规则全文附在提示词里，省掉读文件的回合）→ 程序逐章检查（漏写、空洞、照抄、隐藏的每点篇幅检查、有信息的候选帧没用上），最多退回 2 轮 → 零基础读者审校（追问和要图，退回 1 次，丢了要点就撤回）→ 程序拼装 → `coverage.json`。开了配图时，每章写之前先有一次看图调用给候选帧标类型和内容（`figures/notes.py`）。
+- **中间结果按输入的摘要保存**：`keypoints.json`、`plan.json` + `plan.meta.json`、`chapters/ch-NN.json`、`chapters/ch-NN.frames.json`。失败后「重试」只重做缺的部分；成功后清理只留 `coverage.json`。
+- **不写字数**：规则、规划和反馈里都不出现字数（用户要求，理由见 D-44）。隐藏门槛在 `chapter_checks.py` 的 `THIN_BASE`、`THIN_RATIO`，用英文和卡巴拉校准为 24 和 1.0（D-44）；罗素只做复核，不参与校准。
+- **规则面向未知视频**：depth.md 的示例用手冲咖啡，`test_depth_rules.py` 禁止出现评测样本的主题。
+- **真实运行**（花钱，先问用户）：在 bash 里要先设好工具链变量，否则找不到 node / Pi / ffmpeg：
+  `T=E:/tools/Prometheus-Desktop; export PROMETHEUS_TOOLS=$T PROMETHEUS_NODE=$T/node/node.exe PROMETHEUS_PI=$T/pi/node_modules/.bin/pi.cmd PROMETHEUS_FFMPEG=$T/ffmpeg/bin PYTHONUTF8=1`，
+  然后 `uv run python scripts/report-eval/rewrite.py acceptance-output/r7-data <条目ID> [--frames]`。`--frames` 会给条目打开配图、重新下载视频抽帧，成功后清理；没有标签的条目会顺带跑一次分类补标签。跑完在日志末尾打印这次花了多少（Pi 用量是实数，一次性调用按字数估算）。
+- **评测**：`uv run python scripts/report-eval/run.py acceptance-output/r7-data --items <ID> --label <名字> [--report <ID>=<HTML>]`，结果在 `acceptance-output/report-eval/`（不入库）。旧报告备份在 `old/`，第 1 层（只加规则）的英文报告在 `l1/`。
+- **费用**：中转站没有提示缓存，Agent 每一轮都重发全部上下文。预算原定 60–80 美元，用户后来同意在 justwoker 上跑完英文、罗素和第四轮（15.4.11a）。按官方价估算，Claude 累计约 149 美元（含最后一轮评测约 3.2 美元）；gpt-6-luna 走订阅额度，不按 token 计。
+- **补写已完成的报告**：`rewrite.py <数据目录> <条目ID> --patch`（15.4.11a-5）需要保留的 `keypoints.json`。它读的是已发布的精读，再跑一次就是在补过的版本上再补。卡巴拉和罗素补写前的页面在 `acceptance-output/report-eval/before-patch/`。每章的补写记录（`patch/ch-NN.json`）保留核实前的稿子，改了链接核实规则后重跑不再调用模型。
+- **字幕核对**（用户 2026-09-29 问过有没有缺）：卡巴拉、罗素纠错后的文字和逐段识别结果一字不差。英文只差一个词：10–11 分钟附近识别出的「Kimike 3」被纠成了「Kimi K2」，讲者说的更可能是「Kimi K3」，疑似纠错改错了。没有缺段。
+- **R8 要做的两件事**（用户 2026-09-29）：README 放一张「视频时长 → 用时」表（`docs/report-eval.md`「耗时」一节，所有跑过的都放），加上每个模型、每个思考档位的 token 区间（同一视频不同模型的 token 数在同一数量级，但会差 1.5–3 倍，有没有提示缓存对费用影响更大），再各举 gpt-6-luna 和 claude-opus-4-8 一个例子。控制台的链接输入框下面提示按当前模型估计的用时和费用。
+- **用户的工作习惯**：需要用户定的事用弹窗问（AskUserQuestion），附推荐项；改规格要先问、得到同意再写进 PLAN；回答要说清楚改了什么、为什么。
+- **README 要用的耗时数据**（用户 2026-09-29 要求）：`docs/report-eval.md` 的「耗时」一节，gpt-6-luna（ChatGPT 订阅经本机 CPA）在「最高」「超高」下各视频长度的实测时间。R8 重写 README 时写进去。
+- **当前模型**：预览数据的配置已切回 justwoker 中转（claude-opus-4-8，「中」）；CPA 的 gpt-6-luna 配置保留但不用（用户 2026-09-29：先别用 Codex 订阅）。模型目录已从 pi.dev 更新过。

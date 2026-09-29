@@ -201,6 +201,9 @@ function ProfileEditor({ initial, onSave, onCancel }: {
         <span>思考强度</span>
         <Select label="思考强度" value={thinking} options={thinkingOptions(levels)} onChange={(next) => update({ thinking: next })} />
         {!levels && <small>{THINKING_HINT}。</small>}
+        {!levels && (thinking === "xhigh" || thinking === "max") && (
+          <small>这个模型不在模型目录里：会把所选档位原样发给接口，接口不支持时任务会失败并写明原因。</small>
+        )}
         <small>模型动笔前想多久。越高越仔细，但更慢、更费 token；精读用「中」最均衡。</small>
       </div>
       {custom && (

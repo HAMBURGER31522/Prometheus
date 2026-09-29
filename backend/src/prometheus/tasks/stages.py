@@ -183,15 +183,39 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             return
         frames_mod.extract_frames(video, work)
 
+    def _figures(ctx, row, settings) -> tuple:
+        """(frames exist, the model sees images): Pi (built-in and custom alike) is asked only with frames."""
+        figures = bool(row["figures"]) and (_work(data_dir, ctx) / "frames" / "frames.json").is_file()
+        return figures, figures and capability.query_supports_images(
+            _node_exe(), _pi_cli(), data_dir, settings["llm"],
+        )
+
+    def keypoints(ctx):
+        settings = store.load(data_dir)
+        if workspace_mod.full_depth(settings):  # 「标准」 is the VRA run as it was (PLAN 15.4.11)
+            workspace_mod.run_keypoints_stage(data_dir, ctx.item_id, settings, node_exe=_node_exe(), pi_cli=_pi_cli())
+
+    def plan(ctx):
+        settings = store.load(data_dir)
+        if not workspace_mod.full_depth(settings):
+            return
+        row = _row(data_dir, ctx)
+        workspace_mod.run_plan_stage(data_dir, ctx.item_id, row, settings, node_exe=_node_exe(), pi_cli=_pi_cli(),
+                                     figures=all(_figures(ctx, row, settings)))
+
     def report(ctx):
         row = _row(data_dir, ctx)
         settings = store.load(data_dir)
-        work = _work(data_dir, ctx)
-        figures = bool(row["figures"]) and (work / "frames" / "frames.json").is_file()
-        # Ask Pi (built-in and custom providers alike) only when frames exist.
-        supports_images = figures and capability.query_supports_images(
-            _node_exe(), _pi_cli(), data_dir, settings["llm"],
-        )
+        figures, supports_images = _figures(ctx, row, settings)
+        if workspace_mod.full_depth(settings):
+            def progress(step: str, number: int, total: int) -> None:
+                items_store.update_item(data_dir, ctx.item_id, stage_detail=f"{step}（第 {number}/{total} 章）")
+
+            workspace_mod.run_full_report_stage(
+                data_dir, ctx.item_id, row, settings, node_exe=_node_exe(), pi_cli=_pi_cli(),
+                figures=figures and supports_images, progress=progress,
+            )
+            return
         workspace_mod.run_report_stage(
             data_dir, ctx.item_id, row, settings,
             node_exe=_node_exe(), pi_cli=_pi_cli(),
@@ -241,6 +265,8 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         "transcribe": transcribe,
         "transcript": transcript,
         "frames": frames,
+        "keypoints": keypoints,
+        "plan": plan,
         "report": report,
         "finalize": finalize,
         "subtitle_fix": lambda ctx: subtitle_fix.fix_for_item(

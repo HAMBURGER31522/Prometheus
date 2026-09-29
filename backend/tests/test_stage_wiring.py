@@ -66,8 +66,18 @@ def test_frames_extracts_from_the_video_not_the_info_json_sidecar(data_dir, monk
     assert seen["video"].name == "video.mp4"
 
 
+def _standard(data_dir):
+    """「标准」精读: the single VRA run these older tests are about (「完整」 is the default)."""
+    from prometheus.settings import store
+
+    settings = store.load(data_dir)
+    settings["report"] = {"depth": "standard", "review": True}
+    store.save(data_dir, settings)
+
+
 def test_report_stage_receives_the_item_row(data_dir, monkeypatch):
     ctx = _ctx(data_dir)
+    _standard(data_dir)
     seen = {}
 
     def fake_run(data_dir_arg, item_id, row, settings, **kwargs):
@@ -116,6 +126,7 @@ def test_mindmap_stage_marks_failure_when_output_never_validates(data_dir, monke
 
 def test_report_stage_asks_pi_whether_a_builtin_model_sees_images(data_dir, monkeypatch):
     ctx = _ctx(data_dir, figures=1)
+    _standard(data_dir)
     work = paths.work_dir(data_dir, ctx.item_id)
     (work / "frames").mkdir(parents=True)
     (work / "frames" / "frames.json").write_text("[]", encoding="utf-8")

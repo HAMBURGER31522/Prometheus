@@ -7,17 +7,26 @@ import { ScrollArea } from "../../shared/ScrollArea";
 import { ModelProfiles } from "./ModelProfiles";
 import { SecretInput } from "./SecretInput";
 
+/** 「模型目录：已更新 2026-09-29」 or the bundled one before the first update (PLAN 15.4.12). */
+function catalogueText(updatedAt: string | null): string {
+  return updatedAt
+    ? `模型目录：已更新 ${updatedAt.slice(0, 10)}（每天启动时自动检查一次）`
+    : "模型目录：随安装包自带（新出的模型可能不认识）";
+}
+
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState("");
   const [testing, setTesting] = useState("");
   const [asr, setAsr] = useState<{ state: string; detail: string } | null>(null);
   const [dataDir, setDataDir] = useState<string | null>(null);
+  const [catalogue, setCatalogue] = useState("");
 
   useEffect(() => {
     api.settings().then(setSettings).catch(() => setStatus("读取设置失败"));
     api.dataDir().then((value) => setDataDir(value.data_dir)).catch(() => undefined);
     api.asrStatus().then(setAsr).catch(() => undefined);
+    api.modelCatalogue().then((found) => setCatalogue(catalogueText(found.updated_at))).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -64,6 +73,28 @@ export function SettingsPage() {
         <section className="section card">
           <h2>模型</h2>
           <ModelProfiles profiles={settings.llm_profiles} onChange={(llm_profiles) => update({ llm_profiles })} />
+          <div className="row" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={async () => {
+                setCatalogue("模型目录：正在从 pi.dev 更新…");
+                const result = await api.refreshModelCatalogue().catch(() => null);
+                setCatalogue(
+                  !result
+                    ? "模型目录：更新失败（连不上 pi.dev），继续用原来的目录"
+                    : result.providers
+                      ? catalogueText(result.updated_at)
+                      : "模型目录：这次没有取到任何供应商的目录，继续用原来的目录",
+                );
+              }}
+            >
+              更新模型目录
+            </button>
+            <span className="muted" data-testid="model-catalogue">
+              {catalogue || "模型目录："}
+            </span>
+          </div>
           <div className="row" style={{ marginTop: 16 }}>
             <button
               type="button"
@@ -196,6 +227,49 @@ export function SettingsPage() {
             </div>
             <small>下载 YouTube 视频需要浏览器导出的 cookies 文件。</small>
           </label>
+        </section>
+
+        <section className="section card">
+          <h2>精读</h2>
+          <div className="choices" role="radiogroup" aria-label="精读详细程度">
+            <label className="choice">
+              <input
+                type="radio"
+                name="report-depth"
+                checked={settings.report.depth === "full"}
+                onChange={() => update({ report: { ...settings.report, depth: "full" } })}
+              />
+              <span>
+                <b>完整</b>
+                <small>来源里每个有实质内容的点都写到、讲清楚，可以补充背景解释；篇幅更长，更费 token。</small>
+              </span>
+            </label>
+            <label className="choice">
+              <input
+                type="radio"
+                name="report-depth"
+                checked={settings.report.depth === "standard"}
+                onChange={() => update({ report: { ...settings.report, depth: "standard" } })}
+              />
+              <span>
+                <b>标准</b>
+                <small>VRA 原样：按信息量取舍，更短、更省。</small>
+              </span>
+            </label>
+          </div>
+          {settings.report.depth === "full" && (
+            <label className="switch-label field">
+              <button
+                type="button"
+                role="switch"
+                className="switch"
+                aria-checked={settings.report.review}
+                aria-label="讲清楚审校"
+                onClick={() => update({ report: { ...settings.report, review: !settings.report.review } })}
+              />
+              讲清楚审校：让一位零基础读者逐章追问，看不懂的地方退回去补写（多几次模型调用）
+            </label>
+          )}
         </section>
 
         <section className="section card">

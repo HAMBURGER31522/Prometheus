@@ -3,13 +3,15 @@
 // report's own scripts run in an opaque origin and cannot reach the app or its token. The
 // injected script reports the table of contents, follows the reading zoom and, coming from
 // 导图's 「在精读中查看」, scrolls to the chapter of that moment (PLAN 15.4.9).
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { type ReaderProps } from "../../shared/LibraryPage";
 import { useNav } from "../../shared/NavContext";
 import { ReaderTools, ZoomControls, useZoom } from "../../shared/ReaderTools";
-import { api } from "../../shared/api";
+import { type Coverage, type ItemRow, api } from "../../shared/api";
+import { clock, momentLink } from "../../shared/format";
 import { openExternal } from "../../shared/platform";
+import { coverageLabel } from "./coverage";
 import { reportThemeVars, themeReport } from "./theme";
 
 type TocItem = { id: string; title: string };
@@ -18,6 +20,7 @@ export function ReportView({ item }: ReaderProps) {
   const [html, setHtml] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const { zoom } = useZoom();
   const { nav } = useNav();
@@ -35,6 +38,11 @@ export function ReportView({ item }: ReaderProps) {
         if (alive) setHtml(themeReport(text, vars));
       })
       .catch(() => alive && setFailed(true));
+    setCoverage(null);
+    api
+      .coverage(item.id)
+      .then((found) => alive && setCoverage(found))
+      .catch(() => undefined); // 「标准」 reports have no coverage
     return () => {
       alive = false;
     };
@@ -67,6 +75,7 @@ export function ReportView({ item }: ReaderProps) {
     <>
       <ReaderTools>
         <TocMenu items={toc} onPick={(id) => send({ type: "goto", id })} />
+        {coverage && <CoverageMenu coverage={coverage} item={item} />}
         <ZoomControls />
       </ReaderTools>
       <iframe ref={frame} className="report-frame" title="精读报告" sandbox="allow-scripts allow-popups" srcDoc={html} />
@@ -74,23 +83,64 @@ export function ReportView({ item }: ReaderProps) {
   );
 }
 
+/** 「要点 142/146」 (PLAN 15.4.11): what was skipped and why, what was left out; a line opens the video there. */
+function CoverageMenu({ coverage, item }: { coverage: Coverage; item: ItemRow }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useDismiss(open, box, () => setOpen(false));
+  const jump = (ms: number) => void openExternal(momentLink(item.platform, item.video_id, ms / 1000));
+  return (
+    <div className="toc" ref={box}>
+      <button type="button" className="btn quiet small" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {coverageLabel(coverage)}
+      </button>
+      {open && (
+        <div className="popover coverage-menu" role="dialog" aria-label="要点覆盖">
+          <p className="menu-label">跳过 {coverage.skipped.length} 条（有理由，不算漏写）</p>
+          {coverage.skipped.map((point) => (
+            <button key={point.id} type="button" onClick={() => jump(point.start_ms)}>
+              <span className="toc-num">{clock(point.start_ms / 1000)}</span>
+              <span>
+                <b>{point.reason}</b>　{point.text}
+              </span>
+            </button>
+          ))}
+          <div className="menu-sep" />
+          <p className="menu-label">未写到 {coverage.uncovered.length} 条</p>
+          {coverage.uncovered.map((point) => (
+            <button key={point.id} type="button" onClick={() => jump(point.start_ms)}>
+              <span className="toc-num">{clock(point.start_ms / 1000)}</span>
+              <span>{point.text}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Close a popover on a click outside it or Escape. */
+function useDismiss(open: boolean, box: RefObject<HTMLDivElement | null>, close: () => void) {
+  useEffect(() => {
+    if (!open) return;
+    const onEvent = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent ? event.key === "Escape" : !box.current?.contains(event.target as Node)) {
+        close();
+      }
+    };
+    window.addEventListener("mousedown", onEvent);
+    window.addEventListener("keydown", onEvent);
+    return () => {
+      window.removeEventListener("mousedown", onEvent);
+      window.removeEventListener("keydown", onEvent);
+    };
+  });
+}
+
 function TocMenu({ items, onPick }: { items: TocItem[]; onPick: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === "Escape" : !box.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", close);
-    window.addEventListener("keydown", close);
-    return () => {
-      window.removeEventListener("mousedown", close);
-      window.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  useDismiss(open, box, () => setOpen(false));
   return (
     <div className="toc" ref={box}>
       <button

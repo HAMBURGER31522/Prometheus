@@ -9,7 +9,7 @@ from prometheus.library import items as items_store
 
 STAGES = [
     "resolve", "download", "transcribe", "transcript", "frames",
-    "report", "finalize", "subtitle_fix", "mindmap", "classify", "publish",
+    "keypoints", "plan", "report", "finalize", "subtitle_fix", "mindmap", "classify", "publish",
 ]
 
 
@@ -52,7 +52,7 @@ def run_item(ctx, impls, stages=STAGES) -> None:
     for stage in stages:
         if ctx.cancel_requested:
             raise TaskCancelled()
-        items_store.update_item(ctx.data_dir, ctx.item_id, stage=stage)
+        items_store.update_item(ctx.data_dir, ctx.item_id, stage=stage, stage_detail=None)
         impl = impls.get(stage)
         trace.write(stage, "start")
         started = time.monotonic()

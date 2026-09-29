@@ -275,11 +275,11 @@ html[data-dragging], html[data-dragging] * { user-select: none; cursor: grabbing
   transform-origin: top; animation: pop-in var(--dur-spatial) var(--ease-spatial);
 }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
-.popover [role="menuitem"], .popover [role="option"] {
+.popover [role="menuitem"], .popover [role="option"], .coverage-menu button {
   all: unset; box-sizing: border-box; display: flex; align-items: baseline; gap: 10px; width: 100%;
   padding: 8px 10px; border-radius: 9px; color: var(--ink-2); cursor: default; line-height: 1.45;
 }
-.popover [role="menuitem"]:hover, .popover [role="option"]:hover,
+.popover [role="menuitem"]:hover, .popover [role="option"]:hover, .coverage-menu button:hover,
 .popover [role="option"][data-active] { background: var(--line); color: var(--ink); }
 .popover [role="option"][aria-selected="true"] { color: var(--accent); font-weight: 600; }
 .toc { position: relative; }

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus import paths
-from prometheus.llm import capability, model_list, pi_models
+from prometheus.llm import capability, catalogue_update, model_list, pi_models
 from prometheus.llm.one_shot import OneShotError, run_one_shot
 from prometheus.runtime import RuntimeConfigError
 from prometheus.settings import store
@@ -31,6 +31,10 @@ async def put_settings(request: Request):
     backend = (body.get("asr") or {}).get("backend")
     if backend not in ("local", "cloud", "custom"):
         return JSONResponse({"code": "INVALID_ASR_BACKEND"}, status_code=422)
+    if (body.get("report") or {}).get("depth", "full") not in store.REPORT_DEPTHS:
+        return JSONResponse({"code": "INVALID_REPORT_DEPTH"}, status_code=422)
+    if not isinstance((body.get("report") or {}).get("review", True), bool):
+        return JSONResponse({"code": "INVALID_REPORT_REVIEW"}, status_code=422)
     protocols = [((body.get("llm") or {}).get("custom") or {}).get("protocol", "openai")]
     protocols += [p.get("protocol", "openai") for p in (body.get("llm_profiles") or {}).get("items", [])]
     if any(protocol not in pi_models.PROTOCOL_APIS for protocol in protocols):
@@ -74,6 +78,23 @@ def list_models(request: Request, body: dict):
         return JSONResponse(
             {"code": exc.code, "status": exc.status, "reason": exc.reason, "detail": str(exc)}, status_code=502,
         )
+
+
+@router.get("/api/settings/model-catalogue")
+def model_catalogue(request: Request):
+    """When the model catalogue was last fetched from pi.dev (PLAN 15.4.12); None before the first."""
+    return {"updated_at": catalogue_update.updated_at(request.app.state.data_dir)}
+
+
+@router.post("/api/settings/model-catalogue/refresh")
+def refresh_model_catalogue(request: Request):
+    """「更新模型目录」: fetch the catalogue, then write the model's parameters again (PLAN 15.4.12)."""
+    state = request.app.state
+    proxy = store.load(state.data_dir)["network"].get("proxy", "")
+    result = catalogue_update.refresh(state.data_dir, pi_cli=_pi_cli(state), fetch=state.catalogue_fetch, proxy=proxy,
+                                      providers=state.catalogue_providers)
+    pi_models.refresh_custom_provider(state.data_dir, pi_cli=_pi_cli(state))
+    return result
 
 
 @router.post("/api/settings/model-info")

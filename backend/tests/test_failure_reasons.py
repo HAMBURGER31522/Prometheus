@@ -185,6 +185,22 @@ SAMPLES = [
     ("classify", "EXTERNAL_API_FAILURE", (
         '一次性文本调用失败（exit 1）：Model "deepseek/deepseek-v9" not found. Use --list-models to see available models.'
     ), "MODEL_NOT_FOUND"),
+    # 完整精读's key points (one-shot calls) and plan (a Pi run) call the model too (PLAN 15.4.11)
+    ("keypoints", "EXTERNAL_API_FAILURE", "一次性文本调用失败（exit 1）：503 status code (no body)", "MODEL_BUSY"),
+    ("plan", "EXTERNAL_MODEL_FAILURE", '429 {"type":"error","error":{"type":"rate_limit_error"}}', "MODEL_RATE_LIMITED"),
+    # A local CLIProxyAPI (Go) cut the stream of a long gpt-6-luna call at 「最高」 (English run 2026-09-29)
+    ("keypoints", "EXTERNAL_API_FAILURE", "一次性文本调用失败（exit 1）：unexpected EOF", "MODEL_TIMEOUT"),
+    # ... and its upstream proxy (v2rayN on 10809) resetting the connection (Kabbalah run 2026-09-29)
+    ("keypoints", "EXTERNAL_API_FAILURE", (
+        "一次性文本调用失败（exit 1）：read tcp 127.0.0.1:56032->127.0.0.1:10809: wsarecv: "
+        "An existing connection was forcibly closed by the remote host."
+    ), "MODEL_TIMEOUT"),
+    # OpenAI's "Unsupported value" error (the wording its API uses for a parameter a model does not
+    # accept, e.g. temperature); a thinking level passed through for a model the catalogue lacks
+    ("report", "EXTERNAL_MODEL_FAILURE", (
+        "400 Unsupported value: 'reasoning_effort' does not support 'max' with this model. "
+        "Supported values are: 'low', 'medium', and 'high'."
+    ), "MODEL_THINKING_UNSUPPORTED"),
     # ---- 本机 (transcribe/local.py; downloader/http.py 'unable to write data: <OSError>'; Windows OSError) ----
     ("transcribe", "CUDA_UNAVAILABLE", "尚未安装本地转写组件，请先在设置里启用本地转写。", "ASR_COMPONENTS_MISSING"),
     ("transcribe", "ASR_FAILURE", "本地转写进程异常结束（exit 3221225477），请查看 asr-worker.log。",
@@ -225,7 +241,7 @@ def test_anything_else_is_unclassified():
 
 def test_every_reason_has_a_chinese_sentence_and_an_action(tmp_path):
     codes = {expected for *_, expected in SAMPLES} | {"UNCLASSIFIED"}
-    assert len(codes) == 19
+    assert codes == set(errors.REASONS)  # every reason has a real sample
     for code in codes:
         reason, action = errors.explain(tmp_path, code)
         assert reason and action, code

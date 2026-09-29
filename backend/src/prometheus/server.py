@@ -2,8 +2,10 @@
 
 import argparse
 import json
+import logging
 import os
 import re
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -20,7 +22,8 @@ from prometheus.api import items as items_api
 from prometheus.api import settings as settings_api
 from prometheus.fake.pipeline import build_impls as build_fake_impls
 from prometheus.library import db, migrate
-from prometheus.llm import pi_models
+from prometheus.llm import catalogue_update, pi_models
+from prometheus.settings import store
 from prometheus.subtitle import paragraphs as subtitle_paragraphs
 from prometheus.tasks.queue import TaskQueue
 from prometheus.tasks.stages import build_real_impls
@@ -42,6 +45,10 @@ class AppState:
         self.fake = bool(os.getenv("PROMETHEUS_FAKE") == "1") if fake is None else fake
         self.runtime_dir = Path(runtime_dir) if runtime_dir else None
         self._runtime = found_runtime
+        # The model catalogue's fetch (PLAN 15.4.12): pi.dev by default; the fake backend never goes online.
+        self.catalogue_fetch = (lambda url, proxy="": {}) if self.fake else None
+        self.catalogue_providers = ["anthropic", "deepseek", "openai"] if self.fake else None
+        self.catalogue_thread: threading.Thread | None = None
 
     def get_runtime(self) -> runtime_mod.Runtime:
         """Resolve node / Pi / ffmpeg on first use (PLAN 15.2-1)."""
@@ -64,6 +71,9 @@ class AppState:
         db.init_db(self.data_dir)
         pi_models.ensure_models_json(self.data_dir)
         pi_models.refresh_custom_provider(self.data_dir, pi_cli=self._pi_cli())
+        if catalogue_update.due(self.data_dir):  # at most once a day, in the background (PLAN 15.4.12)
+            self.catalogue_thread = threading.Thread(target=self._update_catalogue, daemon=True)
+            self.catalogue_thread.start()
         # Startup recovery (PLAN 7.1): a running row means the process died.
         db.mark_running_as_interrupted(self.data_dir)
         # Subtitles from before the 10–15 s paragraphs are grouped once (PLAN 15.4.10).
@@ -72,6 +82,15 @@ class AppState:
             impls = build_fake_impls(self.data_dir) if self.fake else build_real_impls(self.data_dir, runtime=self.get_runtime)
             self.queue = TaskQueue(self.data_dir, impls)
             self.queue.start()
+
+    def _update_catalogue(self) -> None:
+        try:
+            proxy = store.load(self.data_dir)["network"].get("proxy", "")
+            catalogue_update.refresh(self.data_dir, pi_cli=self._pi_cli(), fetch=self.catalogue_fetch, proxy=proxy,
+                                     providers=self.catalogue_providers)
+            pi_models.refresh_custom_provider(self.data_dir, pi_cli=self._pi_cli())
+        except Exception as exc:  # noqa: BLE001 - offline or pi.dev down: the catalogue it had stays
+            logging.getLogger(__name__).warning("model catalogue update failed: %s", exc)
 
     def shutdown(self) -> None:
         if self.queue is not None:

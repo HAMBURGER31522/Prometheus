@@ -60,6 +60,10 @@ export const api = {
     (await json<{ api_key: string }>("POST", "/api/settings/reveal-key", target)).api_key,
   listModels: async (profile: ModelProfile) =>
     (await json<{ models: string[] }>("POST", "/api/settings/models", { profile })).models,
+  /** The model catalogue fetched from pi.dev (PLAN 15.4.12): when, and 「更新模型目录」. */
+  modelCatalogue: () => json<{ updated_at: string | null }>("GET", "/api/settings/model-catalogue"),
+  refreshModelCatalogue: () =>
+    json<{ updated_at: string | null; providers: number; failed: string[] }>("POST", "/api/settings/model-catalogue/refresh"),
   modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url">) =>
     json<ModelInfo>("POST", "/api/settings/model-info", { profile }),
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
@@ -94,6 +98,7 @@ export const api = {
     json<unknown>("POST", `/api/categories/${id}/merge`, { into_id: intoId }),
 
   reportHtml: (id: string) => text(`/api/items/${id}/report`),
+  coverage: (id: string) => json<Coverage>("GET", `/api/items/${id}/coverage`),
   mindmapTree: (id: string) => json<MindmapTree>("GET", `/api/items/${id}/mindmap?format=json`),
   mindmapMarkdown: (id: string) => text(`/api/items/${id}/mindmap`),
   subtitle: (id: string, variant: "fixed" | "raw") =>
@@ -115,6 +120,8 @@ export interface ItemRow {
   figures: number;
   status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted";
   stage: string | null;
+  /** Where a long stage is, e.g. 「写作（第 3/10 章）」 (PLAN 15.4.11). */
+  stage_detail: string | null;
   mindmap_status: "ok" | "failed" | null;
   subtitle_status: "ok" | "failed" | null;
   error_code: string | null;
@@ -207,6 +214,22 @@ export interface Settings {
   asr: { backend: "local" | "cloud" | "custom"; custom: { base_url: string; api_key: string; model: string } };
   network: { proxy: string; youtube_cookies_file: string };
   figures_default: boolean;
+  /** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was; review = 讲清楚审校 in 完整. */
+  report: { depth: "full" | "standard"; review: boolean };
+}
+
+/** coverage.json of a 完整 report (PLAN 15.4.11): what was written, skipped with a reason, or left out. */
+export interface CoveragePoint {
+  id: string;
+  text: string;
+  start_ms: number;
+  end_ms: number;
+}
+export interface Coverage {
+  points_total: number;
+  written: number;
+  skipped: (CoveragePoint & { reason: string; duplicate_of?: string })[];
+  uncovered: CoveragePoint[];
 }
 
 export const itemTitle = (item: ItemRow) => item.report_title || item.source_title || item.video_id;

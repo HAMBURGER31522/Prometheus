@@ -101,3 +101,25 @@ def test_report_stage_runs_pi_and_writes_input_json(tmp_path, monkeypatch):
     assert payload["platform"] == "Bilibili" and payload["report_mode"] == "standard"
     assert seen["command_prefix"] == ["node.exe", "cli.js"]
     assert seen["agent_dir"] == paths.pi_config_dir(data_dir)
+
+
+FULL = {**SETTINGS, "report": {"depth": "full"}}
+STANDARD = {**SETTINGS, "report": {"depth": "standard"}}
+
+
+def test_the_single_vra_run_does_not_change_with_the_depth():
+    """「完整」 writes chapter by chapter (report/full.py) and never goes through this run (PLAN 15.4.11)."""
+    full = build_runner_kwargs(ROW, FULL, "n", "c", figures=True, model_supports_images=True)
+    standard = build_runner_kwargs(ROW, STANDARD, "n", "c", figures=True, model_supports_images=True)
+    assert full == standard
+    assert "depth.md" not in full["extra_prompt"]
+    assert [Path(path).name for path in full["extra_files"]] == ["figures.md"]
+
+
+def test_standard_depth_is_the_vra_run_unchanged():
+    standard = build_runner_kwargs(ROW, STANDARD, "n", "c", figures=False, model_supports_images=False)
+    before = build_runner_kwargs(ROW, SETTINGS, "n", "c", figures=False, model_supports_images=False)
+    assert standard == before
+    assert not standard["extra_files"]
+    assert "depth.md" not in standard["extra_prompt"]
+    assert standard["timeout"] == 1800 + 600 * 1

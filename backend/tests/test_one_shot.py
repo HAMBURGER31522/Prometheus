@@ -54,6 +54,21 @@ def test_command_carries_all_no_flags_and_model_args(tmp_path):
     assert argv[argv.index("--api-key") + 1] == "sk-y"
 
 
+def test_images_ride_along_as_at_files_after_the_options(tmp_path):
+    """Pi's `pi -p @screenshot.png "What's in this image?"` (README, File Arguments): the frame ledger."""
+    executable = make_fake_pi_js(tmp_path)
+    frames = [tmp_path / "f_000030.jpg", tmp_path / "f_000400.jpg"]
+    for frame in frames:
+        frame.write_bytes(b"jpg")
+    run_one_shot(
+        tmp_path, prompt="看图", provider="custom", model="m", api_key="sk-z", thinking="medium",
+        node_exe="node.exe", pi_cli=str(executable), agent_dir=tmp_path / "agent3", files=frames,
+    )
+    argv = json.loads((tmp_path / "argv.json").read_text(encoding="utf-8"))
+    assert argv[-2:] == [f"@{frames[0]}", f"@{frames[1]}"]
+    assert (tmp_path / "stdin.txt").read_text(encoding="utf-8") == "看图"
+
+
 # Pi's print mode writes the provider's error message to stderr and exits 1 (dist/modes/print-mode.js).
 FAILING_JS = """const body = JSON.stringify({message: "You exceeded your current quota. " + "x".repeat(400),
   type: "insufficient_quota", param: null, code: "insufficient_quota"});
