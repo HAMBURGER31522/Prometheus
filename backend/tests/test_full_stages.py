@@ -97,6 +97,7 @@ def test_the_coverage_survives_the_cleanup():
     from prometheus.tasks.cleanup import KEEP
 
     assert "coverage.json" in KEEP
+    assert "keypoints.json" in KEEP  # E14's time coverage is measured against the ledger afterwards
 
 
 def test_the_key_point_stage_reads_the_units_and_asks_the_configured_model(data_dir, monkeypatch):
