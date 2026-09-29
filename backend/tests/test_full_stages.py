@@ -331,3 +331,31 @@ def test_the_chapter_report_opens_the_editors_links_through_the_proxy(data_dir, 
                                         figures=False, progress=lambda *args: None)
     assert seen["verify_links"]("https://en.wikipedia.org/wiki/X") == "页面"
     assert seen["opened"] == ("https://en.wikipedia.org/wiki/X", "http://127.0.0.1:7890")
+
+
+def test_the_patch_stage_reads_the_published_report_the_kept_ledger_and_its_skips(data_dir, monkeypatch):
+    """PLAN 15.4.11a-5: nothing is extracted or planned again."""
+    ctx = _ctx(data_dir)
+    work = paths.work_dir(data_dir, ctx.item_id)
+    (work / "keypoints.json").write_text(json.dumps(EMPTY_LEDGER), encoding="utf-8")
+    (work / "coverage.json").write_text(json.dumps({"skipped": [{"id": "K009", "reason": "广告推广"}]},
+                                                   ensure_ascii=False), encoding="utf-8")
+    folder = "测试/2026-09-29 手冲咖啡"
+    items_store.update_item(data_dir, ctx.item_id, status="done", library_path=folder)
+    (data_dir / folder).mkdir(parents=True)
+    (data_dir / folder / paths.LIBRARY_FILES["html"]).write_text("<html>已发布</html>", encoding="utf-8")
+    seen = {}
+    monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda *a, **k: seen.setdefault("keypoints", True))
+    monkeypatch.setattr(workspace_mod.full, "run_plan", lambda *a, **k: seen.setdefault("plan", True))
+
+    def fake_patch(work_arg, html, ledger, units, run_pi, **kwargs):
+        seen.update(html=html, ledger=ledger, units=units, skipped=kwargs["skipped"], verify=kwargs["verify_links"])
+        return {}
+
+    monkeypatch.setattr(workspace_mod.patch, "patch_report", fake_patch)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    workspace_mod.run_patch_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="n", pi_cli="c",
+                                  progress=lambda *args: None)
+    assert "keypoints" not in seen and "plan" not in seen
+    assert seen["html"] == "<html>已发布</html>" and seen["ledger"] == EMPTY_LEDGER and seen["units"] == UNITS
+    assert seen["skipped"] == [{"id": "K009", "reason": "广告推广"}] and callable(seen["verify"])

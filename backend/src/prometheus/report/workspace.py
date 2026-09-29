@@ -9,7 +9,7 @@ from pathlib import Path
 
 from prometheus import paths
 from prometheus.llm import one_shot
-from prometheus.report import full, pi_run, viewpoints
+from prometheus.report import full, patch, pi_run, viewpoints
 from prometheus.report.chunks import load_units
 from prometheus.report.full import FIGURES_MD
 from prometheus.report.timing import pi_timeout_seconds
@@ -211,3 +211,7 @@ def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, 
                                    verify_links=lambda url: viewpoints.open_page(url, proxy=proxy))
     full.finish(work, plan, problems, ledger, chapters, build_input_json(row))
     return work / "report.html"
+
+
+def run_patch_stage(data_dir, item_id, row, settings, *, node_exe, pi_cli, progress):
+    return None
