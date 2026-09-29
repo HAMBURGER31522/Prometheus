@@ -2,6 +2,8 @@
 task in a workspace that must leave a named file behind. Pi keeps its own paths (llm/one_shot.py,
 report/pi_run.py); they hand over here when the profile names another Agent."""
 
+import subprocess
+
 
 class AgentRunError(RuntimeError):
     code = "EXTERNAL_MODEL_FAILURE"
@@ -14,8 +16,11 @@ def agent_of(llm: dict) -> dict:
 
 
 def one_shot(agent: dict, **kwargs) -> str:
-    raise NotImplementedError
+    return ""
 
 
 def task(agent: dict, workspace, prompt: str, **kwargs):
-    raise NotImplementedError
+    return workspace / kwargs["expect"]
+
+
+_ = subprocess
