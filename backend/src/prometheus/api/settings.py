@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus import paths
-from prometheus.agents import rules
+from prometheus.agents import rules, runs
 from prometheus.llm import capability, catalogue_update, model_list, pi_models
 from prometheus.llm.one_shot import OneShotError, run_one_shot
 from prometheus.runtime import RuntimeConfigError
@@ -125,11 +125,14 @@ def test_model(request: Request):
             probe_dir, prompt="回复两个字：可用", provider=llm["provider"],
             model=llm["model"], api_key=llm.get("api_key") or "",
             thinking=llm.get("thinking") or "low",
-            node_exe=str(found.node), pi_cli=str(found.pi_cli), agent_dir=probe_dir,
+            node_exe=str(found.node), pi_cli=str(found.pi_cli), agent_dir=probe_dir, agent=runs.agent_of(llm),
         )
-    except OneShotError as exc:
+    except (OneShotError, runs.AgentRunError) as exc:
         return JSONResponse({"ok": False, "detail": str(exc)[:200]}, status_code=200)
-    images = capability.query_supports_images(found.node, found.pi_cli, state.data_dir, llm)
+    if llm.get("agent", "pi") != "pi":  # Pi's own capability query does not speak for the other Agents
+        images = bool((llm.get("custom") or {}).get("supports_images"))
+    else:
+        images = capability.query_supports_images(found.node, found.pi_cli, state.data_dir, llm)
     return JSONResponse(
         {"ok": True, "detail": f"{reply[:60]} · 支持看图：{'是' if images else '否'}"},
         status_code=200,

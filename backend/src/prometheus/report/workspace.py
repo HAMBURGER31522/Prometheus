@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from prometheus import paths
+from prometheus.agents import runs
 from prometheus.llm import one_shot
 from prometheus.report import full, patch, pi_run, viewpoints
 from prometheus.report.chunks import load_units
@@ -119,7 +120,13 @@ def _patient(call, deadline=None):
 def _llm(settings: dict) -> dict:
     llm = settings["llm"]
     return {"provider": llm["provider"], "model": llm["model"], "thinking": llm.get("thinking") or "medium",
-            "api_key": llm.get("api_key") or ""}
+            "api_key": llm.get("api_key") or "", **_agent(settings)}
+
+
+def _agent(settings: dict) -> dict:
+    """The profile's Agent for pi_run.run_task (PLAN 15.4.13); Pi when the settings predate them."""
+    agent = runs.agent_of(settings["llm"])
+    return {"agent": agent["id"], "access": agent["access"], "base_url": agent["base_url"]}
 
 
 def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
@@ -130,6 +137,7 @@ def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
         return _patient(lambda: one_shot.run_one_shot(
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+            agent=runs.agent_of(llm),
         ))
 
     return ask
@@ -143,7 +151,7 @@ def model_look(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
         return _patient(lambda: one_shot.run_one_shot(
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
-            files=files,
+            files=files, agent=runs.agent_of(llm),
         ))
 
     return look

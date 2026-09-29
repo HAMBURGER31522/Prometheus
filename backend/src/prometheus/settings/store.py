@@ -88,6 +88,7 @@ def _llm_view(profile: dict) -> dict:
         "model": profile["model"], "api_key": profile["api_key"], "thinking": profile["thinking"],
         "custom": {"base_url": profile["base_url"], "supports_images": profile["supports_images"],
                    "protocol": profile["protocol"]},
+        "agent": profile["agent"], "access": profile["access"],
     }
 
 

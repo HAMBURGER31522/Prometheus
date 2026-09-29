@@ -101,6 +101,13 @@ def run_task(workspace, prompt: str, *, expect: str, llm: dict, prefix: list, ag
     """Run Pi once in `workspace` with `prompt`; the file `expect` must be there afterwards."""
     workspace = Path(workspace)
     workspace.mkdir(parents=True, exist_ok=True)
+    if llm.get("agent", "pi") != "pi":  # Codex CLI or Claude Code (PLAN 15.4.13)
+        from prometheus.agents import commands, runs
+
+        return runs.task(runs.agent_of(llm), workspace, prompt, expect=expect, model=llm["model"],
+                         api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "medium",
+                         config_root=Path(agent_dir).parent, tools_root=commands.tools_root(prefix[-1]),
+                         timeout=timeout)
     env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir), "VIDEO_REPORT_PYTHON": sys.executable,
            "PYTHONUTF8": "1"}
     asyncio.run(_run(pi_command(prefix, workspace, llm), workspace, prompt, env, timeout))

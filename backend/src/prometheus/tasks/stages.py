@@ -6,6 +6,7 @@ from pathlib import Path
 
 from prometheus import paths
 from prometheus import runtime as runtime_mod
+from prometheus.agents import runs as agent_runs
 from prometheus.figures import frames as frames_mod
 from prometheus.ingest import download as download_mod
 from prometheus.ingest import platform_subtitles
@@ -243,7 +244,7 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             provider=llm["provider"], model=llm["model"],
             api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
             node_exe=_node_exe(), pi_cli=_pi_cli(),
-            agent_dir=paths.pi_config_dir(data_dir),
+            agent_dir=paths.pi_config_dir(data_dir), agent=agent_runs.agent_of(llm),
         )
         # Only the first completion files the item; after that the user's choice stands (15.4.10).
         category_id = _row(data_dir, ctx).get("category_id") or categories_store.ensure_category(

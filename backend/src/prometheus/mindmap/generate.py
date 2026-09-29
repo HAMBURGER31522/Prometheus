@@ -4,6 +4,7 @@
 import json
 
 from prometheus import paths
+from prometheus.agents import runs
 from prometheus.library import items as items_store
 from prometheus.llm import one_shot
 from prometheus.mindmap import enrich, markdown, prompt, tree
@@ -29,7 +30,7 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
         return one_shot.run_one_shot(
             work, prompt=text, provider=llm["provider"], model=llm["model"],
             api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "medium",
-            node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+            node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir), agent=runs.agent_of(llm),
         )
 
     base = prompt.build_prompt(outline)
