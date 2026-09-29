@@ -190,6 +190,11 @@ SAMPLES = [
     ("plan", "EXTERNAL_MODEL_FAILURE", '429 {"type":"error","error":{"type":"rate_limit_error"}}', "MODEL_RATE_LIMITED"),
     # A local CLIProxyAPI (Go) cut the stream of a long gpt-6-luna call at 「最高」 (English run 2026-09-29)
     ("keypoints", "EXTERNAL_API_FAILURE", "一次性文本调用失败（exit 1）：unexpected EOF", "MODEL_TIMEOUT"),
+    # ... and its upstream proxy (v2rayN on 10809) resetting the connection (Kabbalah run 2026-09-29)
+    ("keypoints", "EXTERNAL_API_FAILURE", (
+        "一次性文本调用失败（exit 1）：read tcp 127.0.0.1:56032->127.0.0.1:10809: wsarecv: "
+        "An existing connection was forcibly closed by the remote host."
+    ), "MODEL_TIMEOUT"),
     # OpenAI's "Unsupported value" error (the wording its API uses for a parameter a model does not
     # accept, e.g. temperature); a thinking level passed through for a model the catalogue lacks
     ("report", "EXTERNAL_MODEL_FAILURE", (
