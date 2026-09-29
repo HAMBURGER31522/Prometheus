@@ -124,6 +124,11 @@ def _is_supplement(node: _Node) -> bool:
     return node.tag == "aside" and "supplement" in node.classes()
 
 
+def _is_viewpoint(node: _Node) -> bool:
+    """「编者观点」(PLAN 15.4.11a): the editor's own view, never sampled as the video's."""
+    return node.tag == "aside" and "viewpoint" in node.classes()
+
+
 def _in(node: _Node, test) -> bool:
     return any(test(ancestor) for ancestor in node.ancestors())
 
@@ -325,7 +330,8 @@ def report_sentences(html: str, units: list) -> list:
     passages = _Passages(units)
     sentences = []
     for block in _leaf_blocks(root):
-        if _in(block, _is_supplement) or _in(block, lambda a: a.tag in ("figure", "header", "h1", "h2")):
+        if _in(block, _is_supplement) or _in(block, _is_viewpoint) or \
+                _in(block, lambda a: a.tag in ("figure", "header", "h1", "h2")):
             continue
         cited = _cited(block, order)
         if cited:

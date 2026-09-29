@@ -99,7 +99,9 @@ def chapter_prompt(plan: dict, number: int, owned: list, points: dict, units: li
         "3. 核心判断照 SKILL.md 用 data-source-units 绑定上面转写里的单元编号。\n"
         "4. 组件、图示、SVG 和表格照 SKILL.md 与 modes/standard.md 使用，样式只用模板里已有的类；"
         "确需新样式时，在片段开头放一个 <style>，只写本章用到的类。\n"
-        '5. 补充说明照 depth.md 写在 <aside class="supplement"> 里。\n'
+        '5. 补充说明照 depth.md 写在 <aside class="supplement"> 里；有争议的地方可以按 depth.md 写编者观点'
+        '（<aside class="viewpoint">，标置信度和依据链接），编者的推测不写成讲者的话。'
+        "原文列举的每一项、每一层原因、提到的具体名称都要写出来。\n"
         + figure_rule
     )
 
