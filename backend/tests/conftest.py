@@ -47,3 +47,13 @@ def wait_for_status(client, item_id, status, timeout=15.0):
             return last
         time.sleep(0.05)
     raise AssertionError(f"item {item_id} never reached {status!r}, last={last!r}")
+
+
+def pytest_collection_modifyitems(config, items):
+    """-m agents runs the real private CLIs (PLAN 15.4.13); every other selection leaves them out."""
+    if "agents" in (config.getoption("-m") or ""):
+        return
+    skip = pytest.mark.skip(reason="runs the app's own Codex CLI and Claude Code: use -m agents")
+    for item in items:
+        if "agents" in item.keywords:
+            item.add_marker(skip)

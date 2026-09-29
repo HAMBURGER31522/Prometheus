@@ -74,6 +74,8 @@ def test_codex_talks_to_the_endpoint_as_its_own_provider_with_its_extras_off():
     disabled = {command[i + 1] for i, part in enumerate(command) if part == "--disable"}
     assert {"plugins", "remote_plugin", "apps", "browser_use", "computer_use", "goals", "hooks", "image_generation",
             "multi_agent", "skill_search", "tool_suggest"} <= disabled
+    # on by default: an endpoint that cannot be reached is tried forever, and the call never ends
+    assert "unbounded_connection_retries" in disabled
     assert _value(command, "--sandbox") == "read-only" and _value(command, "-C") == str(Path("W:/run"))
     assert _value(command, "--model") == "gpt-6-astra" and command[-1] == "-"
     env = commands.codex_env(PARENT, config_root=CONFIG, api_key="sk-x")
