@@ -35,6 +35,7 @@ def main(argv=None, impls=None) -> int:
     parser.add_argument("data_dir", type=Path)
     parser.add_argument("items", nargs="+")
     parser.add_argument("--frames", action="store_true")
+    parser.add_argument("--patch", action="store_true")
     args = parser.parse_args(argv)
     data_dir = args.data_dir.resolve()  # Pi runs elsewhere: relative paths would point astray
     db.init_db(data_dir)  # an older data dir gets the new columns, as the app does at startup

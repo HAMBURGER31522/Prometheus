@@ -136,3 +136,24 @@ def test_a_data_dir_from_before_the_latest_schema_is_brought_up_to_date_first(tm
     impls = {"report": lambda ctx: ran.append(ctx.item_id)}
     assert load_script().main([str(data_dir), "a"], impls=impls) == 0
     assert ran == ["a"]
+
+
+def test_patch_runs_only_the_patch_then_finalize_and_publish(tmp_path):
+    """PLAN 15.4.11a-5: a finished 完整 report is patched by the newer rules, nothing else runs."""
+    from prometheus import paths
+
+    data_dir, item_id = finished_item(tmp_path)
+    items_store.update_item(data_dir, item_id, tags='["示例"]')
+    (paths.cache_dir(data_dir, item_id) / "keypoints.json").write_text('{"points": [], "skips": []}', encoding="utf-8")
+    ran = []
+    impls = {stage: (lambda ctx, stage=stage: ran.append(stage))
+             for stage in ("download", "frames", "keypoints", "plan", "report", "patch", "finalize", "publish")}
+    assert load_script().main([str(data_dir), item_id, "--patch"], impls=impls) == 0
+    assert ran == ["patch", "finalize", "publish"]
+
+
+def test_patch_needs_the_kept_ledger(tmp_path):
+    data_dir, item_id = finished_item(tmp_path)
+    ran = []
+    assert load_script().main([str(data_dir), item_id, "--patch"], impls={"patch": lambda ctx: ran.append(1)}) == 2
+    assert ran == []
