@@ -992,6 +992,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 > 用户希望模型配置里可以选 Agent：Pi / Codex CLI / Claude Code，模型调用路由到所选的 Agent（有的接口只能在对应的 Agent 里用）。执行 agent 的看法：可行。依赖 Pi 的地方集中在两个口子（一次性调用、在工作区里跑任务），加上 Pi 专属的配置（models.json、思考档位与目录、看图能力查询、报错归类、用量记录）；写作规则基本与 Agent 无关。做法是抽出「Agent 后端」接口，各写适配器：Codex CLI 开源（`codex exec --json`，可用 ChatGPT 登录）；Claude Code 不开源但官方支持无界面调用（`claude -p --output-format stream-json`、Claude Agent SDK），调用用户自己安装和登录的那一份，不打包进安装包；订阅登录能否这样用，实现前核对条款。R7e 验收、签字、合并之后，单独开里程碑，先写规格。
 >
 > 用户补充（2026-09-29）：不会用 Claude Code 登录官方订阅；Codex CLI 可能用官方登录。登录要走正规流程：设置里选「Agent：Codex CLI」后给「登录 ChatGPT 账户」按钮，调用 `codex login` 打开 OpenAI 官方登录页，凭据由 Codex 自己保存，应用只用 `codex login status` 显示登录状态，不读取、不保存令牌；用单独的 `CODEX_HOME` 与用户自己的 Codex 分开（或提供「沿用我已有的 Codex 登录」）；参考 CC Switch 把「官方登录」和「第三方接口」分成两类配置，切到官方时不动 auth.json，切到第三方时写 config.toml。具体命令和参数实现前按所装版本核对。
+>
+> 用户再补充（2026-09-29）：Claude Code 用别家模型的接口，像 CC Switch 那样。CC Switch 是把 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL` 等写进 Claude Code 的 settings.json 的 env；我们自己启动 `claude -p`，可以每次调用时通过环境变量传入，并指定单独的配置目录，不改用户自己的 Claude Code 设置。要求接口支持 Anthropic Messages 协议（justwoker、DeepSeek、Kimi、智谱、MiniMax 都有）；价值在于只认 Claude Code 客户端的中转 Key 也能用。实现时核对：Claude Code 的思考强度怎么设、工具名（Read/Write/Edit/Bash）、Windows 上对 Git Bash 的依赖、非 Claude 模型经 Claude Code 调工具是否稳定。
 
 ### 15.5 里程碑
 
