@@ -106,7 +106,7 @@ def _patient(call, deadline=None):
     for attempt in range(RELAY_RETRIES + 1):
         try:
             return call()
-        except (pi_run.PiRunError, one_shot.OneShotError) as exc:
+        except (pi_run.PiRunError, one_shot.OneShotError, runs.AgentRunError) as exc:
             if attempt == RELAY_RETRIES or errors.classify("report", str(exc)) not in _RELAY_FAILURES:
                 raise
             wait = min(RELAY_FIRST_WAIT_S * 2 ** attempt, RELAY_LONGEST_WAIT_S)

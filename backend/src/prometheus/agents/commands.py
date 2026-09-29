@@ -26,6 +26,8 @@ CODEX_OFF = ("plugins", "remote_plugin", "plugin_sharing", "apps", "browser_use"
              "computer_use", "goals", "hooks", "image_generation", "multi_agent", "skill_search", "tool_suggest",
              "sleep_tool", "in_app_updates", "realtime_conversation")
 KEY_VARIABLE = "PROMETHEUS_AGENT_KEY"
+# Pi tries a failed request three times itself; the stage's relay retry comes on top (report/workspace.py).
+RETRIES = 3
 
 
 def executable(tools_root, agent_id: str) -> Path:
@@ -42,22 +44,25 @@ def clean_env(env: dict) -> dict:
     return {name: value for name, value in env.items() if not name.upper().startswith(INHERITED)}
 
 
-def claude_command(exe, *, model: str, thinking: str, tools: bool) -> list:
+def claude_command(exe, *, model: str, thinking: str, tools) -> list:
+    """`tools`: True for a workspace task, "Read" to look at images, False for plain text."""
     command = [str(exe), "-p", "--bare", "--output-format", "stream-json", "--verbose", "--model", model,
                "--effort", CLAUDE_EFFORT.get(thinking, thinking), "--no-session-persistence",
                "--strict-mcp-config", "--disable-slash-commands"]
-    if tools:
-        return command + ["--tools", CLAUDE_TOOLS, "--allowedTools", CLAUDE_TOOLS, "--permission-mode", "dontAsk"]
+    allowed = CLAUDE_TOOLS if tools is True else (tools or "")
+    if allowed:
+        return command + ["--tools", allowed, "--allowedTools", allowed, "--permission-mode", "dontAsk"]
     return command + ["--tools", ""]
 
 
 def claude_env(env: dict, *, config_root, base_url: str, api_key: str) -> dict:
     return {**clean_env(env), "CLAUDE_CONFIG_DIR": str(Path(config_root) / "claude"),
             "ANTHROPIC_BASE_URL": base_url, "ANTHROPIC_API_KEY": api_key,
-            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1"}
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
+            "CLAUDE_CODE_MAX_RETRIES": str(RETRIES)}
 
 
-def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, base_url) -> list:
+def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, base_url, images=()) -> list:
     """`base_url` None: the app's own ChatGPT login instead of an endpoint and a key."""
     command = [str(exe), "exec", "--json", "--model", model, "--ephemeral", "--ignore-user-config", "--ignore-rules",
                "--skip-git-repo-check", "--sandbox", "workspace-write" if write else "read-only", "-C", str(workspace)]
@@ -67,12 +72,17 @@ def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, bas
         settings += ['model_provider="prometheus"', 'model_providers.prometheus.name="prometheus"',
                      f"model_providers.prometheus.base_url={json.dumps(base_url)}",
                      'model_providers.prometheus.wire_api="responses"',
-                     f'model_providers.prometheus.env_key="{KEY_VARIABLE}"']
+                     f'model_providers.prometheus.env_key="{KEY_VARIABLE}"',
+                     f"model_providers.prometheus.request_max_retries={RETRIES}",
+                     f"model_providers.prometheus.stream_max_retries={RETRIES}"]
     for setting in settings:
         command += ["-c", setting]
     for feature in CODEX_OFF:
         command += ["--disable", feature]
-    return command + ["-"]  # the prompt comes on stdin
+    if images:
+        command += ["--image", *(str(image) for image in images)]
+    # the prompt comes on stdin; without 「--」 --image would take 「-」 for one more picture
+    return command + ["--", "-"]
 
 
 def codex_env(env: dict, *, config_root, api_key) -> dict:

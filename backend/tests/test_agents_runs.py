@@ -71,13 +71,13 @@ def test_codex_answers_with_its_last_message(started, tmp_path):
 
 @pytest.mark.parametrize(("agent", "stream"), [(CLAUDE, "claude-rejected-key"), (CODEX, "codex-rejected-key")])
 def test_a_rejected_key_is_reported_so_the_console_says_the_key_is_wrong(started, tmp_path, agent, stream):
-    calls, reply = started
+    _calls, reply = started
     reply["stdout"], reply["code"] = _stream(stream), 1
     (tmp_path / "work").mkdir()
     with pytest.raises(runs.AgentRunError) as failure:
         _one_shot(agent, tmp_path)
     assert "401" in str(failure.value)
-    assert errors.classify("report", "EXTERNAL_MODEL_FAILURE", str(failure.value)) == "MODEL_KEY_INVALID"
+    assert errors.classify("report", str(failure.value), "EXTERNAL_MODEL_FAILURE") == "MODEL_KEY_INVALID"
 
 
 def test_images_go_to_codex_as_attachments_and_claude_code_reads_them(started, tmp_path):
@@ -123,7 +123,7 @@ def test_a_task_gets_the_same_rules_and_skill_as_pi_and_leaves_its_file(started,
 
 
 def test_a_task_that_leaves_no_file_fails(started, tmp_path):
-    calls, reply = started
+    _calls, reply = started
     reply["stdout"] = _stream("claude-answer")
     _stage(tmp_path / "run")
     with pytest.raises(runs.AgentRunError, match="ch-01.html"):
@@ -140,7 +140,7 @@ def test_a_task_out_of_time_is_stopped_and_counts_as_a_timeout(monkeypatch, tmp_
     with pytest.raises(runs.AgentRunError) as failure:
         runs.task(CODEX, tmp_path / "run", "写", expect="x.html", model="m", api_key="k", thinking="medium",
                   config_root=tmp_path / "config", tools_root=tmp_path / "tools", timeout=5)
-    assert errors.classify("report", "EXTERNAL_MODEL_FAILURE", str(failure.value)) == "MODEL_TIMEOUT"
+    assert errors.classify("report", str(failure.value), "EXTERNAL_MODEL_FAILURE") == "MODEL_TIMEOUT"
 
 
 def test_a_relay_failure_from_an_agent_is_tried_again(monkeypatch):
