@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -110,6 +111,8 @@ def _patient(call, deadline=None):
             wait = min(RELAY_FIRST_WAIT_S * 2 ** attempt, RELAY_LONGEST_WAIT_S)
             if deadline is not None and deadline - time.monotonic() < wait + 60:  # room for the retry itself
                 raise
+            logging.getLogger(__name__).warning("relay broke the call (%s); retry %d/%d in %ds",
+                                                str(exc)[-120:], attempt + 1, RELAY_RETRIES, wait)
             time.sleep(wait)
 
 
