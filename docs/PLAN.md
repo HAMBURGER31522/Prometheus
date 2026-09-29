@@ -996,6 +996,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 > 用户再补充（2026-09-29）：Claude Code 用别家模型的接口，像 CC Switch 那样。CC Switch 是把 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL` 等写进 Claude Code 的 settings.json 的 env；我们自己启动 `claude -p`，可以每次调用时通过环境变量传入，并指定单独的配置目录，不改用户自己的 Claude Code 设置。要求接口支持 Anthropic Messages 协议（justwoker、DeepSeek、Kimi、智谱、MiniMax 都有）；价值在于只认 Claude Code 客户端的中转 Key 也能用。实现时核对：Claude Code 的思考强度怎么设、工具名（Read/Write/Edit/Bash）、Windows 上对 Git Bash 的依赖、非 Claude 模型经 Claude Code 调工具是否稳定。
 >
 > 设置页的样子（用户 2026-09-29 认可的思路）：每份模型配置有名称、**Agent**（Pi / Codex CLI / Claude Code）、**接入方式**。「接口 + Key」照旧填地址、协议、Key、模型，Agent 限定协议（Claude Code 只接 Anthropic 协议，Codex 接 OpenAI 协议），选了不匹配的组合当场提示；「官方登录」只对 Codex CLI 提供，选了以后地址和 Key 变灰不可填，换成「登录 ChatGPT 账户」按钮和登录状态。模型列表、思考强度、「测试当前模型」按 Agent 分别处理。
+>
+> 检查更新（用户 2026-09-29，参考 v2rayN 的内核更新）：一个「检查更新」窗口，三行 Agent（Pi / Codex CLI / Claude Code），每行显示已装版本、最新版本和状态，有「检查」和「更新」按钮，另有「全部更新」。Pi 随应用打包：更新后自动跑一次自检（参数兼容、一次短调用），失败就退回原版本；Codex CLI 和 Claude Code 由用户自己安装，更新调用它们自己的更新方式，装在用户目录、不装进 C 盘全局；没装的显示「未安装」和安装说明。
 
 ### 15.5 里程碑
 
