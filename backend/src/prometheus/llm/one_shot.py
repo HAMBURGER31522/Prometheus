@@ -19,7 +19,7 @@ class OneShotError(RuntimeError):
 
 
 def run_one_shot(work_dir, *, prompt: str, provider: str, model: str, api_key: str,
-                 thinking: str, node_exe: str, pi_cli: str, agent_dir, files=()) -> str:
+                 thinking: str, node_exe: str, pi_cli: str, agent_dir, files=(), agent=None) -> str:
     command = [
         node_exe, pi_cli, "-p", *ONE_SHOT_FLAGS,
         "--provider", provider, "--model", model,
