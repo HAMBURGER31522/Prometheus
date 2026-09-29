@@ -18,6 +18,11 @@ type Profiles = Settings["llm_profiles"];
 const KIND_LABELS: Record<ModelProfile["kind"], string> = { deepseek: "DeepSeek", zhipu: "智谱", custom: "自定义" };
 const AGENT_NAMES = Object.fromEntries(AGENTS.map((agent) => [agent.value, agent.label])) as Record<AgentId, string>;
 const CUSTOM_PRESET = PRESETS[PRESETS.length - 1];
+const PROTOCOL_HINTS: Record<AgentId, string> = {
+  pi: "Claude 类中转通常只开放 Anthropic 协议（/v1/messages）。",
+  codex: "Codex CLI 只走 OpenAI 协议。",
+  claude: "Claude Code 只走 Anthropic 协议（/v1/messages）。",
+};
 const PROTOCOLS: Option<ModelProfile["protocol"]>[] = [
   { value: "openai", label: "OpenAI 兼容" },
   { value: "anthropic", label: "Anthropic" },
@@ -225,7 +230,11 @@ function ProfileEditor({ initial, onSave, onCancel }: {
             <span>接口协议</span>
             <Select label="接口协议" value={profile.protocol} options={PROTOCOLS} disabled={login}
               onChange={(protocol) => update({ protocol })} />
-            <small>Claude 类中转通常只开放 Anthropic 协议（/v1/messages）。</small>
+            {problem && !login ? (
+              <small className="field-error" role="alert">{problem}</small>
+            ) : (
+              !login && <small>{PROTOCOL_HINTS[profile.agent]}</small>
+            )}
           </div>
         </>
       )}
@@ -286,7 +295,7 @@ function ProfileEditor({ initial, onSave, onCancel }: {
           <small>{limitSource(info)}</small>
         </details>
       )}
-      {problem && <small className="field-error" role="alert">{problem}</small>}
+      {problem && (login || !custom) && <small className="field-error" role="alert">{problem}</small>}
       <div className="row">
         <button type="button" className="btn primary" disabled={problem !== null} onClick={finish}>
           保存配置
