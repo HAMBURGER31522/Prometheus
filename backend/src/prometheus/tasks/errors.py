@@ -128,6 +128,7 @@ _RULES = [
     ("MODEL_TIMEOUT", MODEL_STAGES, (), (
         "timed? ?out", "timeout", "Connection error", "fetch failed", "socket hang up", "ECONNRESET", "ETIMEDOUT",
         "unexpected EOF",  # a Go proxy (CLIProxyAPI) cutting a long stream
+        "forcibly closed by the remote host",  # WSAECONNRESET: its upstream proxy dropped the connection
         "ENOTFOUND", "EAI_AGAIN", "getaddrinfo",
     ), None),
 ]
