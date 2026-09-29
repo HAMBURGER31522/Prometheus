@@ -24,6 +24,7 @@ _TAG = re.compile(r"<[^>]+>")
 _WORD = re.compile(r"[a-z][a-z0-9]{2,}")
 _CJK = re.compile(r"[一-鿿]+")
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.DOTALL | re.IGNORECASE)
+_SITE = re.compile(r"\s[-|–—]\s")
 
 
 def open_page(url: str, *, proxy: str = "") -> str:
@@ -43,10 +44,14 @@ def _tokens(text: str) -> set:
     return words | bigrams
 
 
+def _within(part: str, whole: str) -> bool:
+    return bool(part) and re.search(r"(?<![a-z0-9])" + re.escape(part) + r"(?![a-z0-9])", whole) is not None
+
+
 def _related(point: str, name: str, page: str) -> bool:
-    title = page.split("\n", 1)[0].strip().lower()
+    own_name = _SITE.split(page.split("\n", 1)[0].strip().lower())[0].strip()  # 「Golem - Wikipedia」 → golem
     source = html_lib.unescape(_TAG.sub("", name)).strip().lower()
-    if source and title and (source in title or title.split(" - ")[0].strip() in source):
+    if _within(source, own_name) or _within(own_name, source):
         return True
     return len(_tokens(point + " " + name) & _tokens(page)) >= MIN_SHARED
 
