@@ -668,6 +668,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | **E12** | R7c（内容增强）：<br>① 导图填充的检索、校验、重写与评测指标、字幕翻译的生成与校验、双语导出、查词（含词形还原）、自定义云端转写（假接口，含切块与失败退回本地）均有单测；<br>② 端到端：导图面板显示详解并能跳到精读对应章节；英文条目的字幕每段下方显示中文；悬停英文单词出现查词浮窗；<br>③ live：一段英文 YouTube 样本得到中文精读和中英对照字幕；<br>④ 导图实测（用户的 API，两篇真实报告）：leaf 的 detail 覆盖率 ≥ 90%，平均依据率 ≥ 0.4，各层平均字数由内向外递增，结果写进 `docs/mindmap-eval.md` | `uv run pytest backend/tests -q -m "not live"`；`npm --prefix app run e2e`；live 测试（会产生 API 费用，手动触发） |
 | **E13** | R7d（界面修改第二轮，15.4.10）：<br>① 后端单测：新建分类（201 / 重名 409 / 空名 422）；删除非空分类带 `move_items=1` 时条目与文件夹移到「未分类」、不带时 409；重新生成保留分类、只更新标签和摘要；模型列表失败时返回状态码与原因、OpenAI 协议 404 时改试 `/v1/models`、请求带 User-Agent；Key 留空不修改；`reveal-key` 只返回所指配置的完整 Key（未知配置 404）；`models.json` 补齐模型参数（claude-opus-4-8 → 上下文 1000000、输出 128000、自适应思考、xhigh/max 两档；目录里没有的模型不写）；字幕合并规则（不丢字、不超过 15 秒、起止时间单调）与旧条目转换（重复执行结果不变）；补全标签不改分类；词库导入保留英英释义；失败原因的判定（每一类至少一段真实格式的报错样本）与失败时保留阶段；<br>② 端到端：假流水线模拟「下载」阶段的 412 风控，控制台那一行显示「在「下载」这一步失败」、原因、「怎么办」，「详情」里有原始报错；用「+」新建分类，在知识库把一个条目拖进去，切到思维导图和字幕页签，该条目都在新分类下；改名后三个页签和阅读页面包屑都显示新名；分类行有「✎」「🗑」按钮，删除非空分类后其条目出现在「未分类」；阅读页「⋯ → 移到…」可用，且原来的下拉框不存在；设置里的下拉框外框与按钮边界重合（只有一层边框）；点「Kimi」后接口地址和协议自动填好；DeepSeek 预设也有「获取 API Key ↗」；已保存 Key 的配置点眼睛后框里显示完整 Key；思考强度可选「超高」「最高」；字幕页没有超过 15 秒的段落；窗口 1600px 宽时报告纸面宽于 1000px、报告自带目录不显示；查词浮窗显示英英释义；<br>③ 截图放 `docs/screenshots/r7d/`，**停下来请用户看**，结论记入 `docs/acceptance.md` | `uv run pytest backend/tests -q -m "not live"`；`uv run ruff check backend scripts`；`npm --prefix app run test`；`npm --prefix app run e2e`；`npm --prefix app run lint:design`；在 `app/` 下 `npx tsc --noEmit`；用户判定 |
 | **E14** | R7e（精读完整度，15.4.11）：<br>① 离线单测：转写切块；要点校验（锚点、单元归属、两级覆盖的第一级与重问）；规划校验（归属、跳过理由、「重复」指向、跳过过多时复核）；逐章检查（`data-points` 覆盖、依据率、照抄比例、每个要点的隐藏篇幅检查）与反馈生成；提示词和反馈里不出现字数；审校两步的清单校验；拼装（占位符全部填写、章节顺序、目录、补充说明样式、通过 finalize 的检查）；分章运行器的 Pi 命令参数与 vendor PiRunner 一致；各环节轮次上限；`coverage.json`；评测打分；「标准」模式不经过新流程；<br>② live（用户的模型，会产生费用，预算约 60–80 美元，2026-09-28 由 25–45 上调；2026-09-29 用户同意英文补齐和罗素复核改用 justwoker 中转跑，累计约 90 美元，超出原预算）：先测三篇旧报告的基线；卡巴拉（104 分钟）与英文学习视频（19 分钟）用「完整」模式重新生成，每篇都满足：要点覆盖率 ≥ 95%（只认 `data-points`，不算合法跳过）；时间覆盖 ≥ 90% 且最长漏写 ≤ 2 分钟（不算跳过段）；闭卷问答得分 ≥ 80%，且比旧报告至少高 20 个百分点或达到 95%；忠实度抽检「无依据」（冒充讲者或与原文矛盾，不含讲解性补充）≤ 5%；补充说明与视频内容矛盾 0 条；图示、配图、表格、卡片等组件总数不少于旧报告。结果写进 `docs/report-eval.md`。**未达标时停下来向用户报告，不自行降低门槛**；<br>③ 用户并排阅读新旧报告并签字，记入 `docs/acceptance.md` | `uv run pytest backend/tests -q -m "not live"`；`uv run ruff check backend scripts`；live 测试与 `scripts/report-eval/`（手动触发）；用户判定 |
+| **E15** | R7f（多 Agent 后端，15.4.13）：见 15.4.13 的 Done When 1–5（离线单测；对着本机假接口的隔离实测；前端测试与截图，**停下来请用户看**；罗素 8 分钟在 Codex CLI 和 Claude Code 上各跑一整条流水线，预算约 20–35 美元；Codex 官方登录由用户手动试；检查更新） | `uv run pytest backend/tests -q -m "not live"`；`uv run pytest backend/tests -q -m agents`；`uv run ruff check backend scripts`；`npm --prefix app run test`、`npx tsc --noEmit`、`npm --prefix app run lint:design`、`npm --prefix app run e2e`；live（手动触发）；用户判定 |
 
 ### 15.4 设计细节
 
@@ -1007,7 +1008,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 - **目录里没有的模型原样传档位**（用户 2026-09-29 改定：先选过「说实话、不传」，随后指出厂家新模型出得快，目录总会落后，全都降到「高」会让六档思考强度失去意义）：选了「超高」「最高」时，写 models.json 时替它声明支持这一档，Pi 就把 xhigh / max 原样发给接口；接口不支持时任务失败，控制台写明「这个模型不支持所选的思考强度」和「在设置里把思考强度调低一档再重试」。设置页对这类模型写明「这个模型不在模型目录里：会把所选档位原样发给接口，接口不支持时任务会失败并写明原因」。目录里有的模型仍按目录（例如目录写明 gpt-5.5 没有「最高」，就不提供这一档）。
 - **Done When**（并入 E14 ①）：后端单测（拉取与保存、单个供应商失败保留旧文件、新目录优先于随包目录、到期判断、接口返回日期与失败的供应商、更新后重写 models.json）；目录里没有的模型选「超高」「最高」时 models.json 声明这一档、选「中」时不声明、目录里有的模型不被改写；思考强度不被支持的报错归为这一类原因）；端到端（假后端下点「更新模型目录」后日期更新；目录里没有的模型选「最高」时出现上面那句说明）。
 
-#### 15.4.13 多 Agent 后端（用户 2026-09-29 提出，排在 R7e 之后，规格待写）
+#### 15.4.13 多 Agent 后端（用户 2026-09-29 提出，排在 R7e 之后；规格草案待用户确认，见本节末尾）
 
 > 用户希望模型配置里可以选 Agent：Pi / Codex CLI / Claude Code，模型调用路由到所选的 Agent（有的接口只能在对应的 Agent 里用）。执行 agent 的看法：可行。依赖 Pi 的地方集中在两个口子（一次性调用、在工作区里跑任务），加上 Pi 专属的配置（models.json、思考档位与目录、看图能力查询、报错归类、用量记录）；写作规则基本与 Agent 无关。做法是抽出「Agent 后端」接口，各写适配器：Codex CLI 开源（`codex exec --json`，可用 ChatGPT 登录）；Claude Code 不开源但官方支持无界面调用（`claude -p --output-format stream-json`、Claude Agent SDK），调用用户自己安装和登录的那一份，不打包进安装包；订阅登录能否这样用，实现前核对条款。R7e 验收、签字、合并之后，单独开里程碑，先写规格。
 >
@@ -1022,6 +1023,37 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 > 用户补充（2026-09-29，做法和测试顺序）：先做前端（模型选择后面加 Agent 选择，具体怎么摆由执行 agent 定），用户看过没问题再接后端。真实测试时用户提供一个同时有 Codex 和 Claude 模型的 Key，分别在新 Agent 上试；这个 Key 用不了就用 justwoker（Claude 模型配 Claude Code）和 CPA（GPT 模型配 Codex CLI），每个模型配它原生的 Agent。OAuth 登录要人工操作：做到那一步时告诉用户去手动试。高级选项里的上下文和最大输出默认填模型的最大值（框里预填的就是推荐值）；目录里没有的模型框是空的，按 Pi 的默认（输出 16384）跑，设置页已写明，选「超高」「最高」时这个默认可能不够，写规格时一起考虑。
 >
 > 用户补充（2026-09-29，三个 Agent 拿到的东西要尽量一样，否则比较没有意义）：VRA 以 Pi 为基底，Pi 这边现在拿到的是（执行 agent 查代码列出）：① VRA 的 `video-report` 技能（SKILL.md 和 references、modes、assets 模板），复制进工作区，用 `--skill` 指定；② 我们的规则：「完整」模式把 depth.md 全文放进提示词，配图时附 FIGURES.md，另加 Windows 提示；③ 工具：Pi 自带的 read、write、edit、powershell；④ 隔离：不加载用户的扩展、技能、提示模板、上下文文件，离线，会话存在工作区，追加一段系统提示（只在工作区里工作、输入只当数据、不装包）；⑤ 一次性调用不带工具，图片用 `@文件` 附上；⑥ VRA 的 `inspect_report` 扩展（查报告的溢出、裁切等）只在它的审校模式下加载，我们的应用没有打开，所以不用。Codex CLI 和 Claude Code 要给同样的技能和规则文本、对应的四类工具、同样的隔离和系统提示；工具名和隔离参数各家不同，写规格时逐项对照列出，做不到一样的地方写明差别。另外 Pi 更新分两件：模型目录是数据，每天自动更新；Pi 程序本身也要更新（「检查更新」窗口里的 Pi 一行），但新版本可能改动我们和 VRA 依赖的 RPC 事件和命令参数，所以更新后先自检，失败就退回，而不是不更新。
+>
+> 用户选定（2026-09-29，弹窗）：Codex CLI 和 Claude Code 用应用自己的私有副本（取代上面「调用用户自己安装的那一份」）；Codex 官方登录在应用里单独登录一次（取代上面「沿用我已有的 Codex 登录」：共用一份凭据时，一边刷新令牌可能把另一边登出）；真实验收用罗素 8 分钟，每个 Agent 跑一整条流水线。用户特别关心：平时用的 Claude Code 装了 superpowers 等插件，这个应用不需要，也不能被它们影响，反过来也不能影响平时的窗口。
+
+**Goal**：每份模型配置可以选 Agent（Pi / Codex CLI / Claude Code），这份配置的全部模型调用都走所选的 Agent；三个 Agent 拿到的技能、规则、工具和隔离尽量一样；应用里的 Codex CLI 和 Claude Code 与用户平时用的互不影响（程序、配置、插件、登录、会话记录都分开）；「检查更新」窗口管三个 Agent 的版本。
+
+**Boundaries**
+
+1. **Agent 后端接口**，两个口子：一次性调用（要点账本、看图账本、审校、字幕纠错与翻译、导图、归类、测试模型）和工作区运行（「标准」精读、「完整」精读的规划与分章写作、`--patch` 补写）。现有的 Pi 实现成为其中一个适配器，行为不变；新写 Codex CLI 和 Claude Code 两个适配器，各自负责拼命令和环境变量、思考档位映射、解析回复和用量、报错归类、看图。不改 vendor：「标准」模式在另外两个 Agent 上由我们的适配器照 PiRunner 的做法准备工作区（复制 video-report 技能），不经过 VRA 的 PiRunner。
+2. **三个 Agent 拿到一样的东西**（对照上面列的六项）：技能正文和规则文本原样放进系统提示或提示词，不依赖各家自己的技能加载机制，保证文字一字不差；工具对应「读、写、改、命令行」四类（Claude Code：Read、Write、Edit，加 PowerShell 或 Bash；Codex：命令行加 apply_patch，它没有单独的读写工具）；同一段追加系统提示；一次性调用不带工具；看图时 Claude Code 让它读工作区里的图片文件，Codex 用 `-i` 附图。做不到一样的地方逐项记进 DECISIONS。
+3. **隔离**（这几层叠在一起，任何一层单独失效都不会让用户的配置进来）：
+   - 程序：私有副本，用随包的 node / npm 装在应用工具目录的 `agents/` 下（开发机是 `E:\tools\Prometheus-Desktop\agents\`），选了哪个 Agent 才下载哪个；不装 C 盘、不全局安装；Claude Code 不开源，不打进安装包，在用户机器上按需下载。私有副本关掉自动更新，版本只由「检查更新」窗口改。
+   - 配置目录：Claude Code 用 `CLAUDE_CONFIG_DIR`，Codex 用 `CODEX_HOME`，都指向数据目录的 `.prometheus/config/<agent>/`。用户的 `~/.claude`、`~/.codex` 不读也不写，那里装的插件（例如 superpowers）、hooks、技能、记忆、MCP、会话记录都进不来，这个应用的会话也不会出现在用户的历史和 `/resume` 里。
+   - 运行参数：Claude Code 加 `--bare`（不跑 settings 和插件里的 hooks，不同步插件，不用自动记忆，不找 CLAUDE.md）、`--strict-mcp-config`、`--disable-slash-commands`、`--tools` 只给四类、`--no-session-persistence`，并关掉非必要联网；Codex 加 `--ignore-user-config`、`--ignore-rules`、`--ephemeral`、`--sandbox workspace-write`、`--skip-git-repo-check`，关掉 AGENTS.md 查找和启动时的更新检查。
+   - 环境变量：子进程的环境从干净的底子开始，先去掉继承来的 `ANTHROPIC_*`、`CLAUDE*`、`CODEX_*`、`OPENAI_*`（例如从 Claude Code 的终端里启动应用时，会带着 `CLAUDE_CODE_SESSION_ID` 这类变量），再放入这一次要用的地址和 Key。Key 不写进任何 CLI 的配置文件，不设用户级或系统级环境变量，不像 CC Switch 那样改用户的 settings.json。
+   - 参数名按 Claude Code 2.1.282、Codex 0.151.0 的 `--help` 写的，实现和每次更新后按实际版本核对。本机没有 Claude Code 的机器级策略文件（公司管理的电脑才有，`--bare` 也关不掉它），有的话设置页如实提示。
+   - 反方向：用户平时的窗口不受影响，因为这个应用不往用户目录写任何东西、不设全局变量，也不更新用户自己装的那一份。
+4. **接入方式**：「接口 + Key」三个 Agent 都有，Agent 限定协议（Claude Code 只接 Anthropic 协议；Codex 接 OpenAI 协议，而且接口要支持 Responses API，实现前核对）。「官方登录」只有 Codex：在应用自己的 `CODEX_HOME` 里走 `codex login`，应用只用 `codex login status` 显示状态，不读不存令牌。Claude Code 不做官方登录（用户不用；`--bare` 下也只认 Key）。
+5. **设置页**：每份配置在名称下面先选「Agent」和「接入方式」，下面的格子随之变化（用户说「你看着办」：这两项决定下面哪些格子能填，所以放在前面，而不是模型后面）。官方登录时地址、协议、Key 变灰，换成「登录 ChatGPT 账户」按钮和登录状态；选了与 Agent 不匹配的协议当场提示；思考强度只列出这个 Agent 支持的档位，不支持的变灰并写明；Agent 未安装时显示「未安装」和「安装」按钮。高级选项里的上下文和最大输出照旧预填模型的最大值；目录里没有的模型、又选了「超高」「最高」时，提示去填最大输出（Pi 的默认只有 16384，思考内容也算在里面）。
+6. **检查更新窗口**：三行（Pi / Codex CLI / Claude Code），每行显示已装版本、最新版本（查 npm 仓库，走设置里的代理）和状态，有「检查」「更新」，另有「全部更新」。更新先装到新目录，自检通过才切换，失败退回原版本。自检是本机进行的：用本机的假模型接口跑一次一次性调用和一次工作区运行，不向任何真实中转发请求。
+7. **其他都和 Pi 一样**：阶段时限和按思考档位放大、中转重试（最多 10 次，10 秒起翻倍、最长 2 分钟）、每次最多 3 章同时写（Claude Code 每个进程约 0.2–0.4 GB 内存，3 章同时约 1 GB；实测太多再调）、用量和费用记录、失败原因（各 CLI 的报错样本进归类表）。
+8. **顺序**（用户 2026-09-29）：先做设置的数据结构和前端（假后端），截图给用户看，没问题再做适配器、隔离和更新窗口，最后真实验收；做到 Codex 官方登录那一步时，告诉用户去手动登录。
+
+明确不做：Claude Code 官方订阅登录；把 Claude Code 打进安装包；容器或虚拟机；修改 vendor；Gemini CLI 等其他 Agent；同一次任务里混用多个 Agent；修改用户自己的 CLI 配置或安装。
+
+**Done When**（E15）
+
+1. 离线：`uv run pytest backend/tests -q -m "not live"` = 0，覆盖：旧配置迁移（已有配置的 Agent 为 Pi、接入方式为「接口 + Key」，行为不变）；Agent 与协议不匹配时拒绝保存；三个适配器拼出的命令和环境（隔离参数都在、继承来的四类变量被去掉、Key 只在子进程环境里、配置目录指向数据目录）；思考档位映射；用录下来的输出样本解析回复和用量；报错归类；更新的检查、安装、自检失败退回（假 npm）；「标准」「完整」「补写」和每种一次性调用都按配置路由到所选的 Agent。`uv run ruff check backend scripts` = 0。
+2. 隔离实测，不花钱：`uv run pytest backend/tests -q -m agents` = 0。用装好的 Codex CLI 和 Claude Code 私有副本，对着本机的假模型接口各跑一次一次性调用和一次工作区运行。事先在一个假的用户目录里放好平时会被加载的东西（CLAUDE.md、AGENTS.md、会在 SessionStart 执行的 hook、技能、插件、MCP 配置），并在父进程里设好 `CLAUDE_CODE_SESSION_ID` 这类变量。断言：假接口收到的请求里没有其中任何内容；hook 没有执行；假用户目录前后一字不差；数据目录之外没有新文件。
+3. 前端：`npm --prefix app run test`、`npx tsc --noEmit`、`npm --prefix app run lint:design`、`npm --prefix app run e2e` = 0。端到端覆盖：选 Agent 后格子的变化；官方登录时 Key 变灰和登录按钮；不匹配组合的提示；思考档位按 Agent 变灰；检查更新窗口的三行和「全部更新」（假后端）。截图给用户看，用户的判定记入 acceptance.md。
+4. live（用户提供的 Key，会产生费用；这个 Key 用不了时，Claude Code 用 justwoker，Codex 用 CPA，每个模型配它原生的 Agent）：罗素 8 分钟分别用 Codex CLI 和 Claude Code 跑一整条流水线（「完整」精读、字幕纠错、导图、归类），两次都成功，精读用 `scripts/report-eval/run.py`（同一评判）满足 E14 的自动门槛；运行后用户的 `~/.claude`、`~/.codex` 里找不到与这两次运行有关的文件（按工作区路径和运行标记检索）。预算约 20–35 美元，超出前停下来问。Codex 官方登录由用户手动登录一次，之后用它跑一次罗素的字幕纠错和导图。
+5. 检查更新：在真实 npm 仓库上「检查」能显示三者的最新版本，「更新」把私有副本更新到最新并通过自检；Pi 的更新和失败退回在假 npm 上测过。
 
 ### 15.5 里程碑
 
@@ -1041,6 +1073,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R7c | `r7c-content` | 15.4.9 导图由简到繁（检索填充）、中外对照字幕、查词、自定义云端转写 | E12 |
 | R7d | `r7d-ui-review` | 15.4.10 界面修改第二轮 | E13；**停下来请用户看截图** |
 | R7e | `r7e-report-depth` | 15.4.11 精读完整度（评测先行、要点账本、分章写作与拼装、逐章检查、讲清楚审校） | E14；**用户签字** |
+| R7f | `r7f-agents` | 15.4.13 多 Agent 后端（Pi / Codex CLI / Claude Code，私有副本与隔离，检查更新窗口） | E15；**先请用户看前端截图**，再做后端 |
 | R8 | `r8-release` | 打包、README、完整验收 | E3、E4、E8、E9 |
 
 ### 15.6 进度记录
@@ -1059,6 +1092,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R7c 内容增强 | 完成 | 2026-09-27 | b4c029c | E12 ①：`uv run pytest backend/tests -q -m "not live"` = 0（318 passed：检索、校验、重写、评测指标、字幕翻译与校验、双语导出、查词含词形还原、自定义云端转写含切块与失败退回本地，均用假模型/假接口）、`ruff` = 0、`verify.ps1` = 0；② `npm --prefix app run e2e` = 0（18/18，新增导图详解与「在精读中查看」、英文字幕中外对照、查词浮窗、自定义转写设置）、`npm --prefix app run test` = 0（34 passed）、`lint:design` = 0、`tsc` = 0；③ live：样本按用户意见改为 B 站英文视频 BV11i8J65EDp，中文精读 + 中外对照字幕（译文 97.9%）+ 自动归类，见 acceptance.md；④ 导图实测（用户的模型，三篇真实报告）全部过线，见 `docs/mindmap-eval.md`。红 58aeedb、a982f8d、8da5d79、3e91ba4、df9ac48、5cace4c、23e1fff、8c928cf、b3ad833、6b83949、9b9a4dd、fe34fe0、ad6d3a5、78d0e87、eea96ae、29d35ca、8aa3edf、e9b60a7/b936694、0db411f、d9ec6cd → 绿 d6fa651、ea704c9、1390362、1cab7ad、aaada5a、c9ed926、5df528b、9505705、5387fd5、bac056b、29da0ea、99c1086、5520b90、533cf9b、95dc9a2、1c6d8f9、665546e、71e6c55、4f33e82、535bfb2/ceaad79、487a1d7 |
 | R7d 界面修改第二轮 | 完成 | 2026-09-28 | 7d05d02 | E13 ①：`uv run pytest backend/tests -q -m "not live"` = 0（449 passed）、`ruff` = 0、`verify.ps1` = 0；② `npm --prefix app run e2e` = 0（42/42，连跑两遍稳定；新增 r7d-library / r7d-report / r7d-settings / r7d-subtitle / r7d-failure）、`npm --prefix app run test` = 0（46 passed）、`lint:design` = 0、`tsc` = 0；③ 用户看过 `docs/screenshots/r7d/` 后判定「看着没啥大问题」（acceptance.md），并追加失败原因、眼睛显示完整 Key、DeepSeek / 智谱 Key 链接三项，均已完成。真实预览数据上确认：models.json 启动时自动补上 claude-opus-4-8 的 1M 上下文 / 128k 输出 / 自适应思考；字幕 3895 段合并为 453 段（98% 在 10–15 秒）。设置页、字幕与查词、失败原因由三个子 agent 并行实现（D-43）。红 eb98160、e626a03、21021d8、af66b4a、a1d213c、59a991d、4352411、4fa05af、6bd1408、2822418、72becf2、d3145f2、798cf5b、c86d8ae、9b8d404、68dbd91 → 绿 5265d1e、2c45e61、ef9e81c、f18eecb、b487a65、bd0a9d7、da11458、e57c03b、2901925、9687377、6e6328a、8d9178f、6a4578c、4aa3c4c、51fa215、ba8485a、f3637f8 |
 | R7e 精读完整度 | 完成 | 2026-09-29 | c907065 | E14 ①：`uv run pytest backend/tests -q -m "not live"` = 0（629 passed）、`uv run ruff check backend scripts` = 0、`verify.ps1` = 0、`npm --prefix app run test` = 0（50 passed）、`tsc --noEmit` = 0、`lint:design` = 0、`npm --prefix app run e2e` = 0（48 passed）；② live（第四轮，claude-opus-4-8「超高」评判，新旧同一评判）：英文完整重跑闭卷 84.4% → 100%、无依据 2/40；卡巴拉补写 62.5% → 91.1%、无依据 0/40；罗素补写（复核样本）75.0% → 100%、无依据 1/40；三篇要点覆盖和时间覆盖 100%、最长漏写 0 分钟、补充说明矛盾 0、组件均多于旧报告，详见 `docs/report-eval.md`；Claude 按官方价估算累计约 149 美元，超出原预算部分用户逐次同意；③ 用户并排阅读后签字（acceptance.md）。含 15.4.12 模型目录更新。红 bc0b011、f22c099、5218db9、cd162a8、d75565b、8fc159c、5662dad、c834a43、dc272fd、706668c、3d3a13a、b8d08ff、3da6803、b43545c、6372307、b5e3f85、5c48eb8、c29b139、cf7396a、0471ab6、2bb74d1、7d0c2bd、974f0ad、d6c6374、6d3cd31、900a0a8、8bda587、17b36a0、37c9ef7、5cffcff、49cc212、d19dadb、5801875、bba702b、deda512、4fbad2f、0a156b9、18a7d17、905ceba、7b694c5、28bc312、6b1383d、df58681、70cb30c → 绿 274a5f5、9b5c750、7ef3f1b、8a8d775、55f0c56、9105149、5c7bfa2、99d356e、faba458、7e10d7c、ae41083、567cfd7、e951998、aa4ac12、be0549f、4a2faa8、bcd4dc0、6ffa33d、0431e81、f58cf86、9a42c46、55a94b3、4436cc4、404eec5、20cc6d5、1092a1f、8571e7a、3c96e3f、9aeeff0、e5258f0、58de36a、c50e861、cb4af1c、70d511a、5e58d13、0670adc、0cef574、e23b026、d7ae694、dd00735、10942d4 |
+| R7f 多 Agent 后端 | 未开始 | | | |
 | R8 发布 | 未开始 | | | |
 
 ## 附录 A：对 vendor/video-report-agent 的修改（只允许以下各项）
