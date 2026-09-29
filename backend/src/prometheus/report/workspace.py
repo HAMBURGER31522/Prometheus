@@ -204,8 +204,10 @@ def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, 
     units, ledger, plan, problems, ask, run_pi = _planned(
         data_dir, work, row, settings, node_exe, pi_cli, figures=figures,
         seconds=_times(settings) * pi_timeout_seconds(row.get("duration_s") or 0.0))
+    proxy = settings["network"].get("proxy", "")
     chapters = full.write_chapters(work, plan, ledger, units, run_pi, ask, figures=figures,
                                    review=review_on(settings), progress=progress,
-                                   look=model_look(data_dir, work, settings, node_exe, pi_cli))
+                                   look=model_look(data_dir, work, settings, node_exe, pi_cli),
+                                   verify_links=lambda url: viewpoints.open_page(url, proxy=proxy))
     full.finish(work, plan, problems, ledger, chapters, build_input_json(row))
     return work / "report.html"

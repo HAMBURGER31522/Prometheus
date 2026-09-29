@@ -18,7 +18,7 @@ from pathlib import Path
 
 from prometheus.figures import notes as frame_notes
 from prometheus.report import assemble as assembling
-from prometheus.report import chapter_checks, chapter_write, keypoints
+from prometheus.report import chapter_checks, chapter_write, keypoints, viewpoints
 from prometheus.report import plan as planning
 from prometheus.report import review as reviewing
 from prometheus.report.evaluation import parse_html
@@ -209,7 +209,7 @@ def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -
 
 
 def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, units: list, run_pi, ask, *,
-               attached: str, figures: bool, review: bool, progress, look) -> dict:
+               attached: str, figures: bool, review: bool, progress, look, verify_links=None) -> dict:
     chapter, total = plan["chapters"][number - 1], len(plan["chapters"])
     filename = f"ch-{number:02d}.html"
     space = work / "chapters" / f"ch-{number:02d}"
@@ -265,9 +265,13 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
             fragment, check, transcript, ask,
             lambda fixes: write(chapter_write.revision_prompt(base, fixes, filename, fragment)), recheck)
         (space / filename).write_bytes(fragment.encode("utf-8"))
+    links = {"points": 0, "links": 0, "kept": 0, "dropped": 0, "unsourced": 0}
+    if verify_links is not None:  # the editor's links, opened one by one (15.4.11a-4)
+        fragment, links = viewpoints.verify(fragment, verify_links)
+        (space / filename).write_bytes(fragment.encode("utf-8"))
     result = {"key": key, "number": number, "id": chapter["id"], "title": chapter["title"], "points": owned,
               "fragment": fragment, "check": check, "rounds": rounds, "targeted": targeted, "review": stats,
-              "review_details": details}
+              "review_details": details, "links": links}
     _write_json(record, result)
     return result
 
@@ -283,7 +287,8 @@ def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, 
     def one(number: int) -> dict:
         chapter = plan["chapters"][number - 1]
         return _write_one(work, plan, number, owned.get(chapter["id"], []), points, units, run_pi, ask,
-                          attached=attached, figures=figures, review=review, progress=progress, look=look)
+                          attached=attached, figures=figures, review=review, progress=progress, look=look,
+                          verify_links=verify_links)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return list(pool.map(one, range(1, len(plan["chapters"]) + 1)))
@@ -342,6 +347,8 @@ def finish(work, plan: dict, plan_problems: list, ledger: dict, chapters: list, 
                           for skip in ledger["skips"]],
         "chapters": [],
         "problems": {"ledger": ledger["problems"], "unassigned_spans": ledger["uncovered"], "plan": plan_problems},
+        "viewpoints": {name: sum((chapter.get("links") or {}).get(name, 0) for chapter in chapters)
+                       for name in ("points", "links", "kept", "dropped", "unsourced")},
     }
     for chapter, result in zip(plan["chapters"], chapters):
         minutes = _minutes(chapter)
