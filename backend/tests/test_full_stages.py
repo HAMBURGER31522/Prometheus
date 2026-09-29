@@ -289,3 +289,27 @@ def test_one_shot_calls_the_relay_broke_are_tried_again_too(data_dir, monkeypatc
     assert workspace_mod.model_ask(data_dir, tmp_path, settings, "n", "c")("问题") == "ok"
     assert workspace_mod.model_look(data_dir, tmp_path, settings, "n", "c")("看图", []) == "ok"
     assert len(calls) == 3 and waits == [10]
+
+
+@pytest.mark.parametrize(("thinking", "times"), [("medium", 3), ("high", 4), ("xhigh", 6), ("max", 8)])
+def test_the_time_limit_grows_with_the_thinking_level(data_dir, monkeypatch, thinking, times):
+    """User 2026-09-29: at xhigh Kabbalah ran out of the 3x at its sixth chapter of eleven."""
+    ctx = _ctx(data_dir)
+    settings = store.load(data_dir)
+    settings["llm_profiles"]["items"][0]["thinking"] = thinking
+    store.save(data_dir, settings)
+    seen = []
+    monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
+    monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
+    monkeypatch.setattr(workspace_mod.full, "write_chapters", lambda *args, **kwargs: [])
+    monkeypatch.setattr(workspace_mod.full, "finish", lambda *args: {})
+    monkeypatch.setattr(workspace_mod, "pi_runner",
+                        lambda *args, deadline: seen.append(deadline - time.monotonic()) or "runner")
+    row = items_store.get_item(data_dir, ctx.item_id)
+    workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="n", pi_cli="c",
+                                        figures=False, progress=lambda *args: None)
+    workspace_mod.run_plan_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="n", pi_cli="c",
+                                 figures=False)
+    report, plan = seen
+    assert times * 1800 - 10 < report <= times * 1800
+    assert max(1, times / 3) * 1800 - 10 < plan <= max(1, times / 3) * 1800
