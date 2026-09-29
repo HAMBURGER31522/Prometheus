@@ -165,3 +165,25 @@ def test_a_relay_failure_from_an_agent_is_tried_again(monkeypatch):
     except runs.AgentRunError:
         answer = None
     assert answer == "ok" and len(tries) == 2
+
+
+def test_the_spend_counts_codex_and_claude_code_runs_too(tmp_path):
+    """What rewrite.py prints (PLAN 15.4.13): Claude Code's result usage, Codex's turn usage (its input
+    count includes the cached part), next to Pi's own events."""
+    from prometheus.report import evaluation
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    (tmp_path / "a" / "agent.events.jsonl").write_text(
+        '{"type":"result","subtype":"success","is_error":false,"num_turns":4,'
+        '"usage":{"input_tokens":1000,"output_tokens":200,"cache_read_input_tokens":5000,'
+        '"cache_creation_input_tokens":300}}\n', encoding="utf-8")
+    (tmp_path / "b" / "agent.events.jsonl").write_text(
+        '{"type":"turn.completed","usage":{"input_tokens":9000,"cached_input_tokens":6000,"output_tokens":700,'
+        '"reasoning_output_tokens":400}}\n', encoding="utf-8")
+    total = evaluation.pi_usage(tmp_path)
+    assert (total["input"], total["cacheRead"], total["output"], total["cacheWrite"]) == (1000 + 3000, 5000 + 6000,
+                                                                                          200 + 700, 300)
+    assert total["replies"] == 4 + 1
+    later = evaluation.pi_events_offsets(tmp_path)
+    assert evaluation.pi_usage(tmp_path, later)["input"] == 0
