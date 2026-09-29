@@ -8,12 +8,14 @@ import { useState } from "react";
 const MASK = "****";
 const isMask = (value: string) => value.startsWith(MASK);
 
-export function SecretInput({ label, value, onChange, reveal }: {
+export function SecretInput({ label, value, onChange, reveal, disabled = false }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   /** Fetches the saved key when the eye opens an empty field. */
   reveal?: () => Promise<string>;
+  /** 「官方登录」 needs no key (PLAN 15.4.13). */
+  disabled?: boolean;
 }) {
   const [shown, setShown] = useState(false);
   const [saved, setSaved] = useState(isMask(value) ? value : "");
@@ -27,6 +29,7 @@ export function SecretInput({ label, value, onChange, reveal }: {
           type={shown ? "text" : "password"}
           autoComplete="off"
           spellCheck={false}
+          disabled={disabled}
           placeholder={saved ? `已保存（末 4 位 ${saved.slice(MASK.length)}），留空则不修改` : undefined}
           value={isMask(value) ? "" : value}
           onChange={(e) => onChange(e.target.value || saved)}
@@ -36,6 +39,7 @@ export function SecretInput({ label, value, onChange, reveal }: {
           className="eye"
           aria-label={shown ? `隐藏 ${label}` : `显示 ${label}`}
           aria-pressed={shown}
+          disabled={disabled}
           onClick={async () => {
             if (!shown && reveal && isMask(value)) onChange(await reveal());
             setShown(!shown);

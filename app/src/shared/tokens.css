@@ -21,6 +21,7 @@
   --danger: #d0835f;
   --shadow-pop: 0 10px 30px rgba(0, 0, 0, .35);
   --shadow-soft: 0 2px 10px rgba(0, 0, 0, .22);
+  --scrim: rgba(10, 11, 13, .6);  /* behind a dialog (PLAN 15.4.13) */
 
   /* ambient light behind the sidebar capsule */
   --ambient-warm: rgba(199, 154, 98, .22);

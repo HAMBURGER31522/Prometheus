@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus import paths
 from prometheus import runtime as runtime_mod
+from prometheus.agents.versions import FakeAgents, LocalAgents
+from prometheus.api import agents as agents_api
 from prometheus.api import app as app_api
 from prometheus.api import asr_components as asr_components_api
 from prometheus.api import categories as categories_api
@@ -49,6 +51,8 @@ class AppState:
         self.catalogue_fetch = (lambda url, proxy="": {}) if self.fake else None
         self.catalogue_providers = ["anthropic", "deepseek", "openai"] if self.fake else None
         self.catalogue_thread: threading.Thread | None = None
+        # The Agents' versions and the Codex login (PLAN 15.4.13): simulated in the fake backend.
+        self.agents = FakeAgents() if self.fake else LocalAgents(self.get_runtime)
 
     def get_runtime(self) -> runtime_mod.Runtime:
         """Resolve node / Pi / ffmpeg on first use (PLAN 15.2-1)."""
@@ -151,6 +155,7 @@ def create_app(
     async def shutdown() -> None:
         state.shutdown()
 
+    app.include_router(agents_api.router)
     app.include_router(app_api.router)
     app.include_router(items_api.router)
     app.include_router(categories_api.router)

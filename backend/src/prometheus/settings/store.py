@@ -13,6 +13,7 @@ import json
 from urllib.parse import urlparse
 
 from prometheus import paths
+from prometheus.agents import rules
 
 BUILTIN = {"deepseek": "DeepSeek", "zhipu": "智谱"}
 
@@ -21,6 +22,8 @@ DEFAULT_PROFILE = {
     "api_key": "", "model": "deepseek-flash", "supports_images": False, "thinking": "medium",
     # 「高级」 (PLAN 15.4.10): the user's own context window / max output; None = from the catalogues.
     "context_window": None, "max_tokens": None,
+    # The Agent that runs this profile and how it connects (PLAN 15.4.13); older profiles run on Pi.
+    "agent": "pi", "access": "key",
 }
 LIMITS = ("context_window", "max_tokens")
 
@@ -101,6 +104,10 @@ def _normalize(settings: dict) -> dict:
     items = [{field: item[field] for field in DEFAULT_PROFILE} for item in items] or [dict(DEFAULT_PROFILE)]
     for item in items:
         item.update({field: _limit(item[field]) for field in LIMITS})
+        if item["agent"] not in rules.IDS:
+            item["agent"] = "pi"
+        if item["access"] != "login" or item["agent"] not in rules.LOGIN:
+            item["access"] = "key"
     active = profiles.get("active")
     if not any(item["id"] == active for item in items):
         active = items[0]["id"]

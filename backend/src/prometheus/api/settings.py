@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus import paths
+from prometheus.agents import rules
 from prometheus.llm import capability, catalogue_update, model_list, pi_models
 from prometheus.llm.one_shot import OneShotError, run_one_shot
 from prometheus.runtime import RuntimeConfigError
@@ -39,6 +40,9 @@ async def put_settings(request: Request):
     protocols += [p.get("protocol", "openai") for p in (body.get("llm_profiles") or {}).get("items", [])]
     if any(protocol not in pi_models.PROTOCOL_APIS for protocol in protocols):
         return JSONResponse({"code": "INVALID_PROTOCOL"}, status_code=422)
+    for profile in (body.get("llm_profiles") or {}).get("items", []):
+        if code := rules.problem(profile):  # the Agent and how it connects (PLAN 15.4.13)
+            return JSONResponse({"code": code, "profile_id": profile.get("id")}, status_code=422)
     stored = store.load(state.data_dir)
     store.save(state.data_dir, store.restore_secrets(body, stored))
     saved = store.load(state.data_dir)

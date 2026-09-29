@@ -5,13 +5,16 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 export interface Option<T extends string> {
   value: T;
   label: string;
+  /** Shown greyed out and cannot be picked (PLAN 15.4.13: a level the Agent cannot send). */
+  disabled?: boolean;
 }
 
-export function Select<T extends string>({ label, value, options, onChange }: {
+export function Select<T extends string>({ label, value, options, onChange, disabled = false }: {
   label: string;
   value: T;
   options: Option<T>[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -33,6 +36,7 @@ export function Select<T extends string>({ label, value, options, onChange }: {
     setOpen(true);
   };
   const pick = (option: Option<T>) => {
+    if (option.disabled) return;
     onChange(option.value);
     setOpen(false);
   };
@@ -42,7 +46,14 @@ export function Select<T extends string>({ label, value, options, onChange }: {
       event.preventDefault();
       if (!open) return show();
       const step = event.key === "ArrowDown" ? 1 : -1;
-      setActive((index) => (index + step + options.length) % options.length);
+      setActive((index) => {
+        let next = index;
+        for (let tries = 0; tries < options.length; tries += 1) {
+          next = (next + step + options.length) % options.length;
+          if (!options[next].disabled) break;
+        }
+        return next;
+      });
     } else if ((event.key === "Enter" || event.key === " ") && open) {
       event.preventDefault();
       pick(options[active]);
@@ -59,6 +70,7 @@ export function Select<T extends string>({ label, value, options, onChange }: {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
+        disabled={disabled}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onKey}
       >
@@ -74,6 +86,7 @@ export function Select<T extends string>({ label, value, options, onChange }: {
               key={option.value}
               role="option"
               aria-selected={option.value === value}
+              aria-disabled={option.disabled || undefined}
               data-active={index === active || undefined}
               onMouseEnter={() => setActive(index)}
               onMouseDown={(event) => event.preventDefault()}
