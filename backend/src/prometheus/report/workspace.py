@@ -213,5 +213,17 @@ def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, 
     return work / "report.html"
 
 
-def run_patch_stage(data_dir, item_id, row, settings, *, node_exe, pi_cli, progress):
-    return None
+def run_patch_stage(data_dir, item_id: str, row: dict, settings: dict, *, node_exe: str, pi_cli: str, progress):
+    """A finished 完整 report patched by the newer rules (PLAN 15.4.11a-5): the published 精读, the
+    kept ledger and the old skips; nothing is extracted or planned again."""
+    work = paths.work_dir(data_dir, item_id)
+    ledger = json.loads((work / "keypoints.json").read_text(encoding="utf-8"))
+    units = load_units(work / "canonical-transcript.jsonl")
+    published = paths.library_folder(data_dir, row["library_path"]) / paths.LIBRARY_FILES["html"]
+    coverage = work / "coverage.json"
+    skipped = (json.loads(coverage.read_text(encoding="utf-8")).get("skipped") or []) if coverage.is_file() else []
+    proxy = settings["network"].get("proxy", "")
+    run_pi = pi_runner(data_dir, settings, node_exe, pi_cli,
+                       deadline=time.monotonic() + _times(settings) * pi_timeout_seconds(row.get("duration_s") or 0.0))
+    patch.patch_report(work, published.read_text(encoding="utf-8"), ledger, units, run_pi, skipped=skipped,
+                       verify_links=lambda url: viewpoints.open_page(url, proxy=proxy), progress=progress)

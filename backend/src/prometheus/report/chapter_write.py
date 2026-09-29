@@ -123,3 +123,15 @@ def targeted_prompt(depth: str, draft: str, failing: list, filename: str) -> str
         "只改讲到它们的段落（或在合适的位置补一段），每条都用 data-points 标出；其余内容保持不变。\n"
         f"{listed}\n"
     )
+
+
+def viewpoint_prompt(depth: str, draft: str, filename: str) -> str:
+    """The editor's-viewpoint pass over a finished chapter (PLAN 15.4.11a-4/5)."""
+    return (
+        f"{depth}\n\n## 这一章现在的稿子（{filename}）\n{draft}\n\n"
+        "## 加编者观点\n"
+        "按上面「编者观点（非视频内容）」一节，在本章视频的说法有争议、值得商榷，或者你有自己判断的地方，"
+        "加编者观点框（分点写，每点标置信度和依据链接）；正文里把编者的推测写成讲者意图或说法的句子，"
+        f"改成编者口吻或挪进编者观点框。用 edit 在 {filename} 上改，其余内容保持不变；"
+        "本章没有值得写的地方就不加。\n"
+    )

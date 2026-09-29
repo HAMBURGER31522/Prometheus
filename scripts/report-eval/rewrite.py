@@ -26,6 +26,7 @@ from prometheus.tasks import cleanup, runner
 from prometheus.tasks.stages import build_real_impls
 
 STAGES = ("keypoints", "plan", "report", "finalize", "publish")
+PATCH = ("patch", "finalize", "publish")
 WITH_FRAMES = ("download", "frames", *STAGES)
 one_shot_call = one_shot.run_one_shot  # the real call; tests put a fake here
 
@@ -45,7 +46,12 @@ def main(argv=None, impls=None) -> int:
     if refused:
         print(f"只能重写已完成的条目：{', '.join(refused)}", file=sys.stderr)
         return 2
-    impls = impls if impls is not None else build_real_impls(data_dir, runtime=runtime_mod.resolve(None))
+    if args.patch:  # a finished 完整 report patched by the newer rules needs its kept ledger (15.4.11a-5)
+        unledgered = [row["id"] for row in rows if not (paths.work_dir(data_dir, row["id"]) / "keypoints.json").is_file()]
+        if unledgered:
+            print(f"没有保留要点账本，不能按新规则补：{', '.join(unledgered)}", file=sys.stderr)
+            return 2
+    impls = impls if impls is not None else _real_impls(data_dir)
     calls: list = []
 
     def tallied(work_dir, **kwargs):
@@ -56,16 +62,33 @@ def main(argv=None, impls=None) -> int:
     original, one_shot.run_one_shot = one_shot.run_one_shot, tallied
     try:
         for row in rows:
-            _rewrite(data_dir, row, impls, calls, frames=args.frames)
+            _rewrite(data_dir, row, impls, calls, frames=args.frames, patching=args.patch)
     finally:
         one_shot.run_one_shot = original
     return 0
 
 
-def _rewrite(data_dir, row: dict, impls: dict, calls: list, *, frames: bool) -> None:
+def _real_impls(data_dir) -> dict:
+    found = runtime_mod.resolve(None)
+    impls = build_real_impls(data_dir, runtime=found)
+
+    def patch(ctx):
+        from prometheus.report import workspace
+        from prometheus.settings import store
+
+        workspace.run_patch_stage(
+            data_dir, ctx.item_id, items_store.get_item(data_dir, ctx.item_id), store.load(data_dir),
+            node_exe=str(found.node), pi_cli=str(found.pi_cli),
+            progress=lambda step, number, total: items_store.update_item(
+                data_dir, ctx.item_id, stage_detail=f"{step}（第 {number}/{total} 章）"))
+
+    return {**impls, "patch": patch}
+
+
+def _rewrite(data_dir, row: dict, impls: dict, calls: list, *, frames: bool, patching: bool = False) -> None:
     started, work = time.monotonic(), paths.work_dir(data_dir, row["id"])
     since, calls[:] = evaluation.pi_events_offsets(work), []
-    stages = WITH_FRAMES if frames else STAGES
+    stages = PATCH if patching else WITH_FRAMES if frames else STAGES
     if not row.get("tags"):  # items from before tags (15.4.10) get them on the way; the category stays
         stages = (*stages[:-1], "classify", stages[-1])
     ctx = runner.StageContext(data_dir, row["id"])
