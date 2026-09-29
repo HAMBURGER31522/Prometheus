@@ -6,7 +6,7 @@ from pathlib import Path
 
 import video_report_agent
 from prometheus import paths
-from prometheus.llm import pi_catalogue
+from prometheus.llm import catalogue_update, pi_catalogue
 from prometheus.settings import store
 
 
@@ -44,9 +44,11 @@ def model_fields(data_dir, profile: dict, *, pi_cli=None) -> tuple:
         for entry in ((document.get("providers") or {}).get(kind) or {}).get("models") or []:
             if entry.get("id") == model_id:
                 return "pi", {name: entry[name] for name in pi_catalogue.NUMBERS if entry.get(name) is not None}
-        return pi_catalogue.lookup(model_id, api=PROTOCOL_APIS["openai"], pi_cli=pi_cli, provider=kind)
+        return pi_catalogue.lookup(model_id, api=PROTOCOL_APIS["openai"], pi_cli=pi_cli, provider=kind,
+                                   fresh=catalogue_update.catalogue_folder(data_dir))
     api = PROTOCOL_APIS.get(profile.get("protocol") or "openai", PROTOCOL_APIS["openai"])
-    return pi_catalogue.lookup(model_id, api=api, base_url=profile.get("base_url", ""), pi_cli=pi_cli)
+    return pi_catalogue.lookup(model_id, api=api, base_url=profile.get("base_url", ""), pi_cli=pi_cli,
+                               fresh=catalogue_update.catalogue_folder(data_dir))
 
 
 def refresh_custom_provider(data_dir, *, pi_cli=None) -> bool:
