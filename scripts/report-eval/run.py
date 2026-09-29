@@ -1,7 +1,7 @@
 """Evaluate 精读 reports on real items (PLAN 15.4.11 「评测」, E14).
 
     python scripts/report-eval/run.py <data dir> [--items ID ...] [--report ID=PATH ...]
-        [--label NAME] [--out acceptance-output/report-eval] [--thinking low] [--questions-only] [--fake]
+        [--label NAME] [--out acceptance-output/report-eval] [--thinking xhigh] [--questions-only] [--fake]
 
 Calls the model configured in the data dir (settings → 模型) unless --fake: per item one call per
 ~5-minute block for the questions (only the first time: they are kept in <out>/questions and every
@@ -96,7 +96,7 @@ def main(argv=None) -> int:
     parser.add_argument("--report", action="append", default=[], help="ID=PATH: evaluate this HTML instead")
     parser.add_argument("--label", default="current")
     parser.add_argument("--out", type=Path, default=Path("acceptance-output/report-eval"))
-    parser.add_argument("--thinking", default="low")
+    parser.add_argument("--thinking", default="xhigh")  # 「低」 scored one report 12–15 points apart (2026-09-29)
     parser.add_argument("--questions-only", action="store_true")
     parser.add_argument("--fake", action="store_true")
     args = parser.parse_args(argv)
