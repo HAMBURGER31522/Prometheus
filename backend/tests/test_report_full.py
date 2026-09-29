@@ -341,4 +341,5 @@ def test_the_editors_links_are_verified_and_counted_in_the_coverage(tmp_path):
     coverage = full.finish(tmp_path, plan, problems, ledger, chapters, INPUT)
     html = (tmp_path / "report.html").read_text(encoding="utf-8")
     assert "example.org/gone" not in html and "Coffee_roasting" in html
-    assert coverage["viewpoints"] == {"points": 2, "links": 4, "kept": 2, "dropped": 2, "unsourced": 0}
+    assert coverage["viewpoints"] == {"points": 2, "links": 4, "kept": 2, "dropped": 2, "unsourced": 0,
+                                      "unreachable": 2, "unrelated": 0}

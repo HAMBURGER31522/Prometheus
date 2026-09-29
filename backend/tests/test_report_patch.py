@@ -91,7 +91,8 @@ def test_a_finished_report_is_patched_by_the_new_rules_without_new_key_points_or
     assert 'data-points="K003"' in page and page.count('class="viewpoint"') == 2
     assert 'src="frames/embedded-01.jpg"' in page and "<h1>手冲咖啡</h1>" in page
     assert coverage["written"] == 24 and coverage["uncovered"] == []
-    assert coverage["viewpoints"] == {"points": 2, "links": 2, "kept": 2, "dropped": 0, "unsourced": 0}
+    assert coverage["viewpoints"] == {"points": 2, "links": 2, "kept": 2, "dropped": 0, "unsourced": 0,
+                                      "unreachable": 0, "unrelated": 0}
     assert json.loads((tmp_path / "coverage.json").read_text(encoding="utf-8"))["written"] == 24
 
 
@@ -117,3 +118,17 @@ def test_a_report_without_point_marks_is_refused(tmp_path):
     with pytest.raises(ValueError, match="data-points"):
         patch.patch_report(tmp_path, plain, ledger, units, PatchPi(), skipped=set(), verify_links=None,
                            progress=lambda *args: None, workers=1)
+
+
+def test_a_second_patch_verifies_the_links_again_without_calling_the_model(tmp_path):
+    """Links are checked afresh every time (a verifier fix, or a page that went away), from the draft
+    kept before verification; the model is not asked again."""
+    units = make_units()
+    ledger = full.run_keypoints(tmp_path, units, Model())
+    patch.patch_report(tmp_path, published(), ledger, units, PatchPi(), skipped=set(),
+                       verify_links=lambda url: (_ for _ in ()).throw(OSError("offline")),
+                       progress=lambda *args: None, workers=1)
+    again = PatchPi()
+    coverage = patch.patch_report(tmp_path, published(), ledger, units, again, skipped=set(), verify_links=open_page,
+                                  progress=lambda *args: None, workers=1)
+    assert again.calls == [] and coverage["viewpoints"]["kept"] == 2
