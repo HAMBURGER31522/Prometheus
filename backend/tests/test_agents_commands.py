@@ -83,10 +83,12 @@ def test_codex_talks_to_the_endpoint_as_its_own_provider_with_its_extras_off():
     assert "OPENAI_API_KEY" not in env and "CLAUDE_CODE_SESSION_ID" not in env
 
 
-def test_codex_writes_only_in_its_workspace_and_off_is_none():
+def test_codex_tasks_write_without_its_own_sandbox_and_off_is_none():
+    """Its Windows sandbox refuses every command without a window; the run is protected by
+    agents/contain.py instead (user 2026-09-29)."""
     command = commands.codex_command(Path("codex.exe"), model="m", thinking="off", workspace=Path("W:/run"),
                                      write=True, base_url="https://relay.example/v1")
-    assert "--sandbox" in command and _value(command, "--sandbox") == "workspace-write"
+    assert "--sandbox" in command and _value(command, "--sandbox") == "danger-full-access"
     assert 'model_reasoning_effort="none"' in _configs(command)
 
 
