@@ -68,6 +68,8 @@ def list_models(request: Request, body: dict):
     """「获取模型列表」 for one profile (PLAN 15.4.8): only ever on the user's click."""
     state = request.app.state
     profile = dict(body.get("profile") or {})
+    if profile.get("agent") == "codex" and profile.get("access") == "login":  # the account's list (15.4.13)
+        return {"models": [model["id"] for model in state.agents.codex_models()]}
     profile["api_key"] = store.stored_key(state.data_dir, profile)
     proxy = store.load(state.data_dir)["network"].get("proxy", "")
 
@@ -106,7 +108,13 @@ def model_info(request: Request, body: dict):
     """What Pi's bundled catalogue or the models.dev snapshot knows about one profile's model
     (PLAN 15.4.10): the page lists the thinking levels and pre-fills 「高级」 from it."""
     state = request.app.state
-    source, fields = pi_models.model_fields(state.data_dir, dict(body.get("profile") or {}), pi_cli=_pi_cli(state))
+    profile = dict(body.get("profile") or {})
+    if profile.get("agent") == "codex":  # Codex says which levels each of its models takes (15.4.13)
+        known = next((model for model in state.agents.codex_models() if model["id"] == profile.get("model")), None)
+        if known:
+            return {"source": "codex", "levels": known["levels"], "context_window": None, "max_tokens": None,
+                    "thinking_level_map": None}
+    source, fields = pi_models.model_fields(state.data_dir, profile, pi_cli=_pi_cli(state))
     return {
         "source": source, "context_window": fields.get("contextWindow"), "max_tokens": fields.get("maxTokens"),
         "thinking_level_map": fields.get("thinkingLevelMap"),

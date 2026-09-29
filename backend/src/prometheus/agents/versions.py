@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from prometheus.agents import commands
@@ -77,6 +78,10 @@ class FakeAgents:
         self.codex_logged_in = True
         return self.codex_login()
 
+    def codex_models(self) -> list:
+        return [{"id": "gpt-6-astra", "levels": ["low", "medium", "high", "xhigh", "max"], "images": True},
+                {"id": "gpt-5.5", "levels": ["low", "medium"], "images": True}]
+
 
 def _version(package_json: Path):
     try:
@@ -121,8 +126,10 @@ class LocalAgents:
     """The copies under the tools folder: their versions, the latest from npm, and updating them —
     staged, self-checked (agents/selfcheck.py), then swapped in; a failure keeps the old copy."""
 
-    def __init__(self, get_runtime, *, npm=None, selfcheck=None, busy=None, proxy=lambda: ""):
+    def __init__(self, get_runtime, *, npm=None, selfcheck=None, busy=None, proxy=lambda: "", config_root=None):
         self.get_runtime = get_runtime
+        self._config_root = config_root or (lambda: None)
+        self._codex_models = (0.0, [])
         self._npm = npm
         self._selfcheck = selfcheck
         self._busy = busy or (lambda: False)
@@ -190,6 +197,30 @@ class LocalAgents:
             shutil.rmtree(old, ignore_errors=True)
         self.latest[agent_id] = version
         return self.rows()
+
+    # ---- Codex CLI's own models and login (codex_app.py) ----
+
+    def codex_models(self) -> list:
+        """Codex's model list, kept five minutes: typing a model name must not start Codex each time."""
+        from prometheus.agents import codex_app
+
+        at, found = self._codex_models
+        if time.monotonic() - at > 300 or not found:
+            found = codex_app.models(self._tools(), self._config_root())
+            self._codex_models = (time.monotonic(), found)
+        return found
+
+    def codex_login(self) -> dict:
+        from prometheus.agents import codex_app
+
+        return {"logged_in": codex_app.logged_in(self._tools(), self._config_root())}
+
+    def start_codex_login(self) -> dict:
+        from prometheus.agents import codex_app
+
+        codex_app.start_login(self._tools(), self._config_root())
+        self._codex_models = (0.0, [])  # the account's own list once signed in
+        return self.codex_login()
 
     def update_all(self) -> list:
         """「全部更新」: check every Agent, then bring each one that is behind to the latest."""

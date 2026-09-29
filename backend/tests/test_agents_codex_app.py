@@ -7,6 +7,7 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
 from prometheus.agents import codex_app, commands
 
 AUTH = {"Authorization": "Bearer test-token"}
@@ -117,3 +118,13 @@ def test_the_settings_page_lists_codex_models_and_their_levels_from_codex(client
         "models": ["gpt-6-astra"]}
     info = client.post("/api/settings/model-info", json={"profile": CODEX_PROFILE}, headers=AUTH).json()
     assert info["source"] == "codex" and info["levels"] == ["low", "medium", "high"]
+
+
+@pytest.mark.agents
+def test_the_apps_own_codex_lists_its_models(tmp_path):
+    """The real private copy, offline: its built-in catalogue until an account is signed in."""
+    import os
+
+    tools = Path(os.environ.get("PROMETHEUS_TOOLS") or "E:/tools/Prometheus-Desktop")
+    found = codex_app.models(tools, tmp_path / "config")
+    assert found and all(model["id"] and set(model["levels"]) <= set(codex_app.OURS) for model in found)

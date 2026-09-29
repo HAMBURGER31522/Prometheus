@@ -71,7 +71,7 @@ export const api = {
   updateAllAgents: async () => (await json<{ agents: AgentRow[] }>("POST", "/api/agents/update-all")).agents,
   codexLogin: () => json<{ logged_in: boolean }>("GET", "/api/agents/codex/login"),
   startCodexLogin: () => json<{ logged_in: boolean }>("POST", "/api/agents/codex/login"),
-  modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url">) =>
+  modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url" | "agent">) =>
     json<ModelInfo>("POST", "/api/settings/model-info", { profile }),
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
   lookupWord: (word: string) => json<LookupEntry>("GET", `/api/dictionary/lookup?word=${encodeURIComponent(word)}`),
@@ -215,7 +215,9 @@ export interface AgentRow {
 
 /** What Pi's bundled catalogue (source "pi") or the models.dev snapshot knows about a profile's model (PLAN 15.4.10). */
 export interface ModelInfo {
-  source: "pi" | "models.dev" | null;
+  source: "pi" | "models.dev" | "codex" | null;
+  /** Codex's own list (PLAN 15.4.13): the thinking levels this model takes there. */
+  levels?: string[] | null;
   context_window: number | null;
   max_tokens: number | null;
   thinking_level_map: Record<string, string | null> | null;

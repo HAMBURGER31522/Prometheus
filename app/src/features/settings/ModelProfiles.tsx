@@ -100,12 +100,12 @@ export function ModelProfiles({ profiles, onChange }: { profiles: Profiles; onCh
 }
 
 /** What the bundled catalogues know about the model being edited (PLAN 15.4.10), asked a moment after typing stops. */
-function useModelInfo({ kind, model, protocol, base_url }: ModelProfile): ModelInfo | null {
+function useModelInfo({ kind, model, protocol, base_url, agent }: ModelProfile): ModelInfo | null {
   const [info, setInfo] = useState<ModelInfo | null>(null);
   useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
-      api.modelInfo({ kind, model, protocol, base_url })
+      api.modelInfo({ kind, model, protocol, base_url, agent })
         .then((next) => live && setInfo(next))
         .catch(() => live && setInfo(null));
     }, 250);
@@ -113,7 +113,7 @@ function useModelInfo({ kind, model, protocol, base_url }: ModelProfile): ModelI
       live = false;
       clearTimeout(timer);
     };
-  }, [kind, model, protocol, base_url]);
+  }, [kind, model, protocol, base_url, agent]);
   return info;
 }
 
@@ -131,7 +131,7 @@ function ProfileEditor({ initial, onSave, onCancel }: {
   const problem = agentProblem(profile);
   // Pi's catalogue only speaks for Pi; the other Agents take every level they can send.
   const levels = profile.agent === "pi" ? thinkingLevels(info) : null;
-  const { unavailable, note } = agentThinking(profile.agent);
+  const { unavailable, note } = modelThinking(profile, info);
   const allowed = (levels ?? THINKING.map((option) => option.value)).filter((level) => !unavailable.includes(level));
   const thinking = clampThinking(profile.thinking, levels || unavailable.length ? allowed : null);
   const offered = thinkingOptions(levels).map((option) => ({ ...option, disabled: unavailable.includes(option.value) }));
@@ -255,7 +255,7 @@ function ProfileEditor({ initial, onSave, onCancel }: {
       {profile.agent === "codex" && login && <CodexLogin />}
       <div className="field">
         <span>模型</span>
-        <ModelPicker profile={profile} onPick={pickModel} listable={!login} />
+        <ModelPicker profile={profile} onPick={pickModel} listable={!login || profile.agent === "codex"} />
       </div>
       <label className="switch-label field">
         <button
@@ -388,20 +388,54 @@ function AgentState({ agent }: { agent: AgentId }) {
 }
 
 /** 「官方登录」 for Codex CLI (PLAN 15.4.13): the app's own Codex login, apart from the user's. */
+/** The levels an Agent or, in Codex, the chosen model cannot take: greyed out, with the reason. */
+function modelThinking(profile: ModelProfile, info: ModelInfo | null): { unavailable: string[]; note: string | null } {
+  if (profile.agent === "codex" && info?.source === "codex" && info.levels) {
+    const levels = info.levels;
+    const names = THINKING.filter((option) => levels.includes(option.value)).map((option) => option.label);
+    return {
+      unavailable: THINKING.map((option) => option.value).filter((level) => !levels.includes(level)),
+      note: `${profile.model} 在 Codex 里支持：${names.join("、")}`,
+    };
+  }
+  return agentThinking(profile.agent);
+}
+
+/** Asks every 2 seconds, up to 5 minutes, while the browser sign-in is under way. */
+const LOGIN_POLL_MS = 2000;
+const LOGIN_POLLS = 150;
+
 function CodexLogin() {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [waiting, setWaiting] = useState(false);
   useEffect(() => {
     api.codexLogin().then((state) => setLoggedIn(state.logged_in)).catch(() => setLoggedIn(false));
   }, []);
+  useEffect(() => {
+    if (!waiting) return;
+    let polls = 0;
+    const timer = setInterval(() => {
+      polls += 1;
+      api.codexLogin().then((state) => {
+        setLoggedIn(state.logged_in);
+        if (state.logged_in || polls >= LOGIN_POLLS) setWaiting(false);
+      }).catch(() => undefined);
+    }, LOGIN_POLL_MS);
+    return () => clearInterval(timer);
+  }, [waiting]);
   return (
     <div className="field" data-testid="codex-login">
       <span>ChatGPT 账户</span>
       <div className="row">
-        <span>{loggedIn === null ? "查询中…" : loggedIn ? "已登录" : "未登录"}</span>
+        <span>{loggedIn === null ? "查询中…" : loggedIn ? "已登录" : waiting ? "等待浏览器里登录…" : "未登录"}</span>
         <button
           type="button"
           className="btn small"
-          onClick={() => api.startCodexLogin().then((state) => setLoggedIn(state.logged_in)).catch(() => undefined)}
+          onClick={() =>
+            api.startCodexLogin().then((state) => {
+              setLoggedIn(state.logged_in);
+              setWaiting(!state.logged_in);
+            }).catch(() => undefined)}
         >
           登录 ChatGPT 账户
         </button>
