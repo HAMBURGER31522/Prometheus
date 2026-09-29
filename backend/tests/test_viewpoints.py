@@ -62,3 +62,16 @@ def test_a_one_word_source_is_related_when_the_page_is_titled_after_it():
            '</ul></aside>')
     fixed, stats = viewpoints.verify(box, pages.__getitem__)
     assert stats["kept"] == 2 and stats["unrelated"] == 0 and "没有可核实的来源" not in fixed
+
+
+def test_the_site_name_or_a_word_inside_another_word_is_not_the_title():
+    """「Wikipedia」 is in every Wikipedia title and 「om」 is inside 「Kingdom」: the page's own name
+    (before 「 - 」 or 「 | 」) has to be the source, as whole words."""
+    pages = {"https://en.wikipedia.org/wiki/Lawn_mower": "Lawn mower - Wikipedia\nA machine for cutting grass.",
+             "https://en.wikipedia.org/wiki/Om": "Om - Wikipedia\nA sacred sound."}
+    box = ('<aside class="viewpoint"><p class="viewpoint-label">编者观点（非视频内容）</p><ul>'
+           '<li>萃取率的说法偏保守。<span class="confidence">置信度：高</span>依据：'
+           '<a href="https://en.wikipedia.org/wiki/Lawn_mower">Wikipedia</a>、'
+           '<a href="https://en.wikipedia.org/wiki/Om">Kingdom of Heaven</a></li></ul></aside>')
+    fixed, stats = viewpoints.verify(box, pages.__getitem__)
+    assert stats["kept"] == 0 and stats["unrelated"] == 2 and "没有可核实的来源" in fixed
