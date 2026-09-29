@@ -195,6 +195,17 @@ SAMPLES = [
         "一次性文本调用失败（exit 1）：read tcp 127.0.0.1:56032->127.0.0.1:10809: wsarecv: "
         "An existing connection was forcibly closed by the remote host."
     ), "MODEL_TIMEOUT"),
+    # Codex CLI 0.159.0 and Claude Code 2.1.285 with an endpoint that is down or cuts the stream
+    # (their real output against a local fake API, PLAN 15.4.13; agents/runs.py puts 「… 调用失败：」 first)
+    ("report", "EXTERNAL_MODEL_FAILURE",
+     "Codex CLI 调用失败：stream disconnected before completion: error sending request", "MODEL_TIMEOUT"),
+    ("report", "EXTERNAL_MODEL_FAILURE",
+     "Codex CLI 调用失败：Reconnecting... waiting for network (Connection failed: error sending request)",
+     "MODEL_TIMEOUT"),
+    ("keypoints", "EXTERNAL_MODEL_FAILURE", (
+        "Claude Code 调用失败：API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)"
+    ), "MODEL_TIMEOUT"),
+    ("plan", "EXTERNAL_MODEL_FAILURE", "Claude Code 调用失败：Prompt is too long", "MODEL_CONTEXT_TOO_LONG"),
     # OpenAI's "Unsupported value" error (the wording its API uses for a parameter a model does not
     # accept, e.g. temperature); a thinking level passed through for a model the catalogue lacks
     ("report", "EXTERNAL_MODEL_FAILURE", (
