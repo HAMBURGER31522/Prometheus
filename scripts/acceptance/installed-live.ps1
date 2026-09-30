@@ -54,6 +54,13 @@ function Descendants($rootPid) {
     return $found
 }
 
+function TaskProcesses($backendPid) {
+    # The task's processes: not the backend's own console host (it stays, by design) nor Codex's model server.
+    return @(Descendants $backendPid | Where-Object {
+        $_.CommandLine -notlike "*app-server*" -and -not ($_.Name -eq "conhost.exe" -and $_.ParentProcessId -eq $backendPid)
+    })
+}
+
 function Api($method, $path, $body = $null, $timeout = 60) {
     $request = @{ Method = $method; Uri = "http://127.0.0.1:$script:Port$path"; Headers = @{ Authorization = "Bearer $script:Token" };
                   TimeoutSec = $timeout; UseBasicParsing = $true }
@@ -210,7 +217,7 @@ try {
         Fail ("cancel video never reached the report: {0} {1} {2}" -f $cancelRow.status, $cancelRow.stage, $cancelRow.error_message)
     } else {
         Start-Sleep -Seconds 20
-        $before = @(Descendants $backend.ProcessId | Where-Object { $_.CommandLine -notlike "*app-server*" })
+        $before = (TaskProcesses $backend.ProcessId)
         Say ("children before cancel: {0}" -f (($before | ForEach-Object { "$($_.Name)/$($_.ProcessId)<-$($_.ParentProcessId)" }) -join ", "))
         $cancelAt = Get-Date
         # The cancel runs as a job while this polls /api/health: a stuck event loop and a stuck cancel look alike
@@ -229,7 +236,7 @@ try {
         $healthMisses = 0
         $healthChecks = 0
         while ($job.State -eq "Running" -and ((Get-Date) - $cancelAt).TotalSeconds -lt 180) {
-            $left = @(Descendants $backend.ProcessId | Where-Object { $_.CommandLine -notlike "*app-server*" })
+            $left = (TaskProcesses $backend.ProcessId)
             if (-not $gone -and $left.Count -eq 0) { $gone = $true; $goneAt = ((Get-Date) - $cancelAt).TotalSeconds }
             $healthChecks += 1
             try { Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$script:Port/api/health" -TimeoutSec 2 | Out-Null }
@@ -239,7 +246,7 @@ try {
         $answer = Receive-Job -Wait $job
         Remove-Job $job
         if (-not $gone) {
-            $left = @(Descendants $backend.ProcessId | Where-Object { $_.CommandLine -notlike "*app-server*" })
+            $left = (TaskProcesses $backend.ProcessId)
             if ($left.Count -eq 0) { $gone = $true; $goneAt = ((Get-Date) - $cancelAt).TotalSeconds }
         }
         $notes += ("cancel request {0}; /api/health missed {1} of {2} checks meanwhile" -f $answer, $healthMisses, $healthChecks)
