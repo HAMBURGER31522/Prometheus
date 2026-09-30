@@ -172,6 +172,10 @@ def _agent(settings: dict) -> dict:
             "protocol": agent["protocol"]}
 
 
+def review_thinking(level: str) -> str:
+    return level
+
+
 def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
     """ask(prompt) -> reply: one-shot calls (key points, the review) with the configured model."""
     llm = _llm(settings)
