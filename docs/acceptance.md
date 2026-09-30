@@ -129,3 +129,10 @@ R5 样本选择说明：B 站的 CC 字幕需要登录才能获取，所以两�
   - **Codex 官方登录**：用户手动登录（2026-09-30），账户的模型列表里有 gpt-6.1-sol。用它（「高」）答一次 16 秒，罗素的字幕纠错和导图 8 分钟跑完，状态都正常，导图 5 个主题 26 个节点。
 - ⑤ 检查更新：真实 npm 仓库上「检查」显示 Pi 0.99.1、Codex 0.159.1、Claude Code 2.1.285；把应用自己的 Codex 从 0.159.0 更新到 0.159.1，自检通过，用时 66 秒，没有留下临时目录。Pi 的更新和失败退回在假 npm 上测过（开发机的 Pi 没有真的更新，verify.ps1 固定了它的版本）。
 - 费用：按官方价估算约 62–65 美元，用户逐次同意：Codex/anyrouter 约 11.2、Claude Code/justwoker「中」约 31.8、runanytime gpt-6-astra 失败的一次约 16.8、Claude Code 在 anyrouter 被拒和 justwoker「超高」超时约 1.4、justwoker 上没评成的评分约 0.6，再加 runanytime 中途停掉的一次（没有打印花费，估约 1–3）。评分和官方登录的测试用的是订阅额度。
+
+## E16（R7g 各模型篇幅对齐，2026-09-30）
+
+- ① 离线：`uv run pytest backend/tests -q -m "not live"` = 0（746 passed；整套 4 次中有 1 次 `test_model_profiles.py::test_an_empty_key_keeps_the_saved_one_and_a_typed_key_replaces_it` 失败，单独 15 次、整套又 3 次都通过，没能复现）；`uv run ruff check backend scripts` = 0；`verify.ps1` = 0。R7f 那个偶发失败查清并修好（tasklist 的 GBK 输出按 UTF-8 读成 None）。
+- ② live：罗素在两个 Claude 接口上都跑不了（agentrouter 规划那一轮 22 分钟无响应，随后两个 Key 的额度池用光；runanytime 在这个话题上拒答越来越密，最后在规划第一轮就拒），改用英文 19 分钟做改前改后（runanytime sonnet-4-6「中」，Pi）。**未达标**：改后 19093 字、补充说明 19 条，改前 19916 字、39 条；原因是当时的「每段只挑最要紧的问」砍掉了背景追问（56 → 15），之后已撤回、没有再跑。E14 的评分没有做。见 `docs/report-eval.md`「R7g」。
+- ③ 用户取消（Codex 本来就写得多）；④ 并入 ②。
+- **用户判定（2026-09-30）**：改的时间太久，就此收工；问题恢复照问、加按比例预留两处改动做完（离线测试覆盖），不再实跑验证。
