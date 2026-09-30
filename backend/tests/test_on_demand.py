@@ -247,3 +247,204 @@ def test_without_a_report_the_subtitles_are_corrected_without_reference(data_dir
     # The rules name 「参考材料」 either way, as when R6b was accepted; the report itself is what is left out.
     assert "今天我们来讲手冲咖啡。" in prompts[alone] and "参考材料（报告）：" not in prompts[alone]
     assert "参考材料（报告）：" in prompts[with_report] and "磨豆要均匀。" in prompts[with_report]
+
+
+# ---------------- 「现在生成」 (E17 ①: only the missing steps) ----------------
+
+FILLED_REPORT = ["keypoints", "plan", "report", "finalize", "mindmap", "publish"]
+
+
+def _done(client, outputs):
+    from conftest import wait_for_status
+
+    item_id = _submit(client, outputs=outputs, depth="standard").json()["id"]
+    wait_for_status(client, item_id, "done")
+    return item_id
+
+
+def _runs(client, item_id) -> list:
+    """The finished steps of each run, oldest first."""
+    import json
+
+    from prometheus import paths
+
+    trace = paths.work_dir(client.app.state.data_dir, item_id) / "run.trace.jsonl"
+    runs: dict = {}
+    for event in map(json.loads, trace.read_text(encoding="utf-8").splitlines()):
+        if event["event"] == "end":
+            runs.setdefault(event["run"], []).append(event["stage"])
+    return list(runs.values())
+
+
+def _settled(client, item_id, until, timeout=15.0):
+    """The row once the fill-in is over and `until(row)` holds."""
+    import time
+
+    deadline = time.time() + timeout
+    row = None
+    while time.time() < deadline:
+        row = _row(client, item_id)
+        if row["stage"] is None and until(row):
+            return row
+        time.sleep(0.05)
+    raise AssertionError(f"never settled: {row!r}")
+
+
+def _fill(client, item_id, **body):
+    return client.post(f"/api/items/{item_id}/regenerate", json=body)
+
+
+def test_filling_in_the_report_with_figures_downloads_only_the_picture_and_cleans_it_after(client, monkeypatch):
+    from prometheus import paths
+    from prometheus.library import layout
+
+    item_id = _done(client, SUBTITLES)
+    work = paths.work_dir(client.app.state.data_dir, item_id)
+
+    def video(ctx):
+        (work / "video.mp4").write_bytes(b"picture")
+
+    def frames(ctx):
+        (work / "frames").mkdir(exist_ok=True)
+        (work / "frames" / "f_0001.jpg").write_bytes(b"jpg")
+
+    monkeypatch.setitem(client.app.state.queue.impls, "video", video)
+    monkeypatch.setitem(client.app.state.queue.impls, "frames", frames)
+    response = _fill(client, item_id, only="report", depth="full", figures=True)
+    assert response.status_code == 200
+    row = _settled(client, item_id, lambda row: row["outputs"]["report"])
+    assert row["outputs"] == {"report": True, "subtitles": False, "mindmap": True}
+    assert (row["status"], row["depth"], row["figures"]) == ("done", "full", 1)
+    assert _runs(client, item_id)[-1] == ["video", "frames", *FILLED_REPORT]
+    folder = client.app.state.data_dir / row["library_path"]
+    assert {"精读.html", "精读.md", "思维导图.md", "字幕.txt"} <= {path.name for path in folder.iterdir()}
+    assert folder.name.endswith(layout.safe_name(row["report_title"]))  # the report's title names the folder
+    assert not (work / "video.mp4").exists() and not (work / "frames").exists()  # user 2026-09-30
+
+
+def test_filling_in_the_report_without_figures_downloads_nothing(client):
+    item_id = _done(client, SUBTITLES)
+    assert _fill(client, item_id, only="report", depth="standard", figures=False).status_code == 200
+    row = _settled(client, item_id, lambda row: row["outputs"]["report"])
+    assert (row["depth"], row["figures"]) == ("standard", 0)
+    assert _runs(client, item_id)[-1] == FILLED_REPORT
+
+
+def test_filling_in_the_subtitles_only_corrects_them(client):
+    item_id = _done(client, {"report": True, "subtitles": False, "mindmap": True})
+    assert _fill(client, item_id, only="subtitles").status_code == 200
+    row = _settled(client, item_id, lambda row: row["outputs"]["subtitles"])
+    assert row["outputs"] == ALL and row["subtitle_status"] == "ok"
+    assert _runs(client, item_id)[-1] == ["subtitle_fix", "publish"]
+
+
+def test_filling_in_the_map_needs_its_report(client):
+    item_id = _done(client, {"report": True, "subtitles": True, "mindmap": False})
+    assert _fill(client, item_id, only="mindmap").status_code == 200
+    row = _settled(client, item_id, lambda row: row["mindmap_status"] == "ok")
+    assert row["outputs"] == ALL
+    assert _runs(client, item_id)[-1] == ["mindmap", "publish"]
+    no_report = _done(client, SUBTITLES)
+    response = _fill(client, no_report, only="mindmap")
+    assert (response.status_code, response.json()) == (409, {"code": "NO_REPORT"})
+
+
+def test_filling_in_what_is_there_an_unknown_depth_or_an_unfinished_item_is_refused(client):
+    full = _done(client, ALL)
+    response = _fill(client, full, only="report", depth="standard", figures=False)
+    assert (response.status_code, response.json()) == (409, {"code": "ALREADY_MADE"})
+    response = _fill(client, full, only="subtitles")
+    assert (response.status_code, response.json()) == (409, {"code": "ALREADY_MADE"})
+    subtitles = _done(client, SUBTITLES)
+    response = _fill(client, subtitles, only="report", depth="deep", figures=False)
+    assert (response.status_code, response.json()) == (422, {"code": "DEPTH_INVALID"})
+    items_store.update_item(client.app.state.data_dir, subtitles, status="failed")
+    response = _fill(client, subtitles, only="report", depth="standard", figures=False)
+    assert (response.status_code, response.json()) == (409, {"code": "NOT_DONE"})
+
+
+def test_a_failed_fill_in_leaves_the_item_done_says_why_and_can_be_tried_again(client, monkeypatch):
+    from video_report_agent.pi import PiError
+
+    item_id = _done(client, SUBTITLES)
+
+    def report_times_out(ctx):
+        raise PiError("EXTERNAL_MODEL_FAILURE", "Request timed out.")
+
+    monkeypatch.setitem(client.app.state.queue.impls, "report", report_times_out)
+    assert _fill(client, item_id, only="report", depth="standard", figures=False).status_code == 200
+    row = _settled(client, item_id, lambda row: row["error_code"] is not None)
+    assert row["status"] == "done" and row["outputs"] == SUBTITLES
+    assert row["error_reason"]
+    monkeypatch.undo()
+    assert _fill(client, item_id, only="report", depth="standard", figures=False).status_code == 200
+    row = _settled(client, item_id, lambda row: row["outputs"]["report"])
+    assert row["error_code"] is None and row["error_message"] is None
+
+
+def test_one_fill_in_at_a_time(client, monkeypatch):
+    import threading
+
+    item_id = _done(client, SUBTITLES)
+    release = threading.Event()
+    started = threading.Event()
+
+    def slow_plan(ctx):
+        started.set()
+        release.wait(timeout=10)
+
+    monkeypatch.setitem(client.app.state.queue.impls, "plan", slow_plan)
+    try:
+        assert _fill(client, item_id, only="report", depth="standard", figures=False).status_code == 200
+        assert started.wait(timeout=10)
+        assert _row(client, item_id)["stage"] == "plan"
+        response = _fill(client, item_id, only="report", depth="standard", figures=False)
+        assert (response.status_code, response.json()) == (409, {"code": "BUSY"})
+    finally:
+        release.set()
+    _settled(client, item_id, lambda row: row["outputs"]["report"])
+
+
+def test_a_waiting_fill_in_shows_as_waiting(client, monkeypatch):
+    """Queued behind another video: the row already has a step, and says it has not started."""
+    import threading
+    import time
+
+    first = _done(client, SUBTITLES)
+    release = threading.Event()
+    monkeypatch.setitem(client.app.state.queue.impls, "resolve", lambda ctx: release.wait(timeout=10))
+    other = client.post("/api/items", json={"url": "https://www.bilibili.com/video/BV1bZhQ6VEQK/", "figures": False})
+    try:
+        deadline = time.time() + 10
+        while _row(client, other.json()["id"])["status"] != "running" and time.time() < deadline:
+            time.sleep(0.05)
+        assert _fill(client, first, only="subtitles").status_code == 200
+        row = _row(client, first)
+        assert (row["stage"], row["stage_detail"]) == ("subtitle_fix", "排队中")
+    finally:
+        release.set()
+    _settled(client, first, lambda row: row["outputs"]["subtitles"])
+
+
+def test_a_restart_ends_a_fill_in_cut_short(data_dir):
+    from prometheus.library import db
+
+    cut = _item(data_dir, status="done", outputs=SUBTITLES)
+    items_store.update_item(data_dir, cut, stage="report", stage_detail="写作（第 2/5 章）")
+    db.mark_running_as_interrupted(data_dir)
+    row = items_store.get_item(data_dir, cut)
+    assert (row["status"], row["stage"], row["stage_detail"]) == ("done", None, None)
+
+
+def test_the_picture_step_downloads_only_the_video(data_dir, monkeypatch):
+    from conftest import DUMMY_RUNTIME
+    from prometheus.tasks import stages as stages_mod
+    from prometheus.tasks.runner import StageContext
+
+    item_id = _item(data_dir, status="done", outputs=SUBTITLES, figures=1)
+    downloaded = []
+    monkeypatch.setattr(stages_mod.download_mod, "download_stage", lambda *a, media: downloaded.append(media))
+    impls = stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)
+    assert "video" in impls, "no step downloads the picture alone"
+    impls["video"](StageContext(data_dir, item_id))
+    assert downloaded == ["video"]
