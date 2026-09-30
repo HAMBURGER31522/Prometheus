@@ -98,3 +98,36 @@ def test_only_mandarin_goes_to_funasr():
     assert choose_engine("en") == "whisper"
     assert choose_engine("yue") == "whisper"
     assert choose_engine("ja") == "whisper"
+
+
+def _accepted_by_vra(segments):
+    """What VRA's normalize_asr_segments takes: no range may start before the one before it ends."""
+    from video_report_agent.asr import normalize_asr_segments
+
+    normalize_asr_segments(segments)
+
+
+def test_a_word_running_past_its_vad_span_does_not_overlap_the_next_sentence():
+    # BV1EJ4m1t7Zs 02:03 (2026-09-30): 「型」 ends at 123.63 s, past its span's 123.60; 「嗯」 opens the next span at 123.61.
+    tokens = ["大", "模", "型", "嗯", "好"]
+    times = [[123180, 123320], [123320, 123480], [123480, 123630], [123610, 124020], [124020, 124300]]
+    segments = build_segments(tokens, times, "大模型。嗯，好。", offset_s=0)
+    assert [s["text"] for s in segments] == ["大模型。", "嗯，好。"]
+    assert segments[1]["start"] >= segments[0]["end"]
+    _accepted_by_vra(segments)
+
+
+def test_a_sentence_break_between_two_words_of_one_spread_timestamp_does_not_overlap():
+    tokens = ["对", "啊", "好", "的"]
+    times = [[0, 100], [0, 100], [100, 300], [300, 400]]  # three timestamps spread over four words
+    segments = build_segments(tokens, times, "对。啊，好的。", offset_s=0)
+    assert "".join(s["text"] for s in segments) == "对。啊，好的。"
+    for before, after in zip(segments, segments[1:], strict=False):
+        assert after["start"] >= before["end"] and after["end"] > after["start"]
+    _accepted_by_vra(segments)
+
+
+def test_a_sentence_with_no_time_of_its_own_joins_the_one_before_it():
+    segments = build_segments(["对", "啊"], [[0, 100], [0, 100]], "对。啊。", offset_s=0)
+    assert segments == [{"start": 0.0, "end": 0.1, "text": "对。啊。"}]
+    _accepted_by_vra(segments)
