@@ -49,6 +49,15 @@ fn spawn_backend(app: &tauri::AppHandle, port: u16, token: &str) -> Child {
     );
 
     let config_dir = app.path().app_config_dir().expect("config dir");
+    // The backend's own output, kept for the last start: an installed app otherwise has nowhere to look.
+    let _ = std::fs::create_dir_all(&config_dir);
+    let log = std::fs::File::create(config_dir.join("backend.log")).ok();
+    let out = log
+        .as_ref()
+        .and_then(|file| file.try_clone().ok())
+        .map(std::process::Stdio::from)
+        .unwrap_or_else(std::process::Stdio::null);
+    let err = log.map(std::process::Stdio::from).unwrap_or_else(std::process::Stdio::null);
 
     std::process::Command::new(&python)
         .args([
@@ -66,7 +75,10 @@ fn spawn_backend(app: &tauri::AppHandle, port: u16, token: &str) -> Child {
             &runtime.display().to_string(),
         ])
         .env("PYTHONUTF8", "1")
+        .env("PYTHONUNBUFFERED", "1")
         .env("PATH", &path)
+        .stdout(out)
+        .stderr(err)
         .creation_flags(CREATE_NO_WINDOW) // children inherit the hidden console
         .spawn()
         .expect("failed to spawn the bundled backend")

@@ -22,6 +22,20 @@ for (let i = 0; !page && i < 60; i += 1) {
 }
 if (!page) throw new Error("the app window never showed a page");
 await page.setViewportSize({ width: 1440, height: 900 }).catch(() => undefined);
+// Evidence when something goes wrong (installed run 2026-09-30: the submit went nowhere).
+page.on("console", (message) => message.type() !== "debug" && log("page console", message.type(), message.text()));
+page.on("requestfailed", (request) => log("request failed", request.method(), request.url(), request.failure()?.errorText));
+page.on("response", (response) => {
+  if (response.request().method() !== "GET") log("response", response.request().method(), response.url(), response.status());
+});
+log("page url", page.url());
+log("fetch from the page:", await page.evaluate(async (base) => {
+  try {
+    return String((await fetch(`${base}/api/health`)).status);
+  } catch (error) {
+    return `failed: ${error}`;
+  }
+}, api));
 const shot = async (name) => {
   await page.mouse.move(0, 0);
   await page.waitForTimeout(1500);
@@ -40,9 +54,11 @@ if (!(state.精读 === "true" && state.字幕 === "true" && state.导图 === "tr
 await page.getByRole("textbox", { name: "视频链接" }).fill(video);
 await shot("01-console-before-start");
 await page.getByRole("button", { name: "开始" }).click();
+await page.waitForTimeout(3000);
+await shot("02-console-after-start");
 await page.locator(".queue-row", { hasText: videoId }).waitFor({ timeout: 30_000 });
 await page.waitForTimeout(5000);
-await shot("02-console-running");
+await shot("03-console-running");
 
 let row = null;
 let seen = "";

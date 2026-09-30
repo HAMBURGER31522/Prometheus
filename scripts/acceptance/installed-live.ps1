@@ -211,16 +211,41 @@ try {
     } else {
         Start-Sleep -Seconds 20
         $before = @(Descendants $backend.ProcessId | Where-Object { $_.CommandLine -notlike "*app-server*" })
-        Say ("children before cancel: {0}" -f (($before | ForEach-Object { $_.Name }) -join ", "))
+        Say ("children before cancel: {0}" -f (($before | ForEach-Object { "$($_.Name)/$($_.ProcessId)<-$($_.ParentProcessId)" }) -join ", "))
         $cancelAt = Get-Date
-        Api POST "/api/items/$($created.id)/cancel" | Out-Null
+        # The cancel runs as a job while this polls /api/health: a stuck event loop and a stuck cancel look alike
+        # from the outside (installed run 2026-09-30: the cancel went unanswered for 60 s).
+        $job = Start-Job -ScriptBlock {
+            param($port, $token, $id)
+            $watch = [Diagnostics.Stopwatch]::StartNew()
+            try {
+                Invoke-WebRequest -UseBasicParsing -Method POST -Uri "http://127.0.0.1:$port/api/items/$id/cancel" `
+                    -Headers @{ Authorization = "Bearer $token" } -TimeoutSec 180 | Out-Null
+                "answered in {0:N1} s" -f $watch.Elapsed.TotalSeconds
+            } catch { "failed after {0:N1} s: {1}" -f $watch.Elapsed.TotalSeconds, $_.Exception.Message }
+        } -ArgumentList $script:Port, $script:Token, $created.id
         $gone = $false
-        while (((Get-Date) - $cancelAt).TotalSeconds -lt 5) {
+        $goneAt = $null
+        $healthMisses = 0
+        $healthChecks = 0
+        while ($job.State -eq "Running" -and ((Get-Date) - $cancelAt).TotalSeconds -lt 180) {
             $left = @(Descendants $backend.ProcessId | Where-Object { $_.CommandLine -notlike "*app-server*" })
-            if ($left.Count -eq 0) { $gone = $true; break }
-            Start-Sleep -Milliseconds 250
+            if (-not $gone -and $left.Count -eq 0) { $gone = $true; $goneAt = ((Get-Date) - $cancelAt).TotalSeconds }
+            $healthChecks += 1
+            try { Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$script:Port/api/health" -TimeoutSec 2 | Out-Null }
+            catch { $healthMisses += 1 }
+            Start-Sleep -Milliseconds 500
         }
-        $seconds = ((Get-Date) - $cancelAt).TotalSeconds
+        $answer = Receive-Job -Wait $job
+        Remove-Job $job
+        if (-not $gone) {
+            $left = @(Descendants $backend.ProcessId | Where-Object { $_.CommandLine -notlike "*app-server*" })
+            if ($left.Count -eq 0) { $gone = $true; $goneAt = ((Get-Date) - $cancelAt).TotalSeconds }
+        }
+        $notes += ("cancel request {0}; /api/health missed {1} of {2} checks meanwhile" -f $answer, $healthMisses, $healthChecks)
+        Say $notes[-1]
+        if ($goneAt -ne $null -and $goneAt -gt 5) { $gone = $false }
+        $seconds = if ($goneAt -ne $null) { $goneAt } else { ((Get-Date) - $cancelAt).TotalSeconds }
         $status = (Row $cancelId).status
         Say ("after cancel: children gone={0} in {1:N1} s, status={2}" -f $gone, $seconds, $status)
         $notes += ("cancel: {0} children before, all gone in {1:N1} s, status {2}" -f $before.Count, $seconds, $status)
@@ -259,6 +284,8 @@ finally {
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Say "clean up the scratch install, data and cache; restore the app's own folders"
     Start-Sleep -Seconds 2
+    $backendLog = "$env:APPDATA\$AppId\backend.log"
+    if (Test-Path $backendLog) { Copy-Item $backendLog "$Results\backend.log" -ErrorAction SilentlyContinue }
     foreach ($folder in $Folders) { if (Test-Path $folder) { Remove-Item -Recurse -Force -LiteralPath $folder } }
     $i = 0
     foreach ($folder in $Folders) {
