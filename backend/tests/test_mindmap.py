@@ -514,14 +514,14 @@ def test_three_failed_tries_keep_which_checks_failed(tmp_path, monkeypatch):
     from prometheus.library import items as items_store
 
     data_dir, item_id = _with_report(tmp_path)
-    prompts = _skeleton_answers(monkeypatch, [_slipped()])
+    prompts = _skeleton_answers(monkeypatch, [_broken()])
     assert _generate(data_dir, item_id) is False
     assert len(prompts) == 3
     row = items_store.get_item(data_dir, item_id)
     assert row["mindmap_status"] == "failed"
     reason = row.get("mindmap_error") or ""
     assert reason.startswith("没通过检查：")
-    assert "；".join(validate_tree(_slipped(), load_example())) in reason
+    assert "；".join(validate_tree(_broken(), load_example())) in reason
 
 
 def test_a_model_error_keeps_what_it_said(tmp_path, monkeypatch):
@@ -557,3 +557,84 @@ def test_regenerating_the_map_clears_the_last_reason(client, monkeypatch):
         assert client.get(f"/api/items/{item_id}").json().get("mindmap_error", "missing") is None
     finally:
         release.set()
+
+
+# ---------------- small problems do not throw a map away (PLAN 15.4.15-11) ----------------
+
+# Shaped like BV1EJ4m1t7Zs's 「标准」 report: the first chapter starts at 02:15, a gap between the first two.
+GAPPY = {"title": "大语言模型", "sections": [
+    {"title": "训练", "start_s": 135, "end_s": 354}, {"title": "分工", "start_s": 358, "end_s": 518},
+    {"title": "推理", "start_s": 518, "end_s": 649}, {"title": "结构", "start_s": 650, "end_s": 781}]}
+
+
+def _gappy_tree():
+    leaves = [_node(f"要点{i}", "leaf", time=time) for i, time in enumerate((136, 200, 360, 520, 651))]
+    themes = [_node("训练", "theme", children=leaves[:2]), _node("分工", "theme", children=leaves[2:3]),
+              _node("推理与结构", "theme", children=leaves[3:])]
+    return {"title": "大语言模型", "root": _node("大语言模型", "root", children=themes)}
+
+
+def _broken():
+    tree = good_tree(load_example())
+    tree["root"]["children"][0]["label"] = "超" * 30  # half again over the limit: a real slip
+    return tree
+
+
+def test_small_problems_are_told_apart_from_ones_that_break_the_map():
+    from prometheus.mindmap.tree import check_tree
+
+    outline = load_example()
+    tree = good_tree(outline)
+    theme = tree["root"]["children"][0]
+    theme["label"] = "超" * 22  # a tenth over 20
+    theme["children"][0]["summary"] = "长" * 70  # 70 of 60
+    major, minor = check_tree(tree, outline)
+    assert major == [] and len(minor) == 2
+    assert sorted(validate_tree(tree, outline)) == sorted(major + minor)
+    theme["label"] = "超" * 25  # a quarter over
+    major, minor = check_tree(tree, outline)
+    assert any("label" in problem for problem in major) and len(minor) == 1
+
+
+def test_a_moment_between_chapters_is_small_but_one_outside_the_video_is_not():
+    from prometheus.mindmap.tree import check_tree
+
+    tree = _gappy_tree()
+    assert check_tree(tree, GAPPY) == ([], [])
+    first = tree["root"]["children"][0]["children"][0]
+    first["time"] = 60  # the opening before the first chapter, still in the video
+    major, minor = check_tree(tree, GAPPY)
+    assert major == [] and any("60" in problem for problem in minor)
+    first["time"] = 900  # after the last chapter ended
+    assert any("900" in problem for problem in check_tree(tree, GAPPY)[0])
+    first["time"] = -3
+    assert check_tree(tree, GAPPY)[0]
+
+
+def test_a_tree_left_with_only_small_problems_is_kept_with_them(tmp_path, monkeypatch):
+    from prometheus import paths
+    from prometheus.library import items as items_store
+
+    data_dir, item_id = _with_report(tmp_path)
+    small = good_tree(load_example())
+    small["root"]["children"][0]["label"] = "超" * 22
+    prompts = _skeleton_answers(monkeypatch, [small])
+    assert _generate(data_dir, item_id) is True
+    assert len(prompts) == 3  # the tries still ask for it to be mended
+    saved = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
+    assert len(saved.get("problems") or []) == 1 and "label" in saved["problems"][0]
+    row = items_store.get_item(data_dir, item_id)
+    assert (row["mindmap_status"], row["mindmap_error"]) == ("ok", None)
+
+
+def test_an_earlier_tree_with_small_problems_beats_a_later_broken_one(tmp_path, monkeypatch):
+    from prometheus import paths
+
+    data_dir, item_id = _with_report(tmp_path)
+    small = good_tree(load_example())
+    small["root"]["children"][0]["label"] = "超" * 22
+    prompts = _skeleton_answers(monkeypatch, [small, _broken(), _broken()])
+    assert _generate(data_dir, item_id) is True
+    assert len(prompts) == 3
+    saved = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
+    assert saved["root"]["children"][0]["label"] == "超" * 22

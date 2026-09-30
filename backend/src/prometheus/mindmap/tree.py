@@ -69,6 +69,11 @@ def _walk(node: dict, depth: int, errors: list, leaves: list) -> None:
         _walk(child, depth + 1, errors, leaves)
 
 
+def check_tree(tree: dict, outline: dict) -> tuple:
+    """(problems that make the map unusable, small ones it can be kept with) (PLAN 15.4.15-11)."""
+    return validate_tree(tree, outline), []
+
+
 def validate_tree(tree: dict, outline: dict) -> list:
     """Human-readable problems; an empty list means the tree is usable."""
     errors: list = []
