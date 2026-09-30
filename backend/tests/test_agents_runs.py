@@ -187,3 +187,44 @@ def test_the_spend_counts_codex_and_claude_code_runs_too(tmp_path):
     assert total["replies"] == 4 + 1
     later = evaluation.pi_events_offsets(tmp_path)
     assert evaluation.pi_usage(tmp_path, later)["input"] == 0
+
+
+@pytest.mark.parametrize(("agent", "stream"), [(CLAUDE, "claude-answer"), (CODEX, "codex-answer")])
+def test_a_task_gets_the_python_the_skill_tells_the_model_about(started, tmp_path, agent, stream):
+    """modes/standard.md: 「Pi 运行环境提供 VIDEO_REPORT_PYTHON，可用 "$VIDEO_REPORT_PYTHON" draw.py」 — as Pi's runs get it."""
+    import sys
+
+    calls, reply = started
+    reply["stdout"], reply["writes"] = _stream(stream), "ch-01.html"
+    _stage(tmp_path / "run")
+    runs.task(agent, tmp_path / "run", "写", expect="ch-01.html", model="m", api_key="k", thinking="medium",
+              config_root=tmp_path / "config", tools_root=tmp_path / "tools", timeout=60)
+    assert calls and calls[0]["env"].get("VIDEO_REPORT_PYTHON") == sys.executable
+    assert calls[0]["env"].get("PYTHONUTF8") == "1"
+
+
+def test_without_the_profiles_numbers_the_models_own_limits_apply_as_for_pi(started, tmp_path, monkeypatch):
+    """Pi fills an empty 「高级」 from the model catalogue (claude-opus-4-8: 1M); Claude Code would
+    otherwise fall back to 200k for a Claude model without 「[1m]」, Codex to its own guess."""
+    from prometheus.llm import pi_models
+
+    calls, reply = started
+    (tmp_path / "work").mkdir()
+    looked = []
+    monkeypatch.setattr(pi_models, "model_fields",
+                        lambda data_dir, profile, pi_cli=None: looked.append(profile) or
+                        ("pi", {"contextWindow": 1000000, "maxTokens": 128000}))
+    reply["stdout"] = _stream("claude-answer")
+    runs.one_shot({**CLAUDE, "protocol": "anthropic"}, prompt="你好", model="claude-opus-4-8", api_key="k",
+                  thinking="medium", work_dir=tmp_path / "work", config_root=tmp_path / "data" / ".prometheus" / "config",
+                  tools_root=tmp_path / "tools")
+    command = calls[0]["command"]
+    assert command[command.index("--model") + 1] == "claude-opus-4-8[1m]"
+    assert calls[0]["env"].get("CLAUDE_CODE_MAX_OUTPUT_TOKENS") == "128000"
+    assert looked and looked[0]["model"] == "claude-opus-4-8"
+    reply["stdout"] = _stream("codex-answer")
+    runs.one_shot({**CODEX, "protocol": "openai"}, prompt="你好", model="gpt-6-astra", api_key="k", thinking="medium",
+                  work_dir=tmp_path / "work", config_root=tmp_path / "data" / ".prometheus" / "config",
+                  tools_root=tmp_path / "tools")
+    assert "model_context_window=1000000" in [calls[1]["command"][i + 1] for i, part in enumerate(calls[1]["command"])
+                                               if part == "-c"]
