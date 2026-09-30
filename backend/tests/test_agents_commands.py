@@ -99,3 +99,11 @@ def test_codex_signed_in_uses_its_own_login_and_no_endpoint_or_key():
     assert not [setting for setting in _configs(command) if setting.startswith("model_provider")]
     env = commands.codex_env(PARENT, config_root=CONFIG, api_key=None)
     assert "CODEX_HOME" in env and "PROMETHEUS_AGENT_KEY" not in env
+
+
+def test_claude_code_gets_the_address_without_v1_as_pi_does():
+    """Claude Code appends /v1/messages itself (as Pi does: pi_models.custom_base_url); a profile
+    saved as 「https://api.justwoker.icu/v1」 would otherwise reach …/v1/v1/messages."""
+    for saved in ("https://relay.example/v1", "https://relay.example/v1/", "https://relay.example/"):
+        env = commands.claude_env({}, config_root=CONFIG, base_url=saved, api_key="k")
+        assert env["ANTHROPIC_BASE_URL"] == "https://relay.example"
