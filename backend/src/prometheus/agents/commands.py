@@ -56,11 +56,14 @@ def claude_model(model: str, context_window) -> str:
     return model
 
 
-def claude_command(exe, *, model: str, thinking: str, tools) -> list:
-    """`tools`: True for a workspace task, "Read" to look at images, False for plain text."""
+def claude_command(exe, *, model: str, thinking: str, tools, system: str = "") -> list:
+    """`tools`: True for a workspace task, "Read" to look at images, False for plain text; `system`
+    is appended to Claude Code's system prompt, as Pi's --append-system-prompt."""
     command = [str(exe), "-p", "--bare", "--output-format", "stream-json", "--verbose", "--model", model,
                "--effort", CLAUDE_EFFORT.get(thinking, thinking), "--no-session-persistence",
                "--strict-mcp-config", "--disable-slash-commands"]
+    if system:
+        command += ["--append-system-prompt", system]
     allowed = CLAUDE_TOOLS if tools is True else (tools or "")
     if allowed:
         return command + ["--tools", allowed, "--allowedTools", allowed, "--permission-mode", "dontAsk"]
@@ -74,8 +77,11 @@ def _anthropic_base(base_url: str) -> str:
 
 
 def claude_env(env: dict, *, config_root, base_url: str, api_key: str, max_tokens=None, context_window=None) -> dict:
-    """`max_tokens`: the profile's 「最大输出」; the context comes with the model (「[1m]」)."""
+    """The profile's 「最大输出」 and 「上下文窗口」: a 1M window also comes with the model name
+    (「[1m]」); any other one Claude Code only knows from CLAUDE_CODE_MAX_CONTEXT_TOKENS."""
     limit = {"CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(max_tokens)} if max_tokens else {}
+    if context_window:
+        limit["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = str(context_window)
     return {**clean_env(env), **limit, "CLAUDE_CONFIG_DIR": str(Path(config_root) / "claude"),
             "ANTHROPIC_BASE_URL": _anthropic_base(base_url), "ANTHROPIC_API_KEY": api_key,
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
@@ -83,14 +89,15 @@ def claude_env(env: dict, *, config_root, base_url: str, api_key: str, max_token
 
 
 def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, base_url, images=(), context_window=None,
-                  max_tokens=None) -> list:
+                  max_tokens=None, system: str = "") -> list:
     """`base_url` None: the app's own ChatGPT login instead of an endpoint and a key. A task that
     writes runs without Codex's own sandbox: on Windows it refuses every command when there is no
     window to ask in, and every run is contained instead (contain.py, user 2026-09-29)."""
     command = [str(exe), "exec", "--json", "--model", model, "--ephemeral", "--ignore-user-config", "--ignore-rules",
                "--skip-git-repo-check", "--sandbox", "danger-full-access" if write else "read-only", "-C", str(workspace)]
+    # verbosity: Codex sends 「low」 for its GPT models; Pi sends none, so the API default (medium) applies
     settings = [f"model_reasoning_effort={json.dumps(CODEX_EFFORT.get(thinking, thinking))}", 'approval_policy="never"',
-                "project_doc_max_bytes=0",
+                'model_verbosity="medium"', "project_doc_max_bytes=0",
                 "skills.include_instructions=false", 'web_search="disabled"', "check_for_update_on_startup=false"]
     if base_url:
         settings += ['model_provider="prometheus"', 'model_providers.prometheus.name="prometheus"',
@@ -102,8 +109,9 @@ def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, bas
     if context_window:  # the endpoint's own limit: Codex compacts by the window it believes in
         settings += [f"model_context_window={context_window}",
                      f"model_auto_compact_token_limit={int(context_window * COMPACT_AT)}"]
-    if max_tokens:
-        settings.append(f"model_max_output_tokens={max_tokens}")
+    # max_tokens: Codex has no output cap to set (no such key in 0.159; the request carries none)
+    if system:  # appended to the model's instructions, as Pi's --append-system-prompt
+        settings.append(f"developer_instructions={json.dumps(system, ensure_ascii=False)}")
     for setting in settings:
         command += ["-c", setting]
     for feature in CODEX_OFF:

@@ -101,6 +101,8 @@ STANDARD_PROMPT = (
     "本次只读取 modes/standard.md 这一份模式文件，不读取另一模式。"
     "Profile 只指导内容关系表达，不覆盖所选模式的展开程度。"
     "只使用当前模式的模板、样式与组件，不读取或混入另一模式的视觉资源。"
+    # VRA gives Pi this in its system prompt (vendor pi.py); finalize rejects reports that load outside files
+    "The supplied transcript is complete; generate a self-contained report.html."
 )
 
 

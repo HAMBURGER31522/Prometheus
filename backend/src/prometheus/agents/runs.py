@@ -19,6 +19,17 @@ from prometheus.agents import commands, contain
 from prometheus.report import pi_run
 
 NAMES = {"claude": "Claude Code", "codex": "Codex CLI"}
+SKILL_ATTACHED = "=== 附件：SKILL.md"
+# The rules and the skill speak of Pi's read / write / edit / powershell tools; this says which of each
+# Agent's tools those are, and keeps text files in UTF-8 (Windows PowerShell 5.1 reads them as GBK).
+UTF8 = ("读写文本文件一律用 UTF-8：读用 Get-Content -Raw -Encoding UTF8，写用 "
+        "[IO.File]::WriteAllText(路径, 文本, [Text.UTF8Encoding]::new($false))；不要用 Set-Content 或 Out-File。")
+TOOL_NOTES = {
+    "claude": ("工具对照：文中说的 read 工具就是 Read，也用它看图片（例如 frames/ 里的候选帧）；write、edit 工具就是 Edit，"
+               "新建文件时 old_string 留空，整篇写回时先 Read 再用 Edit 替换全文；powershell 工具就是 PowerShell。" + UTF8),
+    "codex": ("工具对照：文中说的 read 工具，读文本用 shell，看图片（例如 frames/ 里的候选帧）用 view_image；write、edit 工具"
+              "用 apply_patch（有的话），没有就在 shell 里写；powershell 工具就是你的 shell。" + UTF8),
+}
 PI_CLI = Path("pi/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js")
 _STATUS = re.compile(r"\bstatus (\d{3})\b|API Error: (\d{3})\b")
 
@@ -92,7 +103,7 @@ def _answer(agent_id: str, result: subprocess.CompletedProcess) -> str:
 
 
 def _start(agent: dict, *, prompt: str, model: str, api_key: str, thinking: str, cwd: Path, config_root, tools_root,
-           tools, write: bool, files=(), timeout=None) -> subprocess.CompletedProcess:
+           tools, write: bool, files=(), timeout=None, system: str = "") -> subprocess.CompletedProcess:
     agent_id = agent["id"]
     exe = commands.executable(tools_root, agent_id)
     (Path(config_root) / agent_id).mkdir(parents=True, exist_ok=True)
@@ -100,14 +111,14 @@ def _start(agent: dict, *, prompt: str, model: str, api_key: str, thinking: str,
     base_env = {**os.environ, "VIDEO_REPORT_PYTHON": sys.executable, "PYTHONUTF8": "1"} if write else os.environ
     if agent_id == "claude":
         command = commands.claude_command(exe, model=commands.claude_model(model, context), thinking=thinking,
-                                          tools=tools)
+                                          tools=tools, system=system)
         env = commands.claude_env(base_env, config_root=config_root, base_url=agent["base_url"], api_key=api_key,
-                                  max_tokens=most)
+                                  max_tokens=most, context_window=context)
     else:
         signed_in = agent.get("access") == "login"
         command = commands.codex_command(exe, model=model, thinking=thinking, workspace=cwd, write=write,
                                          base_url=None if signed_in else agent["base_url"], images=files,
-                                         context_window=context, max_tokens=most)
+                                         context_window=context, max_tokens=most, system=system)
         env = commands.codex_env(base_env, config_root=config_root, api_key=None if signed_in else api_key)
     own = Path(config_root) / agent_id
     writable = [cwd, own] if write else [own]  # everything else stays out of reach (contain.py)
@@ -137,10 +148,11 @@ def task(agent: dict, workspace, prompt: str, *, expect: str, model: str, api_ke
     """Run once in `workspace`; the file `expect` must be there afterwards (as pi_run.run_task)."""
     workspace = Path(workspace)
     skill = workspace / "SKILL.md"
-    parts = [pi_run.SYSTEM, skill.read_text(encoding="utf-8") if skill.is_file() else "", prompt]
+    attached = SKILL_ATTACHED in prompt  # the chapter prompts carry SKILL.md already (report/full.py)
+    parts = ["" if attached or not skill.is_file() else skill.read_text(encoding="utf-8"), prompt]
     result = _start(agent, prompt="\n\n".join(part for part in parts if part), model=model, api_key=api_key,
                     thinking=thinking, cwd=workspace, config_root=config_root, tools_root=tools_root, tools=True,
-                    write=True, timeout=timeout)
+                    write=True, timeout=timeout, system=f"{pi_run.SYSTEM}\n\n{TOOL_NOTES[agent['id']]}")
     with (workspace / "agent.events.jsonl").open("ab") as log:
         log.write(result.stdout or b"")
     with (workspace / "agent.stderr.log").open("ab") as log:
