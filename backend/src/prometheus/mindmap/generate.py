@@ -10,6 +10,11 @@ from prometheus.llm import one_shot
 from prometheus.mindmap import enrich, markdown, prompt, tree
 from prometheus.report.outline import extract_outline
 
+# The same report can pass on a later try (BV1EJ4m1t7Zs, 2026-09-30: two tries failed, the next run passed at
+# once): the second and third tries both mend the tree before them (PLAN 15.4.15-9).
+TRIES = 3
+REASON_CHARS = 500
+
 
 def _report_html(data_dir, item_id: str, row: dict) -> str:
     """The run's report copy, or the library's once a finished run's cache was cleaned."""
@@ -36,24 +41,40 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
     base = prompt.build_prompt(outline)
     errors: list = []
     parsed = None
-    for _ in range(2):
+    kept = None  # the latest (tree, small problems) with nothing worse (PLAN 15.4.15-11)
+    for _ in range(TRIES):
         feedback = "\n\n上次输出的问题：" + "；".join(errors) if errors else ""
         if errors and parsed is not None:  # edit the last tree: a fresh one slips elsewhere
             feedback = ("\n\n上次输出的 JSON：\n" + json.dumps(parsed, ensure_ascii=False) + feedback
                         + "\n请在上次输出的基础上只修改这些问题，其余保持不变，仍然只输出完整的 JSON。")
         try:
             text = ask(base + feedback)
-        except Exception:  # noqa: BLE001 - PLAN 8.3: a mind map failure never fails the item
-            items_store.update_item(data_dir, item_id, mindmap_status="failed")
+        except Exception as exc:  # noqa: BLE001 - PLAN 8.3: a mind map failure never fails the item
+            if kept is not None:  # a tree with only small problems is already there: keep it
+                break
+            reason = f"调用出错：{type(exc).__name__}: {exc}"[:REASON_CHARS]
+            items_store.update_item(data_dir, item_id, mindmap_status="failed", mindmap_error=reason)
             return False
         parsed = tree.parse_tree(text)
-        errors = ["没有找到包含 root 的 JSON 对象"] if parsed is None else tree.validate_tree(parsed, outline)
+        if parsed is None:
+            errors = ["没有找到包含 root 的 JSON 对象"]
+        else:
+            major, minor = tree.check_tree(parsed, outline)
+            errors = major + minor
+            if not major:
+                kept = (parsed, minor)
         if not errors:
             break
-    if errors:
-        items_store.update_item(data_dir, item_id, mindmap_status="failed")
+    small: list = []
+    if errors and kept is not None:  # only small problems left: the map is kept with them
+        parsed, small = kept
+    elif errors:  # the map page says which checks it failed (PLAN 15.4.15-9)
+        reason = ("没通过检查：" + "；".join(errors))[:REASON_CHARS]
+        items_store.update_item(data_dir, item_id, mindmap_status="failed", mindmap_error=reason)
         return False
     parsed["root"].pop("summary", None)  # the root is the title only; not worth a retry
+    if small:
+        parsed["problems"] = small
     try:
         parsed, stats = enrich.enrich_tree(parsed, html, ask=ask)
         parsed["enrichment"] = stats
@@ -66,5 +87,5 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
     exported.parent.mkdir(parents=True, exist_ok=True)
     exported.write_text(markdown.tree_to_markdown(parsed, row["platform"], row["video_id"]),
                         encoding="utf-8")
-    items_store.update_item(data_dir, item_id, mindmap_status="ok")
+    items_store.update_item(data_dir, item_id, mindmap_status="ok", mindmap_error=None)
     return True

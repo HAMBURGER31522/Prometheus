@@ -37,7 +37,9 @@ def _published(data_dir) -> list:
                 "uploader": row.get("uploader") or "", "title": row.get("source_title") or "",
                 "duration_s": row.get("duration_s"),
             },
-            "paths": {role: f"{library_path}/{name}" for role, name in paths.LIBRARY_FILES.items()},
+            # Only the files that were made (PLAN 15.4.15): a video can come without a report or a map.
+            "paths": {role: f"{library_path}/{name}" for role, name in paths.LIBRARY_FILES.items()
+                      if (Path(data_dir) / library_path / name).is_file()},
             "folder": library_path,
         })
     return sorted(entries, key=lambda entry: (entry["category"], entry["date"], entry["title"]))
@@ -64,7 +66,7 @@ def rebuild(data_dir) -> None:
         "## 怎么读", "",
         "- 全部条目的元数据（标题、分类、标签、摘要、来源、文件路径）：[index.json](index.json)",
         f"- 某个分类的目录：`<分类>/{CATEGORY_INDEX}`",
-        "- 单篇正文（给 AI 读）：`<分类>/<日期 标题>/精读.md`，开头的 YAML 是元数据", "",
+        "- 单篇正文（给 AI 读）：`<分类>/<日期 标题>/精读.md`，开头的 YAML 是元数据；只要了字幕的只有 `字幕.txt`", "",
         "## 分类", "",
     ]
     for folder, group in sorted(by_category.items()):
@@ -75,7 +77,8 @@ def rebuild(data_dir) -> None:
         rows = [f"# {group[0]['category']}", "", f"共 {len(group)} 篇。", ""]
         for entry in group:
             article = entry["folder"].split("/", 1)[1]
-            line = f"- {entry['date']} [{entry['title']}]({article}/精读.md)"
+            text = paths.LIBRARY_FILES["md" if "md" in entry["paths"] else "txt"]
+            line = f"- {entry['date']} [{entry['title']}]({article}/{text})"
             if entry["description"]:
                 line += f" —— {entry['description']}"
             if entry["tags"]:

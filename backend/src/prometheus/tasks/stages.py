@@ -27,6 +27,7 @@ from prometheus.subtitle import fix as subtitle_fix
 from prometheus.subtitle import format as subtitle_format
 from prometheus.subtitle import paragraphs as subtitle_paragraphs
 from prometheus.subtitle import vtt
+from prometheus.tasks import outputs as outputs_mod
 from prometheus.transcribe import bcut, openai_compat
 from prometheus.transcribe import local as local_mod
 from prometheus.transcribe.audio import to_mp3, to_wav
@@ -93,6 +94,20 @@ def _from_platform_subtitle(work: Path, subtitle: Path) -> Path:
     return asr_path
 
 
+# How much of the transcript files a video that has no report (PLAN 15.4.15).
+TRANSCRIPT_OPENING = 1000
+
+
+def _transcript_opening(data_dir, item_id: str) -> str:
+    segments = json.loads(paths.segments_file(data_dir, item_id).read_text(encoding="utf-8"))
+    return " ".join(segment["text"].strip() for segment in segments)[:TRANSCRIPT_OPENING]
+
+
+def _full(row: dict, settings: dict) -> bool:
+    """「完整」 for this video (PLAN 15.4.15): its own depth; items from before follow the settings."""
+    return row["depth"] == "full" if row.get("depth") else workspace_mod.full_depth(settings)
+
+
 def build_real_impls(data_dir, runtime=None) -> dict:
     """``runtime``: a resolved Runtime, or a zero-argument callable returning one."""
 
@@ -127,6 +142,11 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             media = ["audio"]
         for kind in media + (["video"] if row["figures"] else []):
             download_mod.download_stage(work, row, settings, _node_exe(), media=kind)
+
+    def video(ctx):
+        """「现在生成」 a report with figures (PLAN 15.4.15-5): only the picture; the transcript is there."""
+        download_mod.download_stage(_work(data_dir, ctx), _row(data_dir, ctx), store.load(data_dir), _node_exe(),
+                                    media="video")
 
     def transcribe(ctx):
         work = _work(data_dir, ctx)
@@ -195,14 +215,14 @@ def build_real_impls(data_dir, runtime=None) -> dict:
 
     def keypoints(ctx):
         settings = store.load(data_dir)
-        if workspace_mod.full_depth(settings):  # 「标准」 is the VRA run as it was (PLAN 15.4.11)
+        if _full(_row(data_dir, ctx), settings):  # 「标准」 is the VRA run as it was (PLAN 15.4.11)
             workspace_mod.run_keypoints_stage(data_dir, ctx.item_id, settings, node_exe=_node_exe(), pi_cli=_pi_cli())
 
     def plan(ctx):
         settings = store.load(data_dir)
-        if not workspace_mod.full_depth(settings):
-            return
         row = _row(data_dir, ctx)
+        if not _full(row, settings):
+            return
         workspace_mod.run_plan_stage(data_dir, ctx.item_id, row, settings, node_exe=_node_exe(), pi_cli=_pi_cli(),
                                      figures=all(_figures(ctx, row, settings)))
 
@@ -210,10 +230,11 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         row = _row(data_dir, ctx)
         settings = store.load(data_dir)
         figures, supports_images = _figures(ctx, row, settings)
-        if workspace_mod.full_depth(settings):
-            def progress(step: str, number: int, total: int) -> None:
-                items_store.update_item(data_dir, ctx.item_id, stage_detail=f"{step}（第 {number}/{total} 章）")
 
+        def progress(step: str, number: int, total: int) -> None:
+            items_store.update_item(data_dir, ctx.item_id, stage_detail=f"{step}（第 {number}/{total} 章）")
+
+        if _full(row, settings):
             workspace_mod.run_full_report_stage(
                 data_dir, ctx.item_id, row, settings, node_exe=_node_exe(), pi_cli=_pi_cli(),
                 figures=figures and supports_images, progress=progress,
@@ -224,6 +245,9 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             node_exe=_node_exe(), pi_cli=_pi_cli(),
             figures=figures, model_supports_images=supports_images,
         )
+        # 「标准」 (PLAN 15.4.15-10): the editor's in-depth view on every chapter, and a jump TOC
+        workspace_mod.run_standard_viewpoints(data_dir, ctx.item_id, row, settings, node_exe=_node_exe(),
+                                              pi_cli=_pi_cli(), progress=progress)
 
     def finalize(ctx):
         work = _work(data_dir, ctx)
@@ -235,14 +259,20 @@ def build_real_impls(data_dir, runtime=None) -> dict:
     def classify(ctx):
         settings = store.load(data_dir)
         work = _work(data_dir, ctx)
-        html = publish_mod.report_html(data_dir, ctx.item_id, _row(data_dir, ctx))
-        outline = extract_outline(html)
-        h2_titles = [section["title"] for section in outline["sections"]]
+        row = _row(data_dir, ctx)
+        report = outputs_mod.of(row)["report"]
+        if report:
+            outline = extract_outline(publish_mod.report_html(data_dir, ctx.item_id, row))
+            title, intro = outline["title"], outline["intro"][:500]
+            h2_titles = [section["title"] for section in outline["sections"]]
+        else:  # no report (PLAN 15.4.15): the video's own title and how its transcript opens
+            title, h2_titles = row["source_title"] or row["video_id"], []
+            intro = _transcript_opening(data_dir, ctx.item_id)
         existing = [c["name"] for c in categories_store.list_categories(data_dir)]
         llm = settings["llm"]
         result = classify_item(
-            work, outline["title"], outline["intro"][:500], h2_titles, existing,
-            one_shot=one_shot_mod.run_one_shot,
+            work, title, intro, h2_titles, existing,
+            one_shot=one_shot_mod.run_one_shot, transcript=not report,
             provider=llm["provider"], model=llm["model"],
             api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
             node_exe=_node_exe(), pi_cli=_pi_cli(),
@@ -265,6 +295,7 @@ def build_real_impls(data_dir, runtime=None) -> dict:
     return {
         "resolve": resolve,
         "download": download,
+        "video": video,
         "transcribe": transcribe,
         "transcript": transcript,
         "frames": frames,

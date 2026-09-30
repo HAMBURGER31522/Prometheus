@@ -15,7 +15,16 @@ export const STAGES: [string, string][] = [
   ["publish", "放入知识库"],
 ];
 
+// A step only 「现在生成」 runs (PLAN 15.4.15): a report with figures gets its picture back first.
+const FILL_ONLY: Record<string, string> = { video: "下载画面" };
+
+/** Which step a running row is on, and of how many: the steps this video runs (PLAN 15.4.15). */
+export function stepOf(row: { stage: string | null; stages?: string[] }): { index: number; total: number } {
+  const ids = row.stages ?? STAGES.map(([id]) => id);
+  return { index: ids.indexOf(row.stage ?? ""), total: ids.length };
+}
+
 /** What a running row shows: the stage's own words while it reports them (「写作（第 3/10 章）」). */
 export function stageText(row: { stage: string | null; stage_detail: string | null }): string {
-  return row.stage_detail || STAGES.find(([id]) => id === row.stage)?.[1] || "准备中";
+  return row.stage_detail || STAGES.find(([id]) => id === row.stage)?.[1] || FILL_ONLY[row.stage ?? ""] || "准备中";
 }

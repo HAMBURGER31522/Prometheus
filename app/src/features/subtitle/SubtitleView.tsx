@@ -5,6 +5,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 
+import { FillSubtitles } from "../../shared/FillIn";
 import { type ReaderProps } from "../../shared/LibraryPage";
 import { type Segment, api, itemTitle } from "../../shared/api";
 import { clock, momentLink, sourceLabel } from "../../shared/format";
@@ -16,7 +17,7 @@ import { isForeign, tokenize } from "./words";
 
 const ROW_ESTIMATE = 44;
 
-export function SubtitleView({ item }: ReaderProps) {
+export function SubtitleView({ item, refresh }: ReaderProps) {
   const [variant, setVariant] = useState<"fixed" | "raw">("fixed");
   const [segments, setSegments] = useState<Segment[] | null>(null);
   const [showZh, setShowZh] = useState(true);
@@ -34,7 +35,7 @@ export function SubtitleView({ item }: ReaderProps) {
     return () => {
       alive = false;
     };
-  }, [item.id, variant]);
+  }, [item.id, variant, item.subtitle_status]); // a correction made now (PLAN 15.4.15) shows at once
 
   const rows = segments ?? [];
   const translated = rows.some((segment) => segment.zh);
@@ -58,7 +59,10 @@ export function SubtitleView({ item }: ReaderProps) {
       <div className="subtitle-bar">
         {item.transcript_source && <span className="badge">来源：{sourceLabel(item.transcript_source)}</span>}
         {item.subtitle_status === "ok" && variant === "fixed" && <span className="badge accent">已纠错</span>}
-        {item.subtitle_status === "failed" && <span className="badge danger">纠错未完成，显示原文</span>}
+        {item.subtitle_status === "failed" && item.outputs.subtitles && (
+          <span className="badge danger">纠错未完成，显示原文</span>
+        )}
+        {!item.outputs.subtitles && <FillSubtitles item={item} refresh={refresh} />}
         {item.notice && <span className="notice">{item.notice}</span>}
         <span className="spacer" />
         {translated && (

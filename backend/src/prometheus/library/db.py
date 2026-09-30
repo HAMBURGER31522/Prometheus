@@ -4,7 +4,7 @@ import sqlite3
 
 from prometheus import paths
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 SCHEMA_V1 = """
@@ -52,6 +52,11 @@ _ADDED_COLUMNS = (
     ("subtitle_status", "TEXT"),
     # Version 5 (PLAN 15.4.11): where a long stage is, e.g. 「写作（第 3/10 章）」; cleared with each stage.
     ("stage_detail", "TEXT"),
+    # Version 6 (PLAN 15.4.15): what this video gets and how detailed its report is; NULL = all three,
+    # at the settings' depth (items from before).
+    ("outputs", "TEXT"),             # JSON {"report": bool, "subtitles": bool, "mindmap": bool}
+    ("depth", "TEXT"),               # full | standard
+    ("mindmap_error", "TEXT"),       # why the last mind map failed (PLAN 15.4.15-9); NULL otherwise
 )
 
 
@@ -87,10 +92,14 @@ def mark_running_as_interrupted(data_dir) -> None:
     conn = connect(data_dir)
     try:
         conn.execute("UPDATE items SET status = 'interrupted' WHERE status = 'running'")
-        # A mind map rerun clears mindmap_status; quitting mid-run leaves it pending.
+        # A mind map rerun clears mindmap_status; quitting mid-run leaves it pending. A video
+        # that has no mind map (PLAN 15.4.15) has none to fail.
         conn.execute(
-            "UPDATE items SET mindmap_status = 'failed' WHERE status = 'done' AND mindmap_status IS NULL",
+            "UPDATE items SET mindmap_status = 'failed' WHERE status = 'done' AND mindmap_status IS NULL"
+            " AND (outputs IS NULL OR json_extract(outputs, '$.mindmap') = 1)",
         )
+        # A finished item still naming a step was being filled in (「现在生成」) or rerun when the app quit.
+        conn.execute("UPDATE items SET stage = NULL, stage_detail = NULL WHERE status = 'done' AND stage IS NOT NULL")
         conn.commit()
     finally:
         conn.close()

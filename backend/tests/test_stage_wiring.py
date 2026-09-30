@@ -85,6 +85,7 @@ def test_report_stage_receives_the_item_row(data_dir, monkeypatch):
         seen["row_id"] = row["id"]
 
     monkeypatch.setattr(stages_mod.workspace_mod, "run_report_stage", fake_run)
+    monkeypatch.setattr(stages_mod.workspace_mod, "run_standard_viewpoints", lambda *a, **k: None)  # 15.4.15-10
     stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](ctx)
     assert seen == {"item_id": ctx.item_id, "row_id": ctx.item_id}
 
@@ -140,6 +141,7 @@ def test_report_stage_asks_pi_whether_a_builtin_model_sees_images(data_dir, monk
     # Default settings use the built-in deepseek provider (no custom checkbox involved).
     monkeypatch.setattr(capability, "query_supports_images", lambda *a, **k: True, raising=False)
     monkeypatch.setattr(stages_mod.workspace_mod, "run_report_stage", fake_run)
+    monkeypatch.setattr(stages_mod.workspace_mod, "run_standard_viewpoints", lambda *a, **k: None)  # 15.4.15-10
     stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](ctx)
     assert seen["model_supports_images"] is True
 

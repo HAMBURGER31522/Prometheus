@@ -81,7 +81,9 @@ export const api = {
   dataDir: () => json<{ data_dir: string | null }>("GET", "/api/app/data-dir"),
   setDataDir: (dataDir: string) => json<{ data_dir: string }>("PUT", "/api/app/data-dir", { data_dir: dataDir }),
 
-  addItem: (url: string, figures: boolean) => json<{ id: string }>("POST", "/api/items", { url, figures }),
+  /** What this video gets (PLAN 15.4.15): the three circles and the report's depth, for this video only. */
+  addItem: (url: string, options: { figures: boolean; outputs: Outputs; depth: ReportDepth }) =>
+    json<{ id: string }>("POST", "/api/items", { url, ...options }),
   items: () => json<ItemRow[]>("GET", "/api/items"),
   item: (id: string) => json<ItemRow>("GET", `/api/items/${id}`),
   moveItem: (id: string, categoryId: number) => json<ItemRow>("PATCH", `/api/items/${id}`, { category_id: categoryId }),
@@ -92,6 +94,10 @@ export const api = {
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, figures === undefined ? {} : { figures }),
   regenerateMindmap: (id: string) =>
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "mindmap" }),
+  /** 「现在生成」 (PLAN 15.4.15): the missing report with its map, or the correction of the subtitles. */
+  fillReport: (id: string, depth: ReportDepth, figures: boolean) =>
+    json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "report", depth, figures }),
+  fillSubtitles: (id: string) => json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "subtitles" }),
   /** 「补全标签和摘要」(PLAN 15.4.10): classify + publish again, the category stays. */
   fillTags: (id: string) => json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "tags" }),
   queue: () => json<ItemRow[]>("GET", "/api/queue"),
@@ -130,6 +136,8 @@ export interface ItemRow {
   /** Where a long stage is, e.g. 「写作（第 3/10 章）」 (PLAN 15.4.11). */
   stage_detail: string | null;
   mindmap_status: "ok" | "failed" | null;
+  /** Why the last mind map failed (PLAN 15.4.15-9). */
+  mindmap_error: string | null;
   subtitle_status: "ok" | "failed" | null;
   error_code: string | null;
   error_message: string | null;
@@ -144,6 +152,11 @@ export interface ItemRow {
   transcript_source: string | null;
   notice: string | null;
   files_missing: boolean;
+  /** What this video gets and its report's depth (PLAN 15.4.15); null depth = the settings'. */
+  outputs: Outputs;
+  depth: ReportDepth | null;
+  /** The steps its run goes through, in order: the console counts these. */
+  stages: string[];
 }
 
 export interface CategoryRow {
@@ -223,6 +236,11 @@ export interface ModelInfo {
   thinking_level_map: Record<string, string | null> | null;
 }
 
+/** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was. */
+export type ReportDepth = "full" | "standard";
+/** Which parts a video gets (PLAN 15.4.15); the mind map comes with the report. */
+export type Outputs = { report: boolean; subtitles: boolean; mindmap: boolean };
+
 export interface Settings {
   /** The saved model profiles (PLAN 15.4.8); `llm` is the active one, derived by the backend. */
   llm_profiles: { active: string; items: ModelProfile[] };
@@ -238,7 +256,7 @@ export interface Settings {
   network: { proxy: string; youtube_cookies_file: string };
   figures_default: boolean;
   /** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was; review = 讲清楚审校 in 完整. */
-  report: { depth: "full" | "standard"; review: boolean };
+  report: { depth: ReportDepth; review: boolean };
 }
 
 /** coverage.json of a 完整 report (PLAN 15.4.11): what was written, skipped with a reason, or left out. */

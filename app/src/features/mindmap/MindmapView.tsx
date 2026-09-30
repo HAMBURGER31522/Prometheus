@@ -17,6 +17,7 @@ import {
 } from "@xyflow/react";
 import { useEffect, useMemo, useState } from "react";
 
+import { FillMindmap, FillReport } from "../../shared/FillIn";
 import { type ReaderProps } from "../../shared/LibraryPage";
 import { useNav } from "../../shared/NavContext";
 import { type MindmapTree, api, itemTitle } from "../../shared/api";
@@ -58,6 +59,10 @@ function MindNode({ data, selected }: NodeProps<Node<MindData>>) {
 const NODE_TYPES = { mind: MindNode };
 
 export function MindmapView(props: ReaderProps) {
+  // Without a map (PLAN 15.4.15): the map alone once there is a report, else the report with it.
+  if (!props.item.outputs.mindmap) {
+    return props.item.outputs.report ? <FillMindmap {...props} /> : <FillReport {...props} map />;
+  }
   return (
     <ReactFlowProvider>
       <Canvas {...props} />
@@ -151,6 +156,7 @@ function Canvas({ item, refresh }: ReaderProps) {
     return (
       <div className="page">
         <p className={failed ? "notice danger" : "notice"}>{text}</p>
+        {failed && item.mindmap_error && <p className="muted mind-reason">原因：{item.mindmap_error}</p>}
         {(failed || legacy) && (
           <button type="button" className="btn" style={{ marginTop: 14 }} onClick={regenerate}>
             重新生成导图

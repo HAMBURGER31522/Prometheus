@@ -11,7 +11,7 @@ from pathlib import Path
 from prometheus import paths
 from prometheus.agents import contain, runs
 from prometheus.llm import one_shot
-from prometheus.report import full, patch, pi_run, viewpoints
+from prometheus.report import full, patch, pi_run, standard, viewpoints
 from prometheus.report.chunks import load_units
 from prometheus.report.full import FIGURES_MD
 from prometheus.report.timing import pi_timeout_seconds
@@ -47,6 +47,15 @@ def build_input_json(row: dict) -> dict:
     }
 
 
+# 「标准」 is VRA's own 精读 (PLAN 15.4.15-10): left to itself it wrote a 13-minute video as a short report.
+STANDARD_DEPTH_PROMPT = (
+    "用户要求本次按精读写：按 modes/standard.md 的「精读表达」展开方法、依据、例子和结论的条件，"
+    "不因为视频短就写成速览或只有一两个模块的短报告；按内容分成几章，每章一个 section，"
+    "章节标题里用 section-time 写这一章在视频里的时间范围，多章时从 1 连续编号。"
+    "编者观点这一步不用写，写完后另有一步。"
+)
+
+
 def build_runner_kwargs(row: dict, settings: dict, node_exe: str, pi_cli: str, *,
                         figures: bool, model_supports_images: bool) -> dict:
     llm = settings["llm"]
@@ -60,7 +69,7 @@ def build_runner_kwargs(row: dict, settings: dict, node_exe: str, pi_cli: str, *
         "thinking": llm.get("thinking") or "low",
         "timeout": pi_timeout_seconds(row.get("duration_s") or 0.0),
         "tools": "read,write,edit,powershell",
-        "extra_prompt": WINDOWS_PROMPT + (FIGURES_PROMPT if figures_on else ""),
+        "extra_prompt": WINDOWS_PROMPT + STANDARD_DEPTH_PROMPT + (FIGURES_PROMPT if figures_on else ""),
         "extra_files": extra_files or None,
         "command_prefix": [node_exe, pi_cli],
     }
@@ -122,6 +131,18 @@ def _standard_on_agent(work: Path, settings: dict, kwargs: dict, node_exe: str, 
     if "<html" not in html or "</html>" not in html or "<body" not in html:
         raise runs.AgentRunError("report.html is not a complete HTML document")
     return report
+
+
+def run_standard_viewpoints(data_dir, item_id: str, row: dict, settings: dict, *, node_exe: str, pi_cli: str,
+                            progress) -> dict:
+    """「标准」 ② ③ (PLAN 15.4.15-10): an editor's-viewpoint pass on every chapter VRA wrote, then the jump TOC."""
+    work = paths.work_dir(data_dir, item_id)
+    gate = full.Gate()  # five chapters at a time, fewer once the relay limits the rate
+    seconds = max(1.0, _times(settings) / 3) * pi_timeout_seconds(row.get("duration_s") or 0.0)
+    run_pi = pi_runner(data_dir, settings, node_exe, pi_cli, deadline=time.monotonic() + seconds, on_limit=gate.lower)
+    proxy = settings["network"].get("proxy", "")
+    return standard.add_viewpoints(work, run_pi, verify_links=lambda url: viewpoints.open_page(url, proxy=proxy),
+                                   progress=progress, gate=gate)
 
 
 # ---- 完整精读 (PLAN 15.4.11): 提取要点, 规划, then the report chapter by chapter ----

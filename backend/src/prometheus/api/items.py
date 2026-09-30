@@ -1,6 +1,7 @@
 """Item endpoints and the queue view (PLAN 8.2)."""
 
 import asyncio
+import json
 import sqlite3
 import time
 
@@ -10,6 +11,7 @@ from prometheus.ingest.links import LinkUnsupported, parse_url
 from prometheus.library import items as items_store
 from prometheus.library import publish
 from prometheus.tasks import errors
+from prometheus.tasks import outputs as outputs_mod
 
 router = APIRouter()
 
@@ -23,11 +25,17 @@ async def create_item(request: Request):
         source = parse_url(body.get("url") or "")
     except LinkUnsupported:
         return JSONResponse({"code": "URL_UNSUPPORTED"}, status_code=422)
+    try:
+        outputs, depth = outputs_mod.from_submit(body)
+    except outputs_mod.Refused as refused:
+        return JSONResponse({"code": refused.code}, status_code=422)
     state = request.app.state
     try:
+        # No report, no figures to draw (PLAN 15.4.15).
         item_id = items_store.create_item(
             state.data_dir, platform=source.platform, video_id=source.video_id,
-            source_url=source.canonical_url, figures=1 if body.get("figures") else 0,
+            source_url=source.canonical_url, figures=1 if body.get("figures") and outputs["report"] else 0,
+            outputs=outputs, depth=depth,
         )
     except sqlite3.IntegrityError:
         existing = items_store.find_by_video(state.data_dir, source.platform, source.video_id)
@@ -47,7 +55,8 @@ async def list_items(
 
 def _with_file_state(data_dir, row: dict) -> dict:
     """Flag items whose library folder was moved or deleted outside the app; say why one failed."""
-    return {**row, "files_missing": publish.files_missing(data_dir, row), **errors.view(data_dir, row)}
+    return {**row, "files_missing": publish.files_missing(data_dir, row), **errors.view(data_dir, row),
+            **outputs_mod.view(row)}
 
 
 @router.get("/api/queue")
@@ -56,7 +65,8 @@ async def queue_view(request: Request):
     active = [row for row in items_store.list_items(data_dir) if row["status"] != "done"]
     done = items_store.list_items(data_dir, status="done")
     # A failed row says why and what to do (PLAN 15.4.10).
-    return [{**row, **errors.view(data_dir, row)} for row in active + list(reversed(done[-20:]))]
+    return [{**row, **errors.view(data_dir, row), **outputs_mod.view(row)}
+            for row in active + list(reversed(done[-20:]))]
 
 
 @router.get("/api/items/{item_id}")
@@ -112,6 +122,8 @@ async def retry_item(request: Request, item_id: str):
 @router.post("/api/items/{item_id}/regenerate")
 async def regenerate_item(request: Request, item_id: str):
     body = await request.json() if await request.body() else {}
+    if body.get("only") in outputs_mod.FILL_STAGES:
+        return _fill(request, item_id, body)
     if body.get("only") == "mindmap":
         # 「重新生成导图」(PLAN 8.8): the item stays done while its mind map reruns.
         state = request.app.state
@@ -120,6 +132,11 @@ async def regenerate_item(request: Request, item_id: str):
             return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
         if row["status"] != "done":
             return JSONResponse({"code": "NOT_DONE"}, status_code=409)
+        parts = outputs_mod.of(row)
+        if not parts["report"]:  # the map is drawn from the report's chapters (PLAN 15.4.15)
+            return JSONResponse({"code": "NO_REPORT"}, status_code=409)
+        if not parts["mindmap"]:  # 「现在生成」: from now on this video has a map
+            items_store.update_item(state.data_dir, item_id, outputs=json.dumps({**parts, "mindmap": True}))
         state.queue.enqueue_mindmap(item_id)
         return {"queued": True}
     if body.get("only") == "tags":
@@ -135,6 +152,29 @@ async def regenerate_item(request: Request, item_id: str):
     changes = {"figures": 1 if body["figures"] else 0} if "figures" in body else {}
     # Also finished items: 「重新生成」 for a missing library folder or other figures (PLAN 15.2).
     return _requeue(request, item_id, allowed=(*RETRYABLE, "done"), **changes)
+
+
+def _fill(request: Request, item_id: str, body: dict):
+    """「现在生成」 (PLAN 15.4.15-5): the missing report (with its map, at this depth and with or without
+    figures) or the correction, on a finished item; nothing is downloaded or transcribed again."""
+    state = request.app.state
+    row = items_store.get_item(state.data_dir, item_id)
+    if row is None:
+        return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
+    if row["status"] != "done":
+        return JSONResponse({"code": "NOT_DONE"}, status_code=409)
+    part = body["only"]
+    if outputs_mod.of(row)[part]:
+        return JSONResponse({"code": "ALREADY_MADE"}, status_code=409)
+    if part == "report" and "depth" in body and body["depth"] not in outputs_mod.DEPTHS:
+        return JSONResponse({"code": "DEPTH_INVALID"}, status_code=422)
+    if row["stage"] is not None or state.queue.is_running(item_id):
+        return JSONResponse({"code": "BUSY"}, status_code=409)
+    if part == "report":
+        items_store.update_item(state.data_dir, item_id, depth=body.get("depth"),
+                                figures=1 if body.get("figures") else 0)
+    state.queue.enqueue_fill(item_id, part)
+    return {"queued": True}
 
 
 def _requeue(request: Request, item_id: str, allowed=RETRYABLE, **changes):

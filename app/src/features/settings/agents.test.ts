@@ -53,8 +53,9 @@ describe("the 「高级」 hint", () => {
       .toBe("按模型目录预填，可以手动改；思考档位按 Codex 自己的列表。");
     expect(limitHint(null, "pi")).toBe("目录里没有这个模型：留空就按 Pi 的默认（上下文 128000，输出 16384）。");
     expect(limitHint(null, "codex")).toBe("目录里没有这个模型：留空时 Codex CLI 用它自己的默认；接口的上限更小时请填上。");
+    // User 2026-09-30: the old words read as if a name without 「[1m]」 always meant 200k.
     expect(limitHint(null, "claude")).toBe(
-      "目录里没有这个模型：留空时 Claude Code 用它自己的默认（Claude 模型名不带「[1m]」只有 200k）；接口的上限不同时请填上。");
+      "目录里查不到这个模型名，应用不知道它的上限。留空时 Claude Code 按 200k 跑；如果它是 1M 的，在这里填 1000000，应用会自动加上「[1m]」。");
   });
 });
 

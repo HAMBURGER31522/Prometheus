@@ -1,11 +1,12 @@
 """Serial task queue (PLAN 8.3): one running item at a time."""
 
+import json
 import threading
 from datetime import UTC, datetime
 
 from prometheus import paths
 from prometheus.library import items as items_store
-from prometheus.tasks import cleanup, errors, processes, runner
+from prometheus.tasks import cleanup, errors, outputs, processes, runner
 
 # 「重新生成导图」(PLAN 8.8): a finished item reruns only these and stays done.
 MINDMAP_STAGES = ("mindmap", "publish")
@@ -26,6 +27,7 @@ class TaskQueue:
         self._current = None
         self._mindmap_reruns = []  # item ids, oldest first
         self._tag_reruns = []  # item ids, oldest first
+        self._fills = []  # (item id, part) for 「现在生成」, oldest first
         self._stop_requested = False
         self._thread = None
 
@@ -47,7 +49,7 @@ class TaskQueue:
 
     def enqueue_mindmap(self, item_id) -> None:
         """Rerun only the mind map of a finished item; mindmap_status stays NULL until it ends."""
-        items_store.update_item(self.data_dir, item_id, mindmap_status=None)
+        items_store.update_item(self.data_dir, item_id, mindmap_status=None, mindmap_error=None)
         with self._lock:
             if item_id not in self._mindmap_reruns:
                 self._mindmap_reruns.append(item_id)
@@ -60,6 +62,17 @@ class TaskQueue:
                 self._tag_reruns.append(item_id)
         self._wake.set()
 
+    def enqueue_fill(self, item_id, part: str) -> None:
+        """「现在生成」 (PLAN 15.4.15-5): add the missing part to a finished item, which stays readable.
+        The row names its first step at once and says it has not started."""
+        row = items_store.get_item(self.data_dir, item_id)
+        first = outputs.fill_stages(part, bool(row["figures"]))[0]
+        items_store.update_item(self.data_dir, item_id, stage=first, stage_detail="排队中",
+                                error_code=None, error_message=None)
+        with self._lock:
+            self._fills.append((item_id, part))
+        self._wake.set()
+
     def cancel(self, item_id) -> bool:
         with self._lock:
             current = self._current
@@ -68,6 +81,9 @@ class TaskQueue:
                 self._mindmap_reruns.remove(item_id)
             if item_id in self._tag_reruns:
                 self._tag_reruns.remove(item_id)
+            filling = [fill for fill in self._fills if fill[0] == item_id]
+            for fill in filling:
+                self._fills.remove(fill)
         if current is not None and current.item_id == item_id:
             current.cancel_requested = True
             # The running stage is blocked on Pi / whisper / ffmpeg: end them now.
@@ -76,6 +92,9 @@ class TaskQueue:
             return True
         if waiting:
             items_store.update_item(self.data_dir, item_id, mindmap_status="failed")
+            return True
+        if filling:
+            items_store.update_item(self.data_dir, item_id, stage=None, stage_detail=None)
             return True
         row = items_store.get_item(self.data_dir, item_id)
         if row is not None and row["status"] == "queued":
@@ -112,6 +131,8 @@ class TaskQueue:
                 item_id, rerun = self._mindmap_reruns.pop(0), True
             elif self._tag_reruns:
                 item_id, rerun = self._tag_reruns.pop(0), "tags"
+            elif self._fills:
+                item_id, rerun = self._fills.pop(0)
             elif queued:
                 item_id, rerun = queued[0]["id"], False
             else:
@@ -121,6 +142,8 @@ class TaskQueue:
         try:
             if rerun == "tags":
                 self._rerun_tags(ctx)
+            elif rerun in outputs.FILL_STAGES:
+                self._fill(ctx, rerun)
             elif rerun:
                 self._rerun_mindmap(ctx)
             else:
@@ -137,7 +160,9 @@ class TaskQueue:
             self.data_dir, item_id, status="running", stage=runner.STAGES[0], started_at=_now(),
         )
         try:
-            runner.run_item(ctx, self.impls)
+            # Only the parts this video gets (PLAN 15.4.15).
+            stages = outputs.stages_for(outputs.of(items_store.get_item(self.data_dir, item_id)))
+            runner.run_item(ctx, self.impls, stages=stages)
         except runner.TaskCancelled:
             items_store.update_item(
                 self.data_dir, item_id, status="cancelled", stage=None, finished_at=_now(),
@@ -160,6 +185,28 @@ class TaskQueue:
             items_store.update_item(
                 self.data_dir, item_id, status="done", stage=None, finished_at=_now(),
             )
+
+    def _fill(self, ctx, part: str) -> None:
+        """The item stays done. A failure says why on the row and leaves the part missing, to try again;
+        a correction that did not take leaves the subtitles uncorrected the same way."""
+        item_id = ctx.item_id
+        row = items_store.get_item(self.data_dir, item_id)
+        try:
+            runner.run_item(ctx, self.impls, stages=outputs.fill_stages(part, bool(row["figures"])))
+        except Exception as exc:  # noqa: BLE001 - cancelled (TaskCancelled) or broken
+            failure = {}
+            if not ctx.cancel_requested and not isinstance(exc, runner.TaskCancelled):
+                stage = (items_store.get_item(self.data_dir, item_id) or {}).get("stage")
+                code, message = errors.describe(stage, exc)
+                failure = {"error_code": code, "error_message": message}
+            items_store.update_item(self.data_dir, item_id, stage=None, stage_detail=None, **failure)
+            return
+        # Like the first run: the downloaded picture and its frames go (user 2026-09-30).
+        cleanup.clean_work_dir(paths.work_dir(self.data_dir, item_id))
+        row = items_store.get_item(self.data_dir, item_id)
+        made = part != "subtitles" or row["subtitle_status"] == "ok"
+        parts = {"outputs": json.dumps(outputs.filled(outputs.of(row), part))} if made else {}
+        items_store.update_item(self.data_dir, item_id, stage=None, stage_detail=None, **parts)
 
     def _rerun_tags(self, ctx) -> None:
         """The item stays done; a failure just leaves it without tags (the button stays)."""

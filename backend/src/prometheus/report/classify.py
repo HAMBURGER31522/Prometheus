@@ -39,15 +39,17 @@ MAX_TAG_CHARS = 12
 MAX_DESCRIPTION_CHARS = 80
 
 
-def build_classify_prompt(title: str, intro: str, h2_titles: list, existing: list) -> str:
+def build_classify_prompt(title: str, intro: str, h2_titles: list, existing: list, *, transcript=False) -> str:
+    """`transcript`: a video without a report (PLAN 15.4.15), told by its title and how its transcript opens."""
     names = "、".join(existing[:50]) or "（无）"
-    chapters = "；".join(h2_titles)
+    if transcript:
+        subject, material = "视频", f"视频标题：{title}\n转写开头：{intro}\n"
+    else:
+        subject, material = "报告", f"报告标题：{title}\n导语：{intro}\n章节标题：{'；'.join(h2_titles)}\n"
     return (
-        "为以下报告选择一个分类，并给出标签和一句话摘要。优先从已有分类中选择；都不合适时提出一个新分类。\n"
+        f"为以下{subject}选择一个分类，并给出标签和一句话摘要。优先从已有分类中选择；都不合适时提出一个新分类。\n"
         f"已有分类：{names}\n"
-        f"报告标题：{title}\n"
-        f"导语：{intro}\n"
-        f"章节标题：{chapters}\n"
+        + material +
         '只输出 JSON：{"category": "名称", "tags": ["标签1", "标签2", "标签3"], "description": "一句话摘要"}。'
         "新分类名必须是 2-8 个汉字的名词短语，不能用「其他 / 综合 / 杂项」这类名字。"
         f"tags 给 3-5 个，每个不超过 {MAX_TAG_CHARS} 个字，是内容里的核心概念或人物；"
@@ -71,9 +73,9 @@ def _first_sentence(text: str) -> str:
 
 
 def classify_item(work_dir, title: str, intro: str, h2_titles: list, existing: list, *,
-                  one_shot, **one_shot_kwargs) -> dict:
+                  one_shot, transcript=False, **one_shot_kwargs) -> dict:
     """Category (validated, one retry, then 未分类) plus best-effort tags and description."""
-    prompt = build_classify_prompt(title, intro, h2_titles, existing)
+    prompt = build_classify_prompt(title, intro, h2_titles, existing, transcript=transcript)
     payload: dict = {}
     category = "未分类"
     for _ in range(2):

@@ -1,3 +1,4 @@
+.mind-reason { margin-top: 10px; font-size: 13px; }
 .mindmap { position: absolute; inset: 0; }
 .mindmap .react-flow { background: var(--window); }
 .mind-dots { --xy-background-pattern-color-props: var(--map-dots); }

@@ -1,10 +1,12 @@
 // 控制台 (PLAN 9 / 15.4.5): paste a Bilibili or YouTube link, watch the queue.
-import { type CSSProperties, type FormEvent, useEffect, useState } from "react";
+import { type CSSProperties, type FormEvent, useState } from "react";
 
 import { ApiError, type ItemRow, api, itemTitle } from "../../shared/api";
 import { useNav } from "../../shared/NavContext";
+import { ReportOptions, useReportChoice } from "../../shared/ReportOptions";
 import { ScrollArea } from "../../shared/ScrollArea";
-import { STAGES, stageText } from "./stages";
+import { STAGES, stageText, stepOf } from "../../shared/stages";
+import { type Outputs, loadOutputs, saveOutputs, toggleOutput } from "./outputs";
 
 const STATUS: Record<ItemRow["status"], string> = {
   queued: "排队中",
@@ -19,20 +21,26 @@ const ADD_ERRORS: Record<string, string> = {
   URL_UNSUPPORTED: "只支持 B 站和 YouTube 的视频链接。",
 };
 
+const OUTPUT_LABELS: { key: keyof Outputs; label: string }[] = [
+  { key: "report", label: "精读" },
+  { key: "subtitles", label: "字幕" },
+  { key: "mindmap", label: "导图" },
+];
+
 export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () => Promise<void> }) {
   const [url, setUrl] = useState("");
-  const [figures, setFigures] = useState(true);
+  const choice = useReportChoice();
+  const { figures, depth } = choice;
+  const [outputs, setOutputs] = useState<Outputs>(() => loadOutputs(localStorage));
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    api.settings().then((s) => setFigures(s.figures_default)).catch(() => undefined);
-  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setMessage("");
     try {
-      await api.addItem(url.trim(), figures);
+      // No report, no figures to draw: the switch shows off, and that is what is sent.
+      await api.addItem(url.trim(), { figures: figures && outputs.report, outputs, depth });
+      saveOutputs(localStorage, outputs);
       setUrl("");
       await reload();
     } catch (error) {
@@ -61,20 +69,23 @@ export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () =>
             value={url}
             onChange={(event) => setUrl(event.target.value)}
           />
-          <label className="switch-label">
-            <button
-              type="button"
-              role="switch"
-              className="switch"
-              aria-checked={figures}
-              aria-label="配图"
-              onClick={() => setFigures(!figures)}
-            />
-            配图
-          </label>
+          <div className="outputs" role="group" aria-label="生成哪些">
+            {OUTPUT_LABELS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                className="output"
+                aria-pressed={outputs[key]}
+                onClick={() => setOutputs(toggleOutput(outputs, key))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button type="submit" className="btn primary" disabled={!url.trim()}>
             开始
           </button>
+          <ReportOptions choice={choice} off={!outputs.report} />
         </form>
         {message && (
           <p className="notice danger" role="alert" style={{ marginTop: 10 }}>
@@ -136,8 +147,8 @@ function Failure({ row }: { row: ItemRow }) {
 
 function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }) {
   const { go } = useNav();
-  const index = STAGES.findIndex(([id]) => id === row.stage);
-  const progress = row.status === "done" ? 1 : index < 0 ? 0 : index / STAGES.length;
+  const { index, total } = stepOf(row);
+  const progress = row.status === "done" ? 1 : index < 0 ? 0 : index / total;
   const act = (action: () => Promise<unknown>) => async () => {
     await action();
     await reload();
@@ -152,14 +163,15 @@ function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }
             {stageText(row)}
             <span className="muted">
               {" "}
-              · {Math.max(index, 0) + 1}/{STAGES.length}
+              · {Math.max(index, 0) + 1}/{total}
             </span>
           </span>
         )}
         {row.status === "failed" && row.error_reason ? (
           <Failure row={row} />
         ) : (
-          row.error_message && <span className="queue-error">{row.error_message}</span>
+          // A finished row's error is a 「现在生成」 that did not take: the reader says why.
+          row.status !== "done" && row.error_message && <span className="queue-error">{row.error_message}</span>
         )}
         {row.notice && <span className="muted">{row.notice}</span>}
         <span className="progress" style={{ "--p": progress } as CSSProperties} aria-hidden="true" />
