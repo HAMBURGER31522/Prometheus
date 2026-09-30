@@ -12,12 +12,14 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from prometheus.agents import commands, contain
 from prometheus.report import pi_run
 
 NAMES = {"claude": "Claude Code", "codex": "Codex CLI"}
+PI_CLI = Path("pi/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js")
 _STATUS = re.compile(r"\bstatus (\d{3})\b|API Error: (\d{3})\b")
 
 
@@ -29,7 +31,27 @@ def agent_of(llm: dict) -> dict:
     """The Agent part of the settings' ``llm`` view: which one, how it connects, where to."""
     return {"id": llm.get("agent") or "pi", "access": llm.get("access") or "key",
             "base_url": llm.get("base_url") or (llm.get("custom") or {}).get("base_url", ""),
-            "context_window": llm.get("context_window"), "max_tokens": llm.get("max_tokens")}
+            "context_window": llm.get("context_window"), "max_tokens": llm.get("max_tokens"),
+            "protocol": llm.get("protocol") or (llm.get("custom") or {}).get("protocol", "")}
+
+
+def _limits(agent: dict, model: str, config_root, tools_root) -> tuple:
+    """(context window, maximum output): the profile's own, else what the model catalogue says — the
+    same lookup that fills Pi's models.json (llm/pi_models.model_fields)."""
+    context, most = agent.get("context_window"), agent.get("max_tokens")
+    if context and most:
+        return context, most
+    from prometheus.llm import pi_models
+
+    protocol = agent.get("protocol") or ("anthropic" if agent["id"] == "claude" else "openai")
+    profile = {"kind": "custom", "model": model.removesuffix("[1m]"), "protocol": protocol,
+               "base_url": agent.get("base_url", "")}
+    try:
+        _source, fields = pi_models.model_fields(Path(config_root).parent.parent, profile,
+                                                 pi_cli=Path(tools_root) / PI_CLI)
+    except (OSError, ValueError, KeyError):
+        fields = {}
+    return context or fields.get("contextWindow"), most or fields.get("maxTokens")
 
 
 def _events(stdout: bytes) -> list:
@@ -74,16 +96,19 @@ def _start(agent: dict, *, prompt: str, model: str, api_key: str, thinking: str,
     agent_id = agent["id"]
     exe = commands.executable(tools_root, agent_id)
     (Path(config_root) / agent_id).mkdir(parents=True, exist_ok=True)
+    context, most = _limits(agent, model, config_root, tools_root)
+    base_env = {**os.environ, "VIDEO_REPORT_PYTHON": sys.executable, "PYTHONUTF8": "1"} if write else os.environ
     if agent_id == "claude":
-        command = commands.claude_command(exe, model=model, thinking=thinking, tools=tools)
-        env = commands.claude_env(os.environ, config_root=config_root, base_url=agent["base_url"], api_key=api_key,
-                                  max_tokens=agent.get("max_tokens"))
+        command = commands.claude_command(exe, model=commands.claude_model(model, context), thinking=thinking,
+                                          tools=tools)
+        env = commands.claude_env(base_env, config_root=config_root, base_url=agent["base_url"], api_key=api_key,
+                                  max_tokens=most)
     else:
         signed_in = agent.get("access") == "login"
         command = commands.codex_command(exe, model=model, thinking=thinking, workspace=cwd, write=write,
                                          base_url=None if signed_in else agent["base_url"], images=files,
-                                         context_window=agent.get("context_window"), max_tokens=agent.get("max_tokens"))
-        env = commands.codex_env(os.environ, config_root=config_root, api_key=None if signed_in else api_key)
+                                         context_window=context, max_tokens=most)
+        env = commands.codex_env(base_env, config_root=config_root, api_key=None if signed_in else api_key)
     own = Path(config_root) / agent_id
     writable = [cwd, own] if write else [own]  # everything else stays out of reach (contain.py)
     command = [*contain.prefix(writable, temp=own / "tmp"), *command]

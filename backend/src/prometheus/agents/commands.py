@@ -48,6 +48,14 @@ def clean_env(env: dict) -> dict:
     return {name: value for name, value in env.items() if not name.upper().startswith(INHERITED)}
 
 
+def claude_model(model: str, context_window) -> str:
+    """Claude Code gives a Claude model 200k unless its name asks for 「[1m]」; Pi gives it what the
+    catalogue says (claude-opus-4-8: 1M), so a 1M window adds the suffix."""
+    if context_window and context_window >= 1_000_000 and not model.endswith("[1m]"):
+        return f"{model}[1m]"
+    return model
+
+
 def claude_command(exe, *, model: str, thinking: str, tools) -> list:
     """`tools`: True for a workspace task, "Read" to look at images, False for plain text."""
     command = [str(exe), "-p", "--bare", "--output-format", "stream-json", "--verbose", "--model", model,
