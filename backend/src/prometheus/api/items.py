@@ -1,6 +1,7 @@
 """Item endpoints and the queue view (PLAN 8.2)."""
 
 import asyncio
+import json
 import sqlite3
 import time
 
@@ -121,6 +122,8 @@ async def retry_item(request: Request, item_id: str):
 @router.post("/api/items/{item_id}/regenerate")
 async def regenerate_item(request: Request, item_id: str):
     body = await request.json() if await request.body() else {}
+    if body.get("only") in outputs_mod.FILL_STAGES:
+        return _fill(request, item_id, body)
     if body.get("only") == "mindmap":
         # 「重新生成导图」(PLAN 8.8): the item stays done while its mind map reruns.
         state = request.app.state
@@ -129,6 +132,11 @@ async def regenerate_item(request: Request, item_id: str):
             return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
         if row["status"] != "done":
             return JSONResponse({"code": "NOT_DONE"}, status_code=409)
+        parts = outputs_mod.of(row)
+        if not parts["report"]:  # the map is drawn from the report's chapters (PLAN 15.4.15)
+            return JSONResponse({"code": "NO_REPORT"}, status_code=409)
+        if not parts["mindmap"]:  # 「现在生成」: from now on this video has a map
+            items_store.update_item(state.data_dir, item_id, outputs=json.dumps({**parts, "mindmap": True}))
         state.queue.enqueue_mindmap(item_id)
         return {"queued": True}
     if body.get("only") == "tags":
@@ -144,6 +152,29 @@ async def regenerate_item(request: Request, item_id: str):
     changes = {"figures": 1 if body["figures"] else 0} if "figures" in body else {}
     # Also finished items: 「重新生成」 for a missing library folder or other figures (PLAN 15.2).
     return _requeue(request, item_id, allowed=(*RETRYABLE, "done"), **changes)
+
+
+def _fill(request: Request, item_id: str, body: dict):
+    """「现在生成」 (PLAN 15.4.15-5): the missing report (with its map, at this depth and with or without
+    figures) or the correction, on a finished item; nothing is downloaded or transcribed again."""
+    state = request.app.state
+    row = items_store.get_item(state.data_dir, item_id)
+    if row is None:
+        return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
+    if row["status"] != "done":
+        return JSONResponse({"code": "NOT_DONE"}, status_code=409)
+    part = body["only"]
+    if outputs_mod.of(row)[part]:
+        return JSONResponse({"code": "ALREADY_MADE"}, status_code=409)
+    if part == "report" and "depth" in body and body["depth"] not in outputs_mod.DEPTHS:
+        return JSONResponse({"code": "DEPTH_INVALID"}, status_code=422)
+    if row["stage"] is not None or state.queue.is_running(item_id):
+        return JSONResponse({"code": "BUSY"}, status_code=409)
+    if part == "report":
+        items_store.update_item(state.data_dir, item_id, depth=body.get("depth"),
+                                figures=1 if body.get("figures") else 0)
+    state.queue.enqueue_fill(item_id, part)
+    return {"queued": True}
 
 
 def _requeue(request: Request, item_id: str, allowed=RETRYABLE, **changes):

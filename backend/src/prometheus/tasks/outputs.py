@@ -57,6 +57,25 @@ def stages_for(outputs: dict) -> list:
     return [stage for stage in runner.STAGES if stage not in skipped]
 
 
+# 「现在生成」 (PLAN 15.4.15-5): what filling in a part runs on a finished item; its transcript is there.
+FILL_STAGES = {
+    "report": ("keypoints", "plan", "report", "finalize", "mindmap", "publish"),
+    "subtitles": ("subtitle_fix", "publish"),
+}
+# Before a filled-in report with figures: the video was cleaned after the first run, so only its picture comes back.
+PICTURE_STAGES = ("video", "frames")
+
+
+def fill_stages(part: str, figures: bool) -> list:
+    stages = list(FILL_STAGES[part])
+    return [*PICTURE_STAGES, *stages] if part == "report" and figures else stages
+
+
+def filled(outputs: dict, part: str) -> dict:
+    """The parts once one is filled in: the report brings its mind map."""
+    return {**outputs, part: True, **({"mindmap": True} if part == "report" else {})}
+
+
 def view(row: dict) -> dict:
     """What the API adds to an item row: its parts, and the steps the console counts."""
     outputs = of(row)

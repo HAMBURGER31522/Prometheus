@@ -143,6 +143,11 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         for kind in media + (["video"] if row["figures"] else []):
             download_mod.download_stage(work, row, settings, _node_exe(), media=kind)
 
+    def video(ctx):
+        """「现在生成」 a report with figures (PLAN 15.4.15-5): only the picture; the transcript is there."""
+        download_mod.download_stage(_work(data_dir, ctx), _row(data_dir, ctx), store.load(data_dir), _node_exe(),
+                                    media="video")
+
     def transcribe(ctx):
         work = _work(data_dir, ctx)
         subtitle = platform_subtitles.downloaded_subtitle(work)
@@ -286,6 +291,7 @@ def build_real_impls(data_dir, runtime=None) -> dict:
     return {
         "resolve": resolve,
         "download": download,
+        "video": video,
         "transcribe": transcribe,
         "transcript": transcript,
         "frames": frames,

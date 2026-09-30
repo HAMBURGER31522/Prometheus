@@ -97,6 +97,8 @@ def mark_running_as_interrupted(data_dir) -> None:
             "UPDATE items SET mindmap_status = 'failed' WHERE status = 'done' AND mindmap_status IS NULL"
             " AND (outputs IS NULL OR json_extract(outputs, '$.mindmap') = 1)",
         )
+        # A finished item still naming a step was being filled in (「现在生成」) or rerun when the app quit.
+        conn.execute("UPDATE items SET stage = NULL, stage_detail = NULL WHERE status = 'done' AND stage IS NOT NULL")
         conn.commit()
     finally:
         conn.close()
