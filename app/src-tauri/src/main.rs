@@ -94,6 +94,9 @@ fn main() {
     let backend = Backend { port, token, child: Mutex::new(None) };
 
     tauri::Builder::default()
+        // Picking the data dir / cookies file and opening links (PLAN 4; capabilities/default.json).
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(backend)
         .invoke_handler(tauri::generate_handler![backend_info])
         .setup(|app| {

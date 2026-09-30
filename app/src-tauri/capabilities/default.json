@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the app's window may call: its own commands, the folder / file picker, opening links in the browser.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default", "opener:default"]
+}
