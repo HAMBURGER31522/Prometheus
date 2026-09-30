@@ -46,8 +46,8 @@ async def put_settings(request: Request):
     stored = store.load(state.data_dir)
     store.save(state.data_dir, store.restore_secrets(body, stored))
     saved = store.load(state.data_dir)
-    if saved["llm"]["provider"] == "custom":
-        pi_models.apply_custom_provider(state.data_dir, saved["llm"].get("custom"), pi_cli=_pi_cli(state))
+    # the custom provider's models.json entry, and Pi's compaction reserve for any provider (PLAN 15.4.14 I)
+    pi_models.refresh_custom_provider(state.data_dir, pi_cli=_pi_cli(state))
     return store.masked(saved)
 
 

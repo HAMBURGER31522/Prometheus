@@ -20,6 +20,7 @@ def ensure_models_json(data_dir) -> None:
 
 
 PROTOCOL_APIS = {"openai": "openai-completions", "anthropic": "anthropic-messages"}
+COMPACTION_RESERVE = 0.3  # of the window: Pi compacts at 70%, whatever the window (PLAN 15.4.14 I)
 
 
 def custom_base_url(custom: dict) -> str:
@@ -51,11 +52,32 @@ def model_fields(data_dir, profile: dict, *, pi_cli=None) -> tuple:
                                fresh=catalogue_update.catalogue_folder(data_dir))
 
 
+def apply_compaction(data_dir, window) -> None:
+    """Pi compacts past 「window − reserveTokens」; its fixed 16384 left runanytime's real 100k no room for one
+    chapter read in. The reserve is a share of the window; an unknown window leaves Pi's own (PLAN 15.4.14 I)."""
+    target = paths.pi_config_dir(data_dir) / "settings.json"
+    document = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else {}
+    compaction = dict(document.get("compaction") or {})
+    if window:
+        compaction["reserveTokens"] = int(window * COMPACTION_RESERVE)
+    else:
+        compaction.pop("reserveTokens", None)
+    if compaction:
+        document["compaction"] = compaction
+    else:
+        document.pop("compaction", None)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def refresh_custom_provider(data_dir, *, pi_cli=None) -> bool:
     """Rewrite the custom provider from the saved settings at startup (PLAN 15.4.10): installs
-    from before the model parameters would otherwise keep Pi's 128k / 16k defaults until 保存."""
+    from before the model parameters would otherwise keep Pi's 128k / 16k defaults until 保存. A built-in
+    provider gets its own compaction reserve, not the last relay's."""
     llm = store.load(data_dir)["llm"]
     if llm["provider"] != "custom":
+        _source, fields = model_fields(data_dir, {"kind": llm["provider"], "model": llm["model"]}, pi_cli=pi_cli)
+        apply_compaction(data_dir, fields.get("contextWindow"))
         return False
     apply_custom_provider(data_dir, llm.get("custom"), pi_cli=pi_cli)
     return True
@@ -93,3 +115,4 @@ def apply_custom_provider(data_dir, custom: dict, *, pi_cli=None) -> None:
     target.write_text(
         json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8",
     )
+    apply_compaction(data_dir, fields.get("contextWindow"))
