@@ -1,10 +1,11 @@
-# 交接说明（2026-09-30，R7h 合并之后）
+# 交接说明（2026-09-30，R8 合并之后）
 
 给新开的会话用：读完这份，再按 `AGENTS.md` 的「开工前必读」读 `docs/PLAN.md` 和 `docs/DECISIONS.md`，就能接着做。这份文件是某一时刻的快照，以 PLAN 的进度记录（§15.6）和 git 历史为准。
 
 ## 1. 现在做到哪了
 
-- R1–R7h 全部完成并合并到 `main`，已推送。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。R7d–R7h 的注意事项见第 8–13 节。
+- R1–R8 全部完成并合并到 `main`，已推送。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。R7d–R8 的注意事项见第 8–14 节。
+- **下一个是 R9（发布整理，PLAN 15.4.17）**：仓库只放该放的（docs/、AGENTS.md、CLAUDE.md 只留在本机）、数据目录的 `说明.txt`、README 重写（草稿在 `tmp/README.draft.md`）、GitHub Release v1.0.0、用 video-shotcraft 做宣传片（不进仓库）。用户 2026-09-30 要求无人工监督做完，需要定的按推荐。
 - 按 PLAN §15.5，下一个里程碑是 **R8**：打包（安装包 ≤ 300MB，`PROMETHEUS_FORBID_DEV_PATHS=1` 冒烟）、README 全面重写、完整真实验收（E3 用 BV1yPb46xExH、E4 取消、E9 CI），最后请用户试用安装版，给出 E7 界面观感的最终判定。R8 还要带上第 9 节、第 11 节记下的几件事（耗时和 token 表、控制台的用时提示、随包 npm）。
 - **用户 2026-09-30 要求**：装好安装版以后，由 agent 帮用户把预览数据同步过去：`acceptance-output/r7-data` 里的设置（`.prometheus/config/settings.json`，含各份配置的 Key）、Codex 官方登录（`.prometheus/config/codex/`）和文章（三个分类文件夹、`index.json`、`llms.txt`、`.prometheus/prometheus.db`，以及条目缓存）。整个目录 4.9G，大头是本地转写模型和缓存。同步前先看安装版的数据目录在哪、里面有没有东西，别覆盖；Key 不进任何命令输出和文档。
 - 第 5 节是 R7d 之前的界面修改流程，已经做完；以后有新的界面意见，照同样的流程走。
@@ -30,7 +31,7 @@ PROMETHEUS_TEST_DATA_DIR="$(pwd -W)/acceptance-output/r7-data" PYTHONUTF8=1 .ven
 - 这个数据目录的设置里存着用户的模型配置（justwoker 中转，Anthropic 协议，claude-opus-4-8）。**Key 只在这个本地文件里，不要抄进任何入库的文件、提交信息或命令输出。**
 - 截图脚本（在 `app/` 目录下运行，否则找不到 Playwright）：`node scripts/screenshots.mjs <预览地址> <输出目录>`（所有页面）、`node scripts/screenshots-r7c.mjs <预览地址> <输出目录> "我如何用 AI 高效学习"`（R7c 新功能）。
 - **Claude Code 会在内存紧张时关掉后台进程**（本机 16GB，常被其他软件占到只剩 2GB 左右），8766 的后端就被关过一次。被关后不要自己重启，先告诉用户；用户也可以在自己的 PowerShell 里运行后端，那样不会被回收。
-- **不要碰 pid 22228 的 python**，那是用户装的安装版。
+- **pid 22228 的 python** 是 2026-09-26 安装冒烟留下的孤儿后台（不是用户装的安装版，见第 14 节）；不要替用户结束它，告诉用户即可。
 
 ## 3. 环境与命令
 
@@ -200,3 +201,15 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - 本地中文转写（FunASR）修了两句时间重叠的老问题（R6 起就有，BV1EJ4m1t7Zs 撞上了）。
 - 预览数据：BV1EJ4m1t7Zs（「大语言模型怎样学会接续文本」，分类「人工智能」）是第三次实跑的条目，只有精读和导图、没有纠错字幕；「现在生成」那一版（标准、配图）另存在 `acceptance-output/report-eval/r7h/现在生成-标准-配图/`。当前配置已切回 `chatgpt-codex`（gpt-6.1-sol「高」），新加的 `chatgpt-codex-luna`（gpt-6-luna「超高」）留在列表里。改动前的 prometheus.db 和 settings.json 备份在 `tmp/r7h/backup-preview/`。
 - 设置页 Claude Code 的「目录里查不到这个模型名」提示已按用户给的话改写。
+
+## 14. R8 之后（2026-09-30，已合并）：打包与安装版实测
+
+规格 PLAN 15.4.16，实现选择 DECISIONS D-48，结果 acceptance.md 的 R8 一节。
+
+- **安装包**：`E:\tools\Prometheus-Desktop\release\Prometheus_1.0.0_x64-setup.exe`，190.7 MB。不带 Codex CLI 和 Claude Code（第一次选用时在设置里装），带 npm。
+- **安装版实测**：`scripts/acceptance/installed-live.ps1`（参数 `-Installer -Video -CancelVideo -Preview -Profile`）。它会静默安装到 `acceptance-output/installed-live/`、从预览数据复制 Codex 登录和硬链接模型、驱动真实窗口跑一个视频、测取消、关窗口、卸载、清理、还原 `%LOCALAPPDATA%` / `%APPDATA%` 下这个应用的文件夹。会用 Codex 订阅额度，跑一次约 25 分钟。结果在 `acceptance-output/r8-installed-results/`。
+- **安装版的后台日志**：`%APPDATA%\com.hamburger31522.prometheus\backend.log`，每次启动覆盖。
+- **修好的六个安装版问题**（以前的冒烟只查 `/api/health`，所以一直没暴露）：页面找后台、`\\?\` 运行时路径、dialog / opener 插件、第一次打开选数据目录、设置重试、取消卡死。详见 D-48。
+- **还要注意**：pid 22228（`acceptance-output\installed\resources\runtime\python\python.exe`）是 2026-09-26 安装冒烟被强杀后留下的孤儿后台，程序本体早已卸载，注册表里没有安装记录；HANDOFF 旧版说它是用户装的安装版，是误会。没动它，用户可以在任务管理器里结束它。
+- **预览后端**：8766 的真实数据预览后端在 R8 期间被 Claude Code 因内存紧张关掉了，没有重启（规矩：先告诉用户）。要用时按第 2 节的命令启动。
+- **还没做的**：控制台链接框下的用时 / 费用估计（第 9 节记的 R8 事项）没有做：条目没有记下是哪个模型跑的，估计没有依据；README 里放了用时参考表代替。

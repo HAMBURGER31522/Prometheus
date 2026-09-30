@@ -78,7 +78,8 @@ export const api = {
   dictionaryStatus: () => json<ComponentStatus>("GET", "/api/dictionary"),
   installDictionary: () => json<{ started: boolean }>("POST", "/api/dictionary/install"),
   asrStatus: () => json<{ state: string; detail: string }>("GET", "/api/asr-components"),
-  dataDir: () => json<{ data_dir: string | null }>("GET", "/api/app/data-dir"),
+  /** `suggested`: where a first launch is offered to put the library (PLAN 15.4.16). */
+  dataDir: () => json<{ data_dir: string | null; suggested?: string }>("GET", "/api/app/data-dir"),
   setDataDir: (dataDir: string) => json<{ data_dir: string }>("PUT", "/api/app/data-dir", { data_dir: dataDir }),
 
   /** What this video gets (PLAN 15.4.15): the three circles and the report's depth, for this video only. */

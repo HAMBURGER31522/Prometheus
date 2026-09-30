@@ -1173,6 +1173,60 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
    ② 在阅读页点「现在生成」按「标准」补上精读和导图，跑通；③ 删掉这一条，重新提交，只勾精读和导图（标准），跑通。
    每次记下用时。
 
+#### 15.4.16 打包与安装版实测（R8）
+
+> 用户（2026-09-30）：打包；打包完用 exe 做个最小测试（运行是否正常、功能是否正常），用 BV1P5h16JE8n（5 分钟），
+> Codex 官方登录 gpt-6.1-sol「高」，三样都要；正常就收回清理，用户自己来装。之后无人工监督，需要定的按执行 agent 的推荐。
+> 下面各条中「执行 agent 定」的，都是用户授权按推荐定的。
+
+**Goal**：一个能直接装、装完就能用的安装包，在干净的环境里真跑通一个视频。
+
+**规则**
+
+1. 安装包带 Python（含依赖）、node.exe 和 npm、Pi、ffmpeg。**不带 Codex CLI 和 Claude Code**（执行 agent 定：两者主体各 325MB、244MB，
+   带上会超过 D8 的 300MB）；第一次选用时在设置里点「安装」装到应用自己的运行时目录（R7f 已有「未安装 → 安装」）。npm 是这一步和「检查更新」要用的。
+2. 版本号 1.0.0（执行 agent 定），安装包名 `Prometheus_1.0.0_x64-setup.exe`。
+3. 安装版实测（`scripts/acceptance/installed-live.ps1`）在不碰开发机工具的条件下进行：静默安装到 `acceptance-output/installed-live/`，
+   用干净的环境变量启动（去掉开发用的 PROMETHEUS_*、HF_HOME、UV_* 等，设 `PROMETHEUS_FORBID_DEV_PATHS=1`），数据目录单独一份；
+   转写模型、CUDA 组件用硬链接从预览数据带过去（省下 4.6GB 下载，组件下载在 R6 实测过）；Codex CLI 在应用里点「安装」从 npm 装；
+   Codex 官方登录从预览数据复制 auth.json。通过 WebView2 的调试端口驱动真实界面：控制台三样都要、「标准」（执行 agent 定：顺带实跑 15.4.15-10 的新「标准」）、
+   配图开，提交 BV1P5h16JE8n，跑完打开精读、导图、字幕三页截图。
+4. 取消（E4）也在安装版上测：再提交一个视频，到写精读那一步时取消，5 秒内这个后台下面不再有 Pi / Codex / ffmpeg / 转写进程，状态为已取消。
+5. 测完正常关窗口（不强杀，强杀会留下孤儿后台，9 月 26 日那个 pid 22228 就是这样来的），查一遍没有剩下的进程，静默卸载，确认数据目录还在，
+   再把测试的安装目录、数据目录清掉；测试前备份、测试后还原 `%LOCALAPPDATA%` 和 `%APPDATA%` 下这个应用的文件夹，用户之后自己装时和现在一样。
+
+**Done When**（E8 用这条代替原来的 installed-live 定义；E3 按用户改为这次的最小实测，不再跑 BV1yPb46xExH）
+
+1. `scripts/package.ps1` = 0，安装包 ≤ 300MB，复制到 `E:\tools\Prometheus-Desktop\release\`。
+2. `scripts/acceptance/installed-live.ps1` = 0：BV1P5h16JE8n 完成，知识库文件夹有精读.html / 精读.md / 思维导图.md / 字幕.srt / 字幕.txt / 来源.url，
+   字幕已纠错，导图状态 ok，精读分章、带编者观点和目录；`run.trace.jsonl` 覆盖跑过的每一步；取消 5 秒内子进程全部结束；卸载后数据目录还在；清理和还原完成。
+3. 离线测试照旧 = 0（`uv run pytest …`、ruff、`verify.ps1`、前端四项）。
+
+#### 15.4.17 发布整理（R9）
+
+> 用户（2026-09-30，打包之后）：① 不要什么都上传：参考好的 exe 发布项目，只传该传的，Key 绝不能上传，设计文档不上传；上传前先把项目文件夹整理得像大项目；
+> 装好后软件放东西的文件夹也要分层清楚，看名字就知道文章、导图在哪；Release 能直接点下载。② README 重写：技术栈讲清楚（抓视频、各转写引擎、整个流程、
+> 精读用了什么框架、标准和完整各是什么）；把几种转写思路（Qwen3-ASR、NVIDIA Nemotron ASR、Whisper large-v3、MOSS-Transcribe-Diarize + CrispASR、
+> FunASR 工具箱里的 Paraformer / Fun-ASR-Nano / SenseVoice）列表比较，说明为什么现在的最好；写清楚使用步骤和要不要装别的依赖；用户没想到的按推荐补上。
+> ③ 用 video-shotcraft 做一个展示流程的产品宣传片，缓存进回收站，只留一个命名好的视频，不进仓库。
+
+**规则**（执行 agent 定）
+
+1. 仓库只放代码、构建和测试脚本、README、CHANGELOG、LICENSE、README 用的图片。设计与过程文档（PLAN、DECISIONS、HANDOFF、acceptance、各评测记录、截图）
+   和给开发 Agent 的说明（AGENTS.md、CLAUDE.md）移到本机的 `dev/`（git 忽略，另建一个只在本机的 git 仓库保留它们的历史），不再上传；已经上传过的旧版本留在历史里（不改写 main 的历史）。
+2. 目录整理：顶层只剩 `.github/`、`app/`（桌面端：React 界面 + Tauri 外壳）、`backend/`（Python 服务）、`vendor/`、`scripts/`、`docs/images/` 和几个说明文件；
+   功能文件夹的划分不动（已按功能分）。
+3. 数据目录根下生成一份 `说明.txt`：每个文件夹、每个文件是什么，怎么备份、怎么交给 AI 读。
+4. README 按用户的要求写，比较表里区分「本项目实测」和「公开资料」；加上：界面截图、流程图、耗时参考、常见问题（SmartScreen 提示、杀毒误报、数据放在哪、怎么卸载）、隐私（Key 只存本机）。
+5. GitHub Release v1.0.0：附安装包和 SHA256，说明写这一版有什么、怎么装。
+6. 宣传片放在 `F:\project\Prometheus-宣传片\`，只留一个视频文件；过程文件移进回收站。
+
+**Done When**（E9 并入这里）
+
+1. `git ls-files` 里没有 `docs/*.md`、截图、AGENTS.md、CLAUDE.md；Key 扫描 = 0；离线测试和 CI 为绿；远程 `main` 与本地一致。
+2. README 覆盖上面各项；Release 页面能下载安装包，SHA256 与本机一致。
+3. 宣传片文件存在、能播放，文件夹里只有它。
+
 ### 15.5 里程碑
 
 每个里程碑在单独分支上开发，先写失败测试再实现，测试全绿后 `merge --no-ff` 到 `main` 并推送。
@@ -1194,7 +1248,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R7f | `r7f-agents` | 15.4.13 多 Agent 后端（Pi / Codex CLI / Claude Code，私有副本与隔离，检查更新窗口） | E15；**先请用户看前端截图**，再做后端 |
 | R7g | `r7g-depth-parity` | 15.4.14 各模型篇幅对齐（追问下限、补充写透、要图必出图、正文不写处理过程、少写免责句） | E16 |
 | R7h | `r7h-on-demand` | 15.4.15 按需生成（精读 / 字幕 / 导图三个圆圈、每个视频的详细程度、现在生成） | E17；**先请用户看前端截图** |
-| R8 | `r8-release` | 打包、README、完整验收 | E3、E4、E8、E9 |
+| R8 | `r8-release` | 15.4.16 打包与安装版实测（不带 Codex / Claude Code、带 npm、BV1P5h16JE8n 最小实测、取消） | E8、E4、E3（改为最小实测） |
+| R9 | `r9-publish` | 15.4.17 发布整理（仓库只放该放的、目录整理、数据目录说明、README 重写、Release、宣传片） | E9 与 15.4.17 的 Done When |
 
 ### 15.6 进度记录
 
@@ -1215,7 +1270,8 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R7f 多 Agent 后端 | 完成 | 2026-09-30 | 4982a03 | E15 ①：`uv run pytest backend/tests -q -m "not live"` = 0（714 passed；8 次完整运行里有 1 次一个测试失败，没能复现，名字没记下）、`uv run ruff check backend scripts` = 0、`verify.ps1` = 0；② `uv run pytest backend/tests -q -m agents` = 0（18 passed：隔离与对照、文件保护的诱饵测试、自检、Codex 模型列表）；③ `npm --prefix app run test` = 0（57 passed）、`tsc` = 0、`lint:design` = 0、`npm --prefix app run e2e` = 0（55 passed），用户看过截图（acceptance.md）；④ live：罗素整条流水线 Codex CLI（anyrouter gpt-6-astra「超高」）与 Claude Code（justwoker claude-opus-4-8[1m]「中」）都跑通，官方登录评分：Codex 全部过 E14 门槛，Claude Code 有 1 条补充说明与视频矛盾，用户判定如实记录照样验收；用户手动完成 Codex 官方登录，gpt-6.1-sol 跑通字幕纠错和导图；用户目录里没有运行痕迹；⑤ 真实 npm 检查并更新了应用自己的 Codex（0.159.0 → 0.159.1，自检通过）。费用按官方价约 62–65 美元，用户逐次同意。红 22eaeb7、73695b7、2aba78f、64e5098、9b6ecdd、99a5f19、96c1898、837e620、1203156、8ad507d、2d288ee、730cdc6、1c3c363、d43360e、31076b8、d60d6bc、ae4bd65、7a350a8、5eeb34d → 绿 1acaba3、7990471、b521e34、e1e7b62、d7d18d6、8c75502、1f09fee、4225913、36a74a1、65b2c22、acf4398、ca8dc21、70111ed、8786b8a、c07807a、32cdea2、0f4dadd、f82effb、310fb3a、e247ded、68fde47 |
 | R7g 各模型篇幅对齐 | 完成（用户决定收工，E16 ② 未达标） | 2026-09-30 | 9101507 | E16 ①：`uv run pytest backend/tests -q -m "not live"` = 0（746 passed；4 次整套中 1 次 test_model_profiles 的一个测试失败，没能复现）、`uv run ruff check backend scripts` = 0、`verify.ps1` = 0；② 英文 19 分钟 runanytime sonnet-4-6 改前 19916 字 / 39 条补充，改后 19093 字 / 19 条（当时读者「每段只挑最要紧的问」，之后撤回，未再跑），E14 评分未做，罗素在两个 Claude 接口上跑不了；③ 用户取消；④ 并入 ②；用户 2026-09-30 判定就此收工（acceptance.md）。R7f 的偶发测试修好（b54c531）。红 d2fc0b9、bec524b、dd20fe9、4fd2046、729e0ef、d078b33、92446f8 → 绿 aee935d、47a7d0a、2b32d40、e05973d、a127bed、add8252、9101507 |
 | R7h 按需生成 | 完成 | 2026-09-30 | 63a4308 | E17 ①：`uv run pytest backend/tests -q -m "not live"` = 0（800 passed）、`uv run ruff check backend scripts` = 0、`verify.ps1` = 0；② `npm --prefix app run test` = 0（63 passed）、`tsc --noEmit` = 0、`lint:design` = 0、`npm --prefix app run e2e` = 0（65 passed，新增 r7h-console 4 个、r7h-reader 6 个），用户看过截图判定「前端行了」「行，就这样」（acceptance.md）；③ live（Codex 官方登录 gpt-6-luna「超高」，用户定 BV1EJ4m1t7Zs 代替罗素）：只要字幕 6.4 分钟、「现在生成」标准 + 配图 21.8 分钟、精读 + 导图 16.8 分钟，都跑通；第三次的导图第一回没过检查，同一篇重跑即过，随后按用户选择改为试 3 次、记下原因、只剩小问题照样保存（15.4.15-9、11）。实跑中修好 R6 起的 FunASR 两句时间重叠（31e3f53）。「标准」改为 VRA 精读 + 每章编者观点 + 目录（15.4.15-10，eb7bd7d），用户决定不实跑，在真实报告上离线走过一遍。设置页 Claude Code 提示改写（15.4.15-7）。红 34452c3、2465dd5、67576ed、0507a00、600cfea、6c0e4de、692dbb9（b076a40 修正测试）、533ae44、59e91cc、9b18a4c、62e2dcd、b4676a1、dd0870c → 绿 61ed34c、613abfb、0e86839、4b08a9d、2d88c47、6ab965d、c4d664c、d3be2d4、31e3f53、c71e6b2、966b451、63b9c56、eb7bd7d |
-| R8 发布 | 未开始 | | | |
+| R8 打包与安装版实测 | 完成 | 2026-09-30 | （合并后补） | `scripts/package.ps1` = 0，安装包 190.7 MB；`scripts/acceptance/installed-live.ps1` = 0：干净环境、`PROMETHEUS_FORBID_DEV_PATHS=1`，应用里从 npm 装 Codex CLI 48 秒，真实窗口提交 BV1P5h16JE8n（gpt-6.1-sol「高」、三样、标准、配图）16.7 分钟跑完，精读 5 章 7 个编者观点、有目录、3204 字，六个文件齐全，字幕已纠错、导图 ok；E4 取消 0.9 秒回应、任务进程 2 秒内全部结束；关窗口无残留，卸载后数据目录在，清理和还原完成。离线：`verify.ps1`、pytest（805 passed）、ruff、vitest（65）、tsc、lint:design、e2e（68）= 0。实测修好 6 个安装版问题（D-48）：页面找后台的方式、`\\?\` 运行时路径、dialog / opener 插件、第一次打开选数据目录、设置重试、取消卡死；另修 main 上 CI 的浮点误差（3aaad29）。红 d43f987、4c4bae6、8d58b20、5cfc383 → 绿 4bb8d3b、6617f86、55facc4、bd9b845；外壳 df5d091、271932c 由安装版实测验证 |
+| R9 发布整理 | 未开始 | | | |
 
 ## 附录 A：对 vendor/video-report-agent 的修改（只允许以下各项）
 

@@ -27,6 +27,21 @@ class Runtime:
     ffprobe: Path | None
 
 
+_EXTENDED = "\\\\?\\"
+_EXTENDED_UNC = "\\\\?\\UNC\\"
+
+
+def plain_path(value) -> Path:
+    """The Tauri shell's resource dir comes as \\\\?\\F:\\...; node cannot run a script from such a path (npm and Pi
+    both failed in the installed app, 2026-09-30), so the prefix goes: \\\\?\\UNC\\host\\share becomes \\\\host\\share."""
+    text = str(value)
+    if text.startswith(_EXTENDED_UNC):
+        return Path("\\\\" + text[len(_EXTENDED_UNC):])
+    if text.startswith(_EXTENDED):
+        return Path(text[len(_EXTENDED):])
+    return Path(text)
+
+
 def _from_bundle(root: Path) -> Runtime:
     return Runtime(
         node=root / "node" / "node.exe",
@@ -54,7 +69,7 @@ def _from_toolchain(env) -> Runtime:
 def resolve(runtime_dir, env=None) -> Runtime:
     env = os.environ if env is None else env
     if runtime_dir:
-        found = _from_bundle(Path(runtime_dir))
+        found = _from_bundle(plain_path(runtime_dir))
     elif env.get("PROMETHEUS_FORBID_DEV_PATHS") == "1":
         raise RuntimeConfigError(
             "要求只使用安装包自带的运行时（PROMETHEUS_FORBID_DEV_PATHS=1），但没有提供 --runtime-dir。"
@@ -76,7 +91,7 @@ def activate(found: Runtime, runtime_dir=None, env=None) -> None:
     front = [str(found.ffmpeg.parent), str(found.node.parent)]
     env["PATH"] = os.pathsep.join([*front, env.get("PATH", "")])
     if env.get("PROMETHEUS_FORBID_DEV_PATHS") == "1" and runtime_dir:
-        root = Path(runtime_dir).resolve()
+        root = plain_path(runtime_dir).resolve()
         for tool in ("ffmpeg", "ffprobe", "node"):
             located = shutil.which(tool, path=env["PATH"])
             if located is None or root not in Path(located).resolve().parents:

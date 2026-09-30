@@ -11,8 +11,10 @@ router = APIRouter()
 
 @router.get("/api/app/data-dir")
 async def get_data_dir(request: Request) -> dict:
+    """The data dir, and where a first launch is offered to put it (PLAN 15.4.16)."""
     data_dir = request.app.state.data_dir
-    return {"data_dir": str(data_dir) if data_dir else None}
+    return {"data_dir": str(data_dir) if data_dir else None,
+            "suggested": str(Path.home() / "Documents" / "Prometheus 知识库")}
 
 
 @router.put("/api/app/data-dir")

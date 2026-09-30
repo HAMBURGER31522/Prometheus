@@ -266,6 +266,10 @@ html[data-dragging], html[data-dragging] * { user-select: none; cursor: grabbing
 }
 .report-options[data-off] { opacity: .45; }
 .report-options .switch-label { margin-left: 12px; }
+/* 第一次打开 (shared/FirstRun, PLAN 15.4.16). */
+.first-run { display: grid; place-items: center; min-height: 100vh; padding: 32px; }
+.first-run-card { display: grid; gap: 14px; max-width: 560px; padding: 28px 32px; }
+.first-run-card h1 { font-size: 22px; }
 /* 「没有生成」 / 「现在生成」 (shared/FillIn, PLAN 15.4.15). */
 .fill-in { display: grid; gap: 14px; justify-items: start; }
 .fill-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }

@@ -39,6 +39,18 @@ def test_runtime_dir_resolves_the_bundled_binaries(tmp_path):
     assert found.ffprobe == root / "ffmpeg" / "ffprobe.exe"
 
 
+def test_the_shells_extended_length_prefix_is_dropped(tmp_path):
+    """Tauri hands the runtime dir as \\\\?\\F:\\...; node cannot run a script from such a path, so npm and
+    Pi both failed in the installed app (EISDIR lstat 'F:', installed live run 2026-09-30)."""
+    root = _bundle(tmp_path / "runtime")
+    found = runtime.resolve("\\\\?\\" + str(root), env={})
+    assert found.node == root / "node" / "node.exe"
+    assert found.pi_cli == root / PI_CLI
+    assert not str(found.ffmpeg).startswith("\\\\?\\")
+    assert runtime.plain_path("\\\\?\\UNC\\server\\share\\runtime") == Path("\\\\server\\share\\runtime")
+    assert runtime.plain_path("F:\\apps\\runtime") == Path("F:\\apps\\runtime")
+
+
 def test_development_resolves_from_the_toolchain_env(tmp_path):
     tools = _bundle(tmp_path / "tools")
     found = runtime.resolve(None, env=_dev_env(tools))

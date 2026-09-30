@@ -145,3 +145,12 @@ R5 样本选择说明：B 站的 CC 字幕需要登录才能获取，所以两�
   - ② 阅读页「现在生成」按「标准」、开配图（截图 `30-…`、`31-…`、`32-…`）：21.8 分钟跑通（下载画面 0.6、抽帧 0.1、写精读 15.3、导图 5.9 分钟），没有重新下载音频、没有重新转写；跑完后缓存里没有视频和截图；三样齐全，文件夹改名为精读标题「大语言模型怎样从文本生成文字」；精读 4 章、1461 个汉字、1 张视频截图。这一版另存在 `acceptance-output/report-eval/r7h/现在生成-标准-配图/`（不入库）。
   - ③ 删掉这一条重新提交，只勾精读和导图（标准，不配图；截图 `40-…`、`41-…`）：16.8 分钟，精读跑通（写精读 13.9 分钟），归类又放回「人工智能」；**导图没有生成成功**（1.8 分钟，程序没记原因，最像是大纲两次都没通过检查）。用同一篇精读、同一段代码重跑导图一次就通过（大纲 62 秒，之后 5 次补充调用），已放进知识库。用户随后定：导图最多试 3 次、失败原因记在条目上（PLAN 15.4.15-9）。
   - 没勾字幕时字幕页是没纠错的原文（例如「chat G B T」「派送」「githup call」），纠错后是「ChatGPT」「Python」「GitHub Copilot」。
+
+## R8 打包与安装版实测（E8、E4、E3，2026-09-30）
+
+- `scripts/package.ps1` = 0，安装包 `Prometheus_1.0.0_x64-setup.exe` 190.7 MB（≤ 300 MB），已复制到 `E:\tools\Prometheus-Desktop\release\`。不带 Codex CLI 和 Claude Code（两者主体各 325 MB、244 MB），带 npm。
+- `scripts/acceptance/installed-live.ps1` = 0（用户定：BV1P5h16JE8n 5 分钟，Codex 官方登录 gpt-6.1-sol「高」，三样都要；执行 agent 定「标准」、配图开）：静默安装、干净环境、`PROMETHEUS_FORBID_DEV_PATHS=1`；应用里从 npm 装 Codex CLI 0.159.2 用 48 秒，官方登录照常；通过 WebView2 调试端口驱动真实界面提交，**16.7 分钟**跑完（转写 34 秒、写精读和编者观点 10.4 分钟、纠错 1.6 分钟、导图 3.6 分钟）；精读 5 章、7 个编者观点框、有目录、3204 个汉字；知识库六个文件齐全，字幕已纠错，导图 ok，每一步都在 run.trace.jsonl 里。
+- E4 取消（安装版上测）：BV1EJ4m1t7Zs 写精读时取消，请求 0.9 秒回应，任务的 4 个进程（contain、codex、code-mode-host、它的 conhost）2 秒内全部结束，状态 cancelled。
+- 正常关窗口后没有留下进程；静默卸载后数据目录还在；测试的安装目录、数据目录、npm 缓存已删，`%LOCALAPPDATA%`、`%APPDATA%` 下这个应用的文件夹已还原。截图和精读在 `acceptance-output/r8-installed-results/`（不入库）。
+- 这次实测找出、已修好的安装版问题（此前的安装冒烟只查过 `/api/health`）：① 页面找后台用的是 Tauri 2 默认不存在的 `window.__TAURI__`，所有请求打到测试端口 8765，界面什么都做不了；② 外壳给的运行时路径带 `\?\` 前缀，node 从这种路径起不来，Pi 和 npm 都失败；③ dialog / opener 插件和权限从没注册，选文件夹、打开链接都不能用；④ 第一次打开没有选数据目录的界面；⑤ 页面比后台先起来时设置只取一次；⑥ 取消时连后台自己的控制台宿主（conhost）一起杀，下一个 taskkill 卡住，异步接口又把整个后台堵死 180 秒。
+- 离线：`verify.ps1`、`uv run pytest backend/tests -q -m "not live"`（805 passed）、ruff、`npm --prefix app run test`（65）、`tsc`、`lint:design`、`npm --prefix app run e2e`（68）全部 = 0。

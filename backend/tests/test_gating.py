@@ -52,7 +52,7 @@ def test_data_dir_gating(client_factory, tmp_path):
 
     read = client.get("/api/app/data-dir", headers={"Authorization": f"Bearer {TOKEN}"})
     assert read.status_code == 200
-    assert read.json() == {"data_dir": None}
+    assert read.json()["data_dir"] is None  # plus a suggested place for a first launch (PLAN 15.4.16)
 
     target = tmp_path / "fresh-data"
     set_response = client.put(
@@ -94,3 +94,14 @@ def test_preflight_options_passes_cors(client):
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:1420"
+
+
+def test_a_first_run_is_offered_a_place_for_the_library(client_factory, monkeypatch, tmp_path):
+    """PLAN 15.4.16: the installed app's first launch had no way to pick where the library goes."""
+    from pathlib import Path
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    client = client_factory(data_dir=None)
+    answer = client.get("/api/app/data-dir", headers={"Authorization": f"Bearer {TOKEN}"}).json()
+    assert answer.get("data_dir") is None
+    assert answer.get("suggested") == str(tmp_path / "home" / "Documents" / "Prometheus 知识库")

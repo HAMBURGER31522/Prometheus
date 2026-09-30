@@ -115,3 +115,53 @@ def test_failure_keeps_scratch_files_for_diagnosis(client, monkeypatch):
     work = paths.work_dir(client.app.state.data_dir, item_id)
     assert (work / "media.m4a").is_file()
     assert (work / "frames" / "f_000080.jpg").is_file()
+
+
+# ---- the installed app (PLAN 15.4.16, installed run 2026-09-30): the backend owns a console host ----
+
+def test_the_backends_own_console_host_is_never_killed(monkeypatch):
+    """Started without a window by the Tauri shell, the backend has its own conhost.exe as a child; killing it
+    with the task's processes left the next taskkill stuck and the whole backend unanswering."""
+    from prometheus.tasks import processes
+
+    killed = []
+    monkeypatch.setattr(processes, "child_processes",
+                        lambda parent=None: [(101, "conhost.exe"), (202, "python.exe"), (303, "Conhost.EXE")])
+    monkeypatch.setattr(processes, "kill_tree", killed.append)
+    assert processes.kill_children() == [202]
+    assert killed == [202]
+
+
+def test_taskkill_starts_without_a_console_of_its_own(monkeypatch):
+    from prometheus.tasks import processes
+
+    calls = []
+    monkeypatch.setattr(processes.subprocess, "run", lambda command, **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(processes.sys, "platform", "win32")
+    processes.kill_tree(4242)
+    assert calls and calls[0].get("creationflags", 0) & 0x08000000  # CREATE_NO_WINDOW
+
+
+def test_a_slow_cancel_does_not_stop_the_backend_answering(client, monkeypatch):
+    from prometheus.tasks import processes
+
+    started = threading.Event()
+
+    def report(ctx):
+        started.set()
+        deadline = time.time() + 10
+        while not ctx.cancel_requested and time.time() < deadline:
+            time.sleep(0.02)
+        raise RuntimeError("stopped")
+
+    monkeypatch.setitem(client.app.state.queue.impls, "report", report)
+    monkeypatch.setattr(processes, "kill_children", lambda: time.sleep(2) or [])
+    item_id = _start(client)
+    assert started.wait(timeout=15)
+    cancelling = threading.Thread(target=lambda: client.post(f"/api/items/{item_id}/cancel"))
+    cancelling.start()
+    time.sleep(0.3)
+    asked = time.time()
+    assert client.get("/api/health").status_code == 200
+    assert time.time() - asked < 1.0, "the backend stopped answering while a cancel was killing processes"
+    cancelling.join(timeout=10)
