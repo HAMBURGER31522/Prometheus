@@ -268,6 +268,7 @@ def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, 
     review_ask = model_ask(data_dir, work, settings, node_exe, pi_cli, thinking=review_thinking(_llm(settings)["thinking"]))
     chapters = full.write_chapters(work, plan, ledger, units, run_pi, review_ask, figures=figures,
                                    review=review_on(settings), progress=progress, workers=full.CHAPTERS_AT_ONCE,
+                                   gate=full.Gate(),
                                    look=model_look(data_dir, work, settings, node_exe, pi_cli),
                                    verify_links=lambda url: viewpoints.open_page(url, proxy=proxy))
     full.finish(work, plan, problems, ledger, chapters, build_input_json(row))

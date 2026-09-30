@@ -80,6 +80,14 @@ def test_a_background_question_left_without_its_supplement_is_found():
     assert review.missing_supplements(chapter, asked) == [asked[1]]
 
 
+def test_the_readers_pick_what_matters_most_and_name_no_count():
+    """R7g (PLAN 15.4.14 H): fewer questions than before — sol's readers asked 35–40 a chapter and the review
+    took about an hour of an eight-minute video's run."""
+    for prompt in (review.reader_prompt(CHAPTER), review.second_reader_prompt(CHAPTER, [])):
+        assert "最要紧" in prompt and "每一个都要列出来" not in prompt and "影响理解" in prompt
+        assert not re.search(r"\d+\s*(条|个问题)", prompt)
+
+
 def test_the_two_readers_are_merged_without_repeats():
     first = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
     second = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}, {"quote": "萃取率", "question": "怎么算？"}]

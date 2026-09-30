@@ -210,6 +210,50 @@ def test_the_review_asks_one_level_down_and_five_chapters_are_written_at_a_time(
     assert seen.get("workers") == 5
 
 
+def test_a_rate_limit_in_the_review_or_the_writing_steps_the_chapters_down(data_dir, monkeypatch):
+    """R7g (PLAN 15.4.14 H): five chapters at once may run into the relay's limits; the first 429 of the run
+    brings it to three, the next to one."""
+    ctx = _ctx(data_dir, figures=1)
+    _depth(data_dir, "full")
+    seen, limited, tasks_limited = {}, iter([True, False]), iter([True, False])
+    monkeypatch.setattr(workspace_mod, "RELAY_FIRST_WAIT_S", 0)
+    monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
+    monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
+
+    def fake_one_shot(work, **kwargs):
+        if next(limited, False):
+            raise workspace_mod.one_shot.OneShotError("一次性文本调用失败（exit 1）：429 Too Many Requests")
+        return "{}"
+
+    def fake_task(workspace, prompt, **kwargs):
+        if next(tasks_limited, False):
+            raise PiRunError("Pi 调用失败：429 rate limit reached")
+        return workspace / kwargs["expect"]
+
+    monkeypatch.setattr(workspace_mod.one_shot, "run_one_shot", fake_one_shot)
+    monkeypatch.setattr(workspace_mod.pi_run, "run_task", fake_task)
+
+    def fake_write(work, plan, ledger, units, run_pi, ask, **kwargs):
+        seen.update(kwargs, ask=ask, run_pi=run_pi)
+        return []
+
+    def fake_finish(work, plan, problems, ledger, chapters, input_json):
+        (work / "report.html").write_text("<html></html>", encoding="utf-8")
+        return {}
+
+    monkeypatch.setattr(workspace_mod.full, "write_chapters", fake_write)
+    monkeypatch.setattr(workspace_mod.full, "finish", fake_finish)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="node.exe",
+                                        pi_cli="cli.js", figures=True, progress=lambda *args: None)
+    gate = seen["gate"]
+    assert gate.limit == 5
+    seen["ask"]("读者的问题")
+    assert gate.limit == 3
+    seen["run_pi"](data_dir, "写这一章", "ch-01.html")
+    assert gate.limit == 1
+
+
 def test_every_pi_run_gets_what_is_left_of_the_stage_time(data_dir, monkeypatch, tmp_path):
     seen = {}
 

@@ -357,8 +357,22 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
     return result
 
 
+class Gate:
+    def __init__(self):
+        self.limit = CHAPTERS_AT_ONCE
+
+    def lower(self) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
 def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, figures: bool, review: bool,
-                   progress, workers: int = CHAPTERS_AT_ONCE, look=None, verify_links=None) -> list:
+                   progress, workers: int = CHAPTERS_AT_ONCE, look=None, verify_links=None, gate=None) -> list:
     """`look(prompt, files) -> reply`: a call that sees images, for the frame ledger (多配图 ①)."""
     work = Path(work)
     points = {point["id"]: point for point in ledger["points"]}

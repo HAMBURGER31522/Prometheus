@@ -4,6 +4,8 @@ revisions, the 讲清楚 review, assembly into the template and coverage.json.""
 
 import json
 import re
+import threading
+import time
 
 import pytest
 from prometheus.report import chapter_checks, full, review
@@ -546,6 +548,50 @@ def test_a_writing_run_that_left_nothing_is_run_once_more(tmp_path):
 def test_a_run_that_changes_nothing_twice_is_left_as_it_is(tmp_path):
     _l, _p, _chapters, _c, pi, _m = pipeline(tmp_path, pi=Silent(stubborn=True), review=False)
     assert sum("加编者观点" in prompt for prompt in pi.runs("ch-01.html")) == 2
+
+
+def test_the_gate_steps_down_to_three_and_then_one():
+    """R7g (PLAN 15.4.14 H): five chapters at a time until the relay limits the rate."""
+    gate = full.Gate()
+    assert gate.limit == full.CHAPTERS_AT_ONCE == 5
+    gate.lower()
+    assert gate.limit == 3
+    gate.lower()
+    gate.lower()
+    assert gate.limit == 1
+
+
+class Counting(Pi):
+    """How many chapters are being written at the same moment."""
+
+    def __init__(self):
+        super().__init__()
+        self.now, self.most, self.lock = set(), 0, threading.Lock()
+
+    def __call__(self, workspace, prompt, expect):
+        with self.lock:
+            self.now.add(expect)
+            self.most = max(self.most, len(self.now))
+        time.sleep(0.05)
+        try:
+            return super().__call__(workspace, prompt, expect)
+        finally:
+            with self.lock:
+                self.now.discard(expect)
+
+
+def test_chapters_wait_for_a_place_when_the_gate_is_down(tmp_path):
+    for folder, lowered, most in (("open", 0, 2), ("down", 2, 1)):
+        work = tmp_path / folder
+        units, model, pi = make_units(), Model(), Counting()
+        ledger = full.run_keypoints(work, units, model)
+        plan, _problems = full.run_plan(work, ledger, pi, figures=False, input_json=INPUT)
+        gate = full.Gate()
+        for _ in range(lowered):
+            gate.lower()
+        full.write_chapters(work, plan, ledger, units, pi, model, figures=False, review=False,
+                            progress=lambda *args: None, gate=gate)
+        assert pi.most == most, folder
 
 
 def test_a_viewpoint_pass_that_loses_a_point_is_undone(tmp_path):
