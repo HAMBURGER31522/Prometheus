@@ -85,6 +85,23 @@ def _usable(plan: dict) -> dict:
     return {**plan, "chapters": chapters}
 
 
+def _written(run_pi, space: Path, prompt: str, filename: str, *, unchanged_too: bool = True) -> Path:
+    """Run once more when the Agent ended without writing `filename` or, with `unchanged_too`, left it as it
+    was: a relay's refusal otherwise failed the report or dropped a revision without a word (PLAN 15.4.14 G ②)."""
+    target = space / filename
+    before = target.read_bytes() if target.is_file() else None
+    for attempt in range(2):
+        try:
+            run_pi(space, prompt, filename)
+        except (PiRunError, AgentRunError) as exc:
+            if attempt or "没有写出" not in str(exc):
+                raise
+            continue
+        if not unchanged_too or target.read_bytes() != before:
+            break
+    return target
+
+
 def run_plan(work, ledger: dict, run_pi, *, figures: bool, input_json: dict) -> tuple:
     """(plan, problems left after one redo); raises when there is no usable plan at all."""
     work = Path(work)
@@ -100,7 +117,9 @@ def run_plan(work, ledger: dict, run_pi, *, figures: bool, input_json: dict) -> 
     base = planning.plan_prompt(figures=figures)
     prompt, plan, problems = base, None, []
     for _attempt in range(2):
-        plan = planning.read_plan(run_pi(space, prompt, "plan.json").read_text(encoding="utf-8"))
+        # a redo that writes the same plan is 「still wrong」, not a loss: only a missing plan.json runs again
+        written = _written(run_pi, space, prompt, "plan.json", unchanged_too=False)
+        plan = planning.read_plan(written.read_text(encoding="utf-8"))
         problems = planning.validate_plan(plan, ledger) if plan is not None else ["plan.json 不是合法的 JSON 对象"]
         if not problems:
             break
@@ -273,22 +292,8 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
                                  units[index[points[point_id]["units"][0]]:index[points[point_id]["units"][1]] + 1])
                for point_id in owned}
 
-    target = space / filename
-
     def write(prompt: str) -> str:
-        """An Agent that ended without writing the chapter, or left it as it was, gets one more go: a relay's
-        refusal otherwise failed the report or dropped a revision without a word (PLAN 15.4.14 G ②)."""
-        before = target.read_bytes() if target.is_file() else None
-        for attempt in range(2):
-            try:
-                run_pi(space, prompt, filename)
-            except (PiRunError, AgentRunError) as exc:
-                if attempt or "没有写出" not in str(exc):
-                    raise
-                continue
-            if target.read_bytes() != before:
-                break
-        return target.read_text(encoding="utf-8")
+        return _written(run_pi, space, prompt, filename).read_text(encoding="utf-8")
 
     def recheck(fragment: str) -> dict:
         return chapter_checks.check_chapter(fragment, owned, points, spoken, sources=sources, frames=ledger)
