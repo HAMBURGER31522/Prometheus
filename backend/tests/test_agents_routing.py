@@ -201,3 +201,11 @@ def test_whether_another_agent_sees_images_comes_from_the_profile_not_pis_catalo
     store.save(data_dir, settings)
     stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](StageContext(data_dir, item_id))
     assert seen["figures"] is True
+
+
+def test_the_profiles_limits_travel_with_the_agent(data_dir):
+    settings = store.load(data_dir)
+    settings["llm_profiles"]["items"][0].update(context_window=272000, max_tokens=64000)
+    store.save(data_dir, settings)
+    agent = runs.agent_of(store.load(data_dir)["llm"])
+    assert (agent.get("context_window"), agent.get("max_tokens")) == (272000, 64000)

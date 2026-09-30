@@ -107,3 +107,24 @@ def test_claude_code_gets_the_address_without_v1_as_pi_does():
     for saved in ("https://relay.example/v1", "https://relay.example/v1/", "https://relay.example/"):
         env = commands.claude_env({}, config_root=CONFIG, base_url=saved, api_key="k")
         assert env["ANTHROPIC_BASE_URL"] == "https://relay.example"
+
+
+def test_the_profiles_limits_reach_codex_so_it_compacts_before_the_relay_refuses():
+    """runanytime's gpt-6-astra refused a chapter's history (context_length_exceeded, 2026-09-30):
+    Codex compacts by the window it believes in, so the profile's 「高级」 numbers go to it too."""
+    command = commands.codex_command(Path("codex.exe"), model="gpt-6-astra", thinking="xhigh", workspace=Path("W:/run"),
+                                     write=True, base_url="https://relay.example/v1", context_window=272000,
+                                     max_tokens=64000)
+    configs = _configs(command)
+    assert "model_context_window=272000" in configs
+    assert "model_auto_compact_token_limit=217600" in configs  # 80 %: compact well before the limit
+    assert "model_max_output_tokens=64000" in configs
+    plain = _configs(commands.codex_command(Path("codex.exe"), model="m", thinking="medium", workspace=Path("W:/run"),
+                                            write=False, base_url=None))
+    assert not [setting for setting in plain if setting.startswith(("model_context_window", "model_max_output"))]
+
+
+def test_claude_code_gets_the_profiles_maximum_output():
+    env = commands.claude_env({}, config_root=CONFIG, base_url="https://relay.example", api_key="k", max_tokens=32000)
+    assert env.get("CLAUDE_CODE_MAX_OUTPUT_TOKENS") == "32000"
+    assert "CLAUDE_CODE_MAX_OUTPUT_TOKENS" not in commands.claude_env({}, config_root=CONFIG, base_url="u", api_key="k")
