@@ -76,12 +76,17 @@ class Pi:
         else:
             attempt = sum(1 for name, _ in self.calls if name == expect)
             first = next(text for name, text in self.calls if name == expect)
-            (workspace / expect).write_text(self.chapter(prompt if "只补" not in prompt else first, attempt),
-                                            encoding="utf-8")
+            # a targeted run and the viewpoint pass rewrite the draft: the chapter comes from the first prompt
+            later = "只补" in prompt or "加编者观点" in prompt
+            (workspace / expect).write_text(self.chapter(first if later else prompt, attempt), encoding="utf-8")
         return workspace / expect
 
     def runs(self, expect):
         return [prompt for name, prompt in self.calls if name == expect]
+
+    def writes(self, expect):
+        """The writing runs: every run but the closing editor's-viewpoint pass."""
+        return [prompt for prompt in self.runs(expect) if "加编者观点" not in prompt]
 
 
 def pipeline(tmp_path, *, pi=None, model=None, review=True, units=None, progress=None):
@@ -151,10 +156,10 @@ def test_every_chapter_is_its_own_run_and_the_report_is_assembled(tmp_path):
 def test_a_chapter_that_misses_a_point_is_revised_at_most_twice_and_the_miss_is_recorded(tmp_path):
     pi = Pi(chapter=lambda prompt, attempt: section(prompt, leave_out=("K003",)))
     _ledger, _plan, chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
-    revisions = pi.runs("ch-01.html")[1:3]
+    revisions = pi.writes("ch-01.html")[1:3]
     assert len(revisions) == 2 and all("K003" in prompt and "上一稿" in prompt for prompt in revisions)
     # still missing after two rounds: one targeted run with only the rules, the draft and K003's source
-    [targeted] = pi.runs("ch-01.html")[3:]
+    [targeted] = pi.writes("ch-01.html")[3:]
     assert "只补" in targeted and "第2句原话" in targeted and "=== 附件：SKILL.md" not in targeted
     assert [point["id"] for point in coverage["uncovered"]] == ["K003"]
     assert coverage["uncovered"][0]["start_ms"] == 60_000 and coverage["uncovered"][0]["text"]
@@ -164,18 +169,18 @@ def test_a_chapter_that_misses_a_point_is_revised_at_most_twice_and_the_miss_is_
 def test_a_targeted_run_that_fixes_the_point_is_kept(tmp_path):
     pi = Pi(chapter=lambda prompt, attempt: section(prompt, leave_out=("K003",) if attempt < 4 else ()))
     _ledger, _plan, chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
-    assert len(pi.runs("ch-01.html")) == 4 and coverage["uncovered"] == [] and chapters[0]["targeted"] is True
+    assert len(pi.writes("ch-01.html")) == 4 and coverage["uncovered"] == [] and chapters[0]["targeted"] is True
 
 
 def test_a_fixed_chapter_is_not_revised(tmp_path):
     pi = Pi(chapter=lambda prompt, attempt: section(prompt, leave_out=("K003",) if attempt == 1 else ()))
     _ledger, _plan, _chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
-    assert len(pi.runs("ch-01.html")) == 2 and coverage["uncovered"] == []
+    assert len(pi.writes("ch-01.html")) == 2 and coverage["uncovered"] == []
 
 
 def test_the_review_sends_answers_found_in_the_source_back_once(tmp_path):
     _ledger, _plan, chapters, _coverage, pi, model = pipeline(tmp_path)
-    runs = pi.runs("ch-01.html")
+    runs = pi.writes("ch-01.html")
     assert len(runs) == 2 and "烘焙到什么程度" in runs[1] and "中深烘" in runs[1]
     assert chapters[0]["review"] == {"questions": 1, "answered": 1, "background": 0, "revised": True,
                                      "reverted": False}
@@ -193,9 +198,9 @@ def test_a_review_revision_that_loses_points_is_undone(tmp_path):
 def test_no_review_when_it_is_off_or_the_reader_has_no_questions(tmp_path):
     _ledger, _plan, _chapters, _coverage, pi, model = pipeline(tmp_path, review=False)
     assert not any("没看过视频" in prompt for prompt in model.prompts)
-    assert len(pi.runs("ch-01.html")) == 1
+    assert len(pi.writes("ch-01.html")) == 1
     _l, _p, chapters, _c, pi, _m = pipeline(tmp_path / "again", model=Model(reader_questions=False))
-    assert len(pi.runs("ch-01.html")) == 1 and chapters[0]["review"]["questions"] == 0
+    assert len(pi.writes("ch-01.html")) == 1 and chapters[0]["review"]["questions"] == 0
 
 
 def test_progress_names_the_step_and_the_chapter(tmp_path):
@@ -265,7 +270,7 @@ def test_the_frame_ledger_is_offered_to_the_writer_and_an_unused_slide_is_sent_b
     chapters = full.write_chapters(tmp_path, plan, ledger, units, pi, Model(), figures=True, review=False,
                                    progress=lambda *args: None, workers=1, look=look)
     assert look.calls == [["f_000030.jpg"], ["f_000400.jpg"]]
-    first = pi.runs("ch-01.html")
+    first = pi.writes("ch-01.html")
     assert "f_000030.jpg" in first[0] and "讲义第000030秒那页" in first[0]
     assert len(first) == 3 and "f_000030.jpg" in first[1]  # never used, never declined: two revisions
     assert chapters[0]["check"]["unused_frames"] == ["f_000030.jpg"]
