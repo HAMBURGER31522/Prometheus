@@ -168,6 +168,6 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 
 - **没验证的**：恢复照问之后没有再实跑；E14 评分没做。英文的改前改后在 `acceptance-output/report-eval/r7g/`（不入库）。
 - **接口**：agentrouter 只让 Claude Code / Codex 用，规划那种长对话 22 分钟无响应，两个 Key 的额度池都用光了；runanytime 的 sonnet 实际上限约 10 万（带 [1m] 也一样），配置里「高级」填了 10 万，这个题材（战争、杀人）常被上游拒答，也常断流。不要向 venlacy、justwoker 发探测请求。
-- **main 分支的 git worktree** 在 `F:\project\prometheus-r7g-main`，用来跑改前的基线；不再需要时 `git worktree remove ../prometheus-r7g-main`。
+- **预览数据现在的样子**：罗素条目显示的是 sonnet 改前那一版（runanytime，14565 字），英文条目显示的是 sonnet 改后那一版（19093 字）；当前配置是 chatgpt-codex（官方登录）。跑改前基线用过的 git worktree 已删除，要再跑就 `git worktree add ../prometheus-main main`，用 `PYTHONPATH` 指向它的 backend/src。
 - **查到但没做的**：已有测试 `test_a_viewpoint_pass_that_loses_a_point_is_undone` 的条件永远不成立（假 Pi 在编者观点那一步收到的是第一次的提示词），测的是空；Claude Code 和 Codex 的事件要等运行结束才写进日志，运行中看不到进度（Pi 是边跑边写）；「获取上下文长度」按钮大多数接口拿不到，只能当可选项；Pi 压缩在实际运行里为什么没触发还没确诊，下次实跑失败时先把章节工作区整个复制出来再重试。
 - **用户的新想法（待写规格）**：精读、字幕、导图可以分开选，不是每个视频都要三样。事实：字幕纠错有精读时拿它当参考（人名、术语更准），没有也能纠（R6b 在不给报告的条件下测过：whisper 8.17% → 7.01%，必剪 6.17% → 5.86%）；导图现在从精读的章节结构生成，不写精读就要改成从转写或要点账本生成。
