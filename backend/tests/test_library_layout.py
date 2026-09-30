@@ -33,3 +33,22 @@ def test_clashing_names_get_a_number(tmp_path):
     second.mkdir()
     assert (first.name, second.name) == ("同名", "同名 (2)")
     assert layout.unique_child(tmp_path, "同名").name == "同名 (3)"
+
+
+def test_the_data_dir_explains_itself(client):
+    """PLAN 15.4.17: a user who opens the data folder can tell from 说明.txt where the reports, maps and
+    subtitles are, what is for AI, what the app keeps, and how to back it up."""
+    guide = client.app.state.data_dir / "说明.txt"
+    assert guide.is_file()
+    text = guide.read_text(encoding="utf-8")
+    for words in ("精读.html", "思维导图.md", "字幕.srt", "llms.txt", "index.json", ".prometheus", "备份"):
+        assert words in text
+
+
+def test_the_guide_is_written_again_when_it_changed(client):
+    from prometheus.library import guide
+
+    target = client.app.state.data_dir / "说明.txt"
+    target.write_text("旧的说明", encoding="utf-8")
+    guide.write(client.app.state.data_dir)
+    assert target.read_text(encoding="utf-8") == guide.TEXT
