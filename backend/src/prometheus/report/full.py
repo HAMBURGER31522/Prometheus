@@ -28,6 +28,7 @@ from prometheus.report.pi_run import SKILL_DIR, PiRunError, stage_skill
 DEPTH_MD = Path(__file__).with_name("depth.md")
 FIGURES_MD = Path(__file__).parents[1] / "figures" / "figures.md"
 MAX_REVISIONS = 2
+CHAPTERS_AT_ONCE = 5  # chapters written at the same time; the count of chapters is the plan's (PLAN 15.4.14 H)
 _PROFILE = re.compile(r"^[a-z]+$")
 
 
@@ -357,7 +358,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
 
 
 def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, figures: bool, review: bool,
-                   progress, workers: int = 3, look=None, verify_links=None) -> list:
+                   progress, workers: int = CHAPTERS_AT_ONCE, look=None, verify_links=None) -> list:
     """`look(prompt, files) -> reply`: a call that sees images, for the frame ledger (多配图 ①)."""
     work = Path(work)
     points = {point["id"]: point for point in ledger["points"]}

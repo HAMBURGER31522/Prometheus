@@ -172,19 +172,24 @@ def _agent(settings: dict) -> dict:
             "protocol": agent["protocol"]}
 
 
+_ONE_DOWN = {"max": "xhigh", "xhigh": "high", "high": "medium", "medium": "low"}
+
+
 def review_thinking(level: str) -> str:
-    return level
+    """The reader and the judge only ask and sort: one level below the profile's (PLAN 15.4.14 H)."""
+    return _ONE_DOWN.get(level, level)
 
 
-def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
-    """ask(prompt) -> reply: one-shot calls (key points, the review) with the configured model."""
+def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str, *, thinking=None):
+    """ask(prompt) -> reply: one-shot calls (key points, the review) with the configured model; `thinking`
+    overrides the profile's level."""
     llm = _llm(settings)
 
     def ask(prompt: str) -> str:
         return _patient(lambda: one_shot.run_one_shot(
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
-            thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
-            agent=runs.agent_of(llm),
+            thinking=thinking or llm["thinking"], node_exe=node_exe, pi_cli=pi_cli,
+            agent_dir=paths.pi_config_dir(data_dir), agent=runs.agent_of(llm),
         ))
 
     return ask
@@ -256,12 +261,13 @@ def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, 
                           figures: bool, progress):
     """Chapters, checks, review, assembly: work/report.html for finalize (15.4.11)."""
     work = paths.work_dir(data_dir, item_id)
-    units, ledger, plan, problems, ask, run_pi = _planned(
+    units, ledger, plan, problems, _ask, run_pi = _planned(
         data_dir, work, row, settings, node_exe, pi_cli, figures=figures,
         seconds=_times(settings) * pi_timeout_seconds(row.get("duration_s") or 0.0))
     proxy = settings["network"].get("proxy", "")
-    chapters = full.write_chapters(work, plan, ledger, units, run_pi, ask, figures=figures,
-                                   review=review_on(settings), progress=progress,
+    review_ask = model_ask(data_dir, work, settings, node_exe, pi_cli, thinking=review_thinking(_llm(settings)["thinking"]))
+    chapters = full.write_chapters(work, plan, ledger, units, run_pi, review_ask, figures=figures,
+                                   review=review_on(settings), progress=progress, workers=full.CHAPTERS_AT_ONCE,
                                    look=model_look(data_dir, work, settings, node_exe, pi_cli),
                                    verify_links=lambda url: viewpoints.open_page(url, proxy=proxy))
     full.finish(work, plan, problems, ledger, chapters, build_input_json(row))
