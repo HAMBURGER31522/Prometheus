@@ -50,7 +50,7 @@ export function limitHint(info: ModelInfo | null, agent: AgentId): string {
   if (info?.source === "codex" && info.context_window) return "按模型目录预填，可以手动改；思考档位按 Codex 自己的列表。";
   if (agent === "codex") return "目录里没有这个模型：留空时 Codex CLI 用它自己的默认；接口的上限更小时请填上。";
   if (agent === "claude") {
-    return "目录里没有这个模型：留空时 Claude Code 用它自己的默认（Claude 模型名不带「[1m]」只有 200k）；接口的上限不同时请填上。";
+    return "目录里查不到这个模型名，应用不知道它的上限。留空时 Claude Code 按 200k 跑；如果它是 1M 的，在这里填 1000000，应用会自动加上「[1m]」。";
   }
   return "目录里没有这个模型：留空就按 Pi 的默认（上下文 128000，输出 16384）。";
 }
