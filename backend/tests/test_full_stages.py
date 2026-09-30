@@ -262,6 +262,8 @@ def test_every_pi_run_gets_what_is_left_of_the_stage_time(data_dir, monkeypatch,
         return workspace / expect
 
     monkeypatch.setattr(workspace_mod.pi_run, "run_task", fake_task)
+    # Windows' clock can read the same twice; (t + 100) - t is then 100.0000000000036 here (CI, 2026-09-30).
+    monkeypatch.setattr(time, "monotonic", lambda: 32728.185951439325)
     settings = store.load(data_dir)
     run = workspace_mod.pi_runner(data_dir, settings, "node.exe", "cli.js", deadline=time.monotonic() + 100)
     assert run(tmp_path, "任务", "plan.json") == tmp_path / "plan.json"
