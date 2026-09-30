@@ -3,6 +3,7 @@ is unclear from the chapter alone; then the transcript decides what can be fixed
 what a supplement may explain, and what stays as it is."""
 
 import json
+import re
 
 from prometheus.report import review
 
@@ -59,20 +60,24 @@ LONG = ("<section><h2>水温</h2>" + "".join(f"<p>第{i}段讲水温和研磨怎
                                           for i in range(40)) + "</section>")
 
 
-def test_a_second_reader_is_asked_only_when_the_first_asked_too_little():
-    """R7g (PLAN 15.4.14 A): Claude's readers asked about half as many questions a thousand characters as
-    GPT's on the English and Kabbalah videos."""
-    few = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
-    assert review.needs_second_reader(few, LONG) is True
-    assert review.needs_second_reader(few * 200, LONG) is False
-
-
 def test_the_second_reader_gets_the_first_list_and_never_a_number():
+    """R7g (PLAN 15.4.14 A): every chapter gets a second reader who looks for what the first one missed."""
     first = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
     prompt = review.second_reader_prompt(LONG, first)
     assert "没看过视频" in prompt and "已经问过" in prompt and "讲究什么？" in prompt and "第3段讲水温" in prompt
     assert "为什么" in prompt and "例子" in prompt and "pictures" in prompt
-    assert str(review.QUESTION_FLOOR) not in prompt and "千字" not in prompt
+    assert not re.search(r"\d+\s*条|千字", prompt)
+
+
+def test_a_background_question_left_without_its_supplement_is_found():
+    """R7g (15.4.14 F): the sonnet baseline raised 34 background questions and wrote 22 supplements."""
+    label = '<p class="supplement-label">补充说明（非视频内容）</p>'
+    chapter = (f'<section><h2>水温</h2><p>萃取率决定味道。</p><aside class="supplement">{label}<p>萃取率是溶出的比例。</p>'
+               '</aside><p>浅烘豆要用高一点的水温。</p><p>其他。</p><p>其他二。</p><p>其他三。</p></section>')
+    asked = [{"quote": "萃取率决定味道", "question": "萃取率是什么？"},
+             {"quote": "浅烘豆要用高一点的水温", "question": "浅烘是什么？"},
+             {"quote": "已经改写掉的一句", "question": "随便"}]
+    assert review.missing_supplements(chapter, asked) == [asked[1]]
 
 
 def test_the_two_readers_are_merged_without_repeats():

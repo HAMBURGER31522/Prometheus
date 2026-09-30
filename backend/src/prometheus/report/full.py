@@ -180,7 +180,7 @@ def _failing(check: dict, points: dict, sources: dict) -> list:
             for point_id in ids]
 
 
-def closing_problems(fragment: str, pictures: list) -> list:
+def closing_problems(fragment: str, pictures: list, background=()) -> list:
     """What the last look at a finished chapter sends back once (PLAN 15.4.14 B–E): pictures the reader
     asked for and did not get, supplements of a sentence or two, the writing materials, crowded limits."""
     problems = [f"读者读到「{picture['quote']}」时希望有一张图：{picture['want']}。这张图还没画：按 depth.md 画一张图示，"

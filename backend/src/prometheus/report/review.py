@@ -86,6 +86,10 @@ def thin_supplements(chapter: str) -> list:
     return found
 
 
+def missing_supplements(chapter: str, asked: list) -> list:
+    return []
+
+
 def missing_pictures(chapter: str, pictures: list) -> list:
     """The places the reader wanted a picture with none in the next few blocks (PLAN 15.4.14 C); a place
     rewritten out of the chapter is not asked for again."""

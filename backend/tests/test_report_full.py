@@ -378,9 +378,9 @@ class Readers(Model):
                           ensure_ascii=False)
 
 
-def test_a_second_reader_asks_when_the_first_asked_too_little(tmp_path):
-    """R7g (PLAN 15.4.14 A): below the bar a second reader looks for what the first one missed, and the
-    two lists are judged together."""
+def test_a_second_reader_looks_for_what_the_first_missed(tmp_path):
+    """R7g (PLAN 15.4.14 A): a second reader looks for what the first one missed, and the two lists are
+    judged together."""
     _l, _p, chapters, _c, _pi, model = pipeline(tmp_path, model=Readers(first=1))
     second = [prompt for prompt in model.prompts if "已经问过" in prompt]
     assert len(second) == 2 and "烘焙到什么程度0？" in second[0]
@@ -389,10 +389,30 @@ def test_a_second_reader_asks_when_the_first_asked_too_little(tmp_path):
     assert chapters[0]["review"]["second_reader"] is True and chapters[0]["review"]["questions"] == 2
 
 
-def test_no_second_reader_when_the_first_asked_enough(tmp_path):
+def test_every_chapter_gets_a_second_reader_however_many_the_first_asked(tmp_path):
+    """The sonnet baseline: short chapters kept a per-thousand-characters bar from ever calling one
+    (user 2026-09-30: every chapter)."""
     _l, _p, chapters, _c, _pi, model = pipeline(tmp_path, model=Readers(first=30))
-    assert not any("已经问过" in prompt for prompt in model.prompts)
-    assert chapters[0]["review"]["second_reader"] is False
+    assert len([prompt for prompt in model.prompts if "已经问过" in prompt]) == 2
+    assert all(chapter["review"]["second_reader"] is True for chapter in chapters)
+
+
+class Background(Model):
+    """The judge calls the reader's question background: the revision should add a supplement."""
+
+    def __call__(self, prompt: str) -> str:
+        if "逐条判断" in prompt:
+            self.prompts.append(prompt)
+            return json.dumps({"verdicts": {"1": {"kind": "术语或背景"}}}, ensure_ascii=False)
+        return super().__call__(prompt)
+
+
+def test_a_background_question_left_without_a_supplement_goes_back_once(tmp_path):
+    """R7g (15.4.14 F): the revision was asked for a supplement and wrote none."""
+    _l, _p, chapters, _c, pi, _m = pipeline(tmp_path, model=Background())
+    runs = pi.runs("ch-01.html")
+    assert "还没有补充说明" in runs[-1] and sum("还没有补充说明" in prompt for prompt in runs) == 1
+    assert any("还没有补充说明" in problem for problem in chapters[0]["closing"])
 
 
 class LeakyPi(Pi):
@@ -430,11 +450,12 @@ def test_the_closing_problems_name_what_to_fix_and_never_a_threshold():
                   "<p>萃取率是溶出的比例。</p></aside>")
     fragment = (f"<section><h2>一</h2><p>浅烘豆要用高一点的水温。</p>{supplement}"
                 "<p>" + "这件事不能据此断定。" * 5 + "</p><p>候选帧已逐张查看。</p></section>")
-    problems = full.closing_problems(fragment, [{"quote": "浅烘豆要用高一点的水温", "want": "温度对照图"}])
+    problems = full.closing_problems(fragment, [{"quote": "浅烘豆要用高一点的水温", "want": "温度对照图"}],
+                                     [{"quote": "这件事不能据此断定", "question": "为什么不能断定？"}])
     joined = "".join(problems)
-    assert len(problems) == 4 and "温度对照图" in joined and "溶出的比例" in joined and "候选帧" in joined
-    assert "不能据此断定" in joined and "为什么要紧" in joined
-    for threshold in (review.QUESTION_FLOOR, review.SUPPLEMENT_MIN, chapter_checks.HEDGE_MAX):
+    assert len(problems) == 5 and "温度对照图" in joined and "溶出的比例" in joined and "候选帧" in joined
+    assert "不能据此断定" in joined and "为什么要紧" in joined and "为什么不能断定？" in joined
+    for threshold in (review.SUPPLEMENT_MIN, chapter_checks.HEDGE_MAX):
         assert str(threshold) not in joined
 
 
