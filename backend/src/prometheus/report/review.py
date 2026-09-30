@@ -132,6 +132,17 @@ def _quoted(text: str, chapter: str, key: str, field: str) -> list:
     return kept
 
 
+def readable_reader(text: str) -> bool:
+    """The reader answered in the JSON asked for (an empty list counts); a refusal does not."""
+    value = first_json_object(text or "")
+    return isinstance(value, dict) and isinstance(value.get("questions"), list)
+
+
+def readable_judge(text: str) -> bool:
+    value = first_json_object(text or "")
+    return isinstance(value, dict) and isinstance(value.get("verdicts"), dict)
+
+
 def parse_reader(text: str, chapter: str) -> list:
     return _quoted(text, chapter, "questions", "question")
 

@@ -483,7 +483,7 @@ class Refusing(Model):
 
 def test_a_refused_reader_or_judge_is_asked_again(tmp_path):
     """R7g (PLAN 15.4.14 G ①): a refusal was read as 「no questions」 and two chapters got no supplements."""
-    _l, _p, chapters, _c, pi, model = pipeline(tmp_path, model=Refusing(times=1))
+    _l, _p, chapters, _c, _pi, model = pipeline(tmp_path, model=Refusing(times=1))
     first_readers = [p for p in model.prompts if "没看过视频" in p and "已经问过" not in p]
     assert len(first_readers) == 3  # chapter 1 asked twice, chapter 2 once
     assert chapters[0]["review"]["questions"] == 1 and chapters[0]["review"]["answered"] == 1
@@ -519,7 +519,7 @@ class Silent(Pi):
 
 def test_a_writing_run_that_left_nothing_is_run_once_more(tmp_path):
     """R7g (15.4.14 G ②): chapter 1's first write was refused and the whole report failed."""
-    _l, _p, chapters, coverage, pi, _m = pipeline(tmp_path, pi=Silent(), review=False)
+    _l, _p, _chapters, coverage, pi, _m = pipeline(tmp_path, pi=Silent(), review=False)
     runs = pi.runs("ch-01.html")
     assert sum("加编者观点" in prompt for prompt in runs) == 2 and coverage["uncovered"] == []
     assert pi.skipped == ["write", "viewpoint"]

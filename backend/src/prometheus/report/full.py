@@ -16,6 +16,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from prometheus.agents.runs import AgentRunError
 from prometheus.figures import notes as frame_notes
 from prometheus.report import assemble as assembling
 from prometheus.report import chapter_checks, chapter_write, keypoints, viewpoints
@@ -208,16 +209,27 @@ def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -
     details keep what was asked and how it was judged, so a review that led nowhere can be read."""
     stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False,
              "second_reader": False, "unfinished": False}
-    reply = ask(reviewing.reader_prompt(fragment))
+
+    def asked(prompt: str, readable) -> str:
+        """A reply that is not the JSON asked for (a relay's refusal) is asked once more; still not, the
+        review is marked unfinished instead of passing for 「no questions」 (PLAN 15.4.14 G ①)."""
+        for _attempt in range(2):
+            reply = ask(prompt) or ""
+            if readable(reply):
+                return reply
+        stats["unfinished"] = True
+        return ""
+
+    reply = asked(reviewing.reader_prompt(fragment), reviewing.readable_reader)
     questions, pictures = reviewing.parse_reader(reply, fragment), reviewing.parse_pictures(reply, fragment)
     stats["second_reader"] = True  # every chapter (PLAN 15.4.14 A)
-    again = ask(reviewing.second_reader_prompt(fragment, questions))
+    again = asked(reviewing.second_reader_prompt(fragment, questions), reviewing.readable_reader)
     questions = reviewing.merge(questions, reviewing.parse_reader(again, fragment))
     pictures = reviewing.merge(pictures, reviewing.parse_pictures(again, fragment))
     stats["questions"] = len(questions)
     verdicts, judged = [], ""
     if questions:
-        judged = ask(reviewing.judge_prompt(questions, transcript)) or ""
+        judged = asked(reviewing.judge_prompt(questions, transcript), reviewing.readable_judge)
         verdicts = reviewing.parse_judge(judged, len(questions))
     details = {"questions": [{**question, "verdict": verdict} for question, verdict in zip(questions, verdicts)]
                if verdicts else [{**question, "verdict": None} for question in questions],
@@ -261,8 +273,22 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
                                  units[index[points[point_id]["units"][0]]:index[points[point_id]["units"][1]] + 1])
                for point_id in owned}
 
+    target = space / filename
+
     def write(prompt: str) -> str:
-        return run_pi(space, prompt, filename).read_text(encoding="utf-8")
+        """An Agent that ended without writing the chapter, or left it as it was, gets one more go: a relay's
+        refusal otherwise failed the report or dropped a revision without a word (PLAN 15.4.14 G ②)."""
+        before = target.read_bytes() if target.is_file() else None
+        for attempt in range(2):
+            try:
+                run_pi(space, prompt, filename)
+            except (PiRunError, AgentRunError) as exc:
+                if attempt or "没有写出" not in str(exc):
+                    raise
+                continue
+            if target.read_bytes() != before:
+                break
+        return target.read_text(encoding="utf-8")
 
     def recheck(fragment: str) -> dict:
         return chapter_checks.check_chapter(fragment, owned, points, spoken, sources=sources, frames=ledger)

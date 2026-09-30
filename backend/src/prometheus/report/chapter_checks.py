@@ -168,6 +168,11 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
     by_file = {frame["file"]: frame for frame in frames or []}
     for file in unused:
         frame = by_file[file]
+        if file in text:  # the file's name as text in the page: the reader sees a path (PLAN 15.4.14 G ③)
+            problems.append(f"候选帧 {file}（{frame['label']}，{frame['kind']}：{frame['what']}）只写了文件名，没有插进去："
+                            f"只写文件名页面上不显示图。用 <img src=\"frames/{file}\" alt=\"画面内容\"> 插在讲到它的段落后面，"
+                            f"图注写画面里的关键信息，并删掉单独写出的文件名")
+            continue
         problems.append(f"候选帧 {file}（{frame['label']}，{frame['kind']}：{frame['what']}）没有用上：在讲到它的段落后面配上这张图，"
                         f"图注写画面里的关键信息；如果它和已用的图是同一个画面，或者正文已经完整写出了它的信息，"
                         f"就在片段里写一行 <!-- 不用 {file}：理由 -->")
