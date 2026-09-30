@@ -257,6 +257,15 @@ html[data-dragging], html[data-dragging] * { user-select: none; cursor: grabbing
   transform: translateX(calc(var(--i, 0) * 100%));
   transition: transform var(--dur-spatial) var(--ease-spatial);
 }
+.segmented.two .thumb { width: calc((100% - 6px) / 2); }
+.segmented [role="radio"][aria-checked="true"] { color: var(--accent-ink); font-weight: 600; }
+/* 精读：标准 / 完整 + 配图 (shared/ReportOptions, PLAN 15.4.15); grey when there is no report to make. */
+.report-options {
+  display: flex; align-items: center; gap: 10px; font-size: 13px;
+  transition: opacity var(--dur-effects) var(--ease-effects);
+}
+.report-options[data-off] { opacity: .45; }
+.report-options .switch-label { margin-left: 12px; }
 .reader-actions { position: relative; display: flex; align-items: center; gap: 6px; flex: none; }
 .btn.icon-only { width: 32px; padding: 0; }
 .btn.icon-only svg { width: 18px; height: 18px; }

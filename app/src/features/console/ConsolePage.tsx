@@ -1,11 +1,12 @@
 // 控制台 (PLAN 9 / 15.4.5): paste a Bilibili or YouTube link, watch the queue.
-import { type CSSProperties, type FormEvent, useEffect, useState } from "react";
+import { type CSSProperties, type FormEvent, useState } from "react";
 
-import { ApiError, type ItemRow, type ReportDepth, api, itemTitle } from "../../shared/api";
+import { ApiError, type ItemRow, api, itemTitle } from "../../shared/api";
 import { useNav } from "../../shared/NavContext";
+import { ReportOptions, useReportChoice } from "../../shared/ReportOptions";
 import { ScrollArea } from "../../shared/ScrollArea";
+import { STAGES, stageText } from "../../shared/stages";
 import { type Outputs, loadOutputs, saveOutputs, toggleOutput } from "./outputs";
-import { STAGES, stageText } from "./stages";
 
 const STATUS: Record<ItemRow["status"], string> = {
   queued: "排队中",
@@ -25,27 +26,13 @@ const OUTPUT_LABELS: { key: keyof Outputs; label: string }[] = [
   { key: "subtitles", label: "字幕" },
   { key: "mindmap", label: "导图" },
 ];
-const DEPTHS: { value: ReportDepth; label: string }[] = [
-  { value: "standard", label: "标准" },
-  { value: "full", label: "完整" },
-];
 
 export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () => Promise<void> }) {
   const [url, setUrl] = useState("");
-  const [figures, setFigures] = useState(true);
+  const choice = useReportChoice();
+  const { figures, depth } = choice;
   const [outputs, setOutputs] = useState<Outputs>(() => loadOutputs(localStorage));
-  const [depth, setDepth] = useState<ReportDepth>("full");
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    api
-      .settings()
-      .then((s) => {
-        setFigures(s.figures_default);
-        setDepth(s.report.depth);
-      })
-      .catch(() => undefined);
-  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -98,41 +85,7 @@ export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () =>
           <button type="submit" className="btn primary" disabled={!url.trim()}>
             开始
           </button>
-          <div className="importer-options" data-off={!outputs.report || undefined}>
-            <span className="muted">精读</span>
-            <div
-              className="segmented two"
-              role="radiogroup"
-              aria-label="精读详细程度"
-              style={{ "--i": depth === "full" ? 1 : 0 } as CSSProperties}
-            >
-              <span className="thumb" aria-hidden="true" />
-              {DEPTHS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={depth === value}
-                  disabled={!outputs.report}
-                  onClick={() => setDepth(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <label className="switch-label">
-              <button
-                type="button"
-                role="switch"
-                className="switch"
-                aria-checked={figures && outputs.report}
-                aria-label="配图"
-                disabled={!outputs.report}
-                onClick={() => setFigures(!figures)}
-              />
-              配图
-            </label>
-          </div>
+          <ReportOptions choice={choice} off={!outputs.report} />
         </form>
         {message && (
           <p className="notice danger" role="alert" style={{ marginTop: 10 }}>

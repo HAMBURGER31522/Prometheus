@@ -16,15 +16,8 @@
 .output:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .output[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); color: var(--ink); }
 .output[aria-pressed="true"]::before { border-color: var(--accent); background: var(--accent); }
-/* Second row: how detailed the report is, and figures; grey when there is no report. */
-.importer-options {
-  grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font-size: 13px;
-  transition: opacity var(--dur-effects) var(--ease-effects);
-}
-.importer-options[data-off] { opacity: .45; }
-.importer-options .switch-label { margin-left: 12px; }
-.segmented.two .thumb { width: calc((100% - 6px) / 2); }
-.segmented [role="radio"][aria-checked="true"] { color: var(--accent-ink); font-weight: 600; }
+/* Second row: how detailed the report is, and figures (shared/ReportOptions). */
+.importer .report-options { grid-column: 1 / -1; }
 .queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .queue-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
 .queue-main { display: grid; gap: 3px; min-width: 0; }
