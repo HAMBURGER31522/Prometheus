@@ -95,8 +95,9 @@ async def delete_item(request: Request, item_id: str):
     row = items_store.get_item(state.data_dir, item_id)
     if row is None:
         return JSONResponse({"code": "ITEM_NOT_FOUND"}, status_code=404)
-    # Stop a live task or a mind map rerun first so no stage recreates the folder.
-    state.queue.cancel(item_id)
+    # Stop a live task or a mind map rerun first so no stage recreates the folder; killing processes blocks,
+    # so it runs off the event loop (a stuck kill once left the whole backend unanswering, 2026-09-30).
+    await asyncio.to_thread(state.queue.cancel, item_id)
     deadline = time.time() + 15
     while time.time() < deadline:
         current = items_store.get_item(state.data_dir, item_id)
@@ -109,7 +110,7 @@ async def delete_item(request: Request, item_id: str):
 
 @router.post("/api/items/{item_id}/cancel")
 async def cancel_item(request: Request, item_id: str):
-    if not request.app.state.queue.cancel(item_id):
+    if not await asyncio.to_thread(request.app.state.queue.cancel, item_id):  # killing processes blocks
         return JSONResponse({"code": "NOT_CANCELLABLE"}, status_code=409)
     return {"cancelled": True}
 
