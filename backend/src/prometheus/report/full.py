@@ -181,11 +181,16 @@ def _failing(check: dict, points: dict, sources: dict) -> list:
 
 
 def closing_problems(fragment: str, pictures: list, background=()) -> list:
-    """What the last look at a finished chapter sends back once (PLAN 15.4.14 B–E): pictures the reader
-    asked for and did not get, supplements of a sentence or two, the writing materials, crowded limits."""
+    """What the last look at a finished chapter sends back once (PLAN 15.4.14 B–F): pictures the reader
+    asked for and did not get, background questions left without a supplement, supplements of a sentence
+    or two, the writing materials, crowded limits."""
     problems = [f"读者读到「{picture['quote']}」时希望有一张图：{picture['want']}。这张图还没画：按 depth.md 画一张图示，"
                 "或者用本章候选帧里合适的那张；只画本章正文已经写到的内容"
                 for picture in reviewing.missing_pictures(fragment, pictures)]
+    problems += [f"读者读到「{question['quote']}」时问：{question['question']}。这里还没有补充说明：在这句附近加一个补充说明"
+                 "（<aside class=\"supplement\">），用通用知识解释，不写成讲者的话；按三步写透：它是什么；"
+                 "放在这句话里为什么要紧；一个具体例子、数字或出处"
+                 for question in reviewing.missing_supplements(fragment, list(background))]
     problems += [f"这条补充说明只有一两句（「{text}」）：按三步写透——它是什么；放在这句话里为什么要紧；"
                  "一个具体例子、数字或出处" for text in reviewing.thin_supplements(fragment)]
     terms = chapter_checks.process_terms(fragment)
@@ -205,11 +210,10 @@ def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -
              "second_reader": False}
     reply = ask(reviewing.reader_prompt(fragment))
     questions, pictures = reviewing.parse_reader(reply, fragment), reviewing.parse_pictures(reply, fragment)
-    if reviewing.needs_second_reader(questions, fragment):  # PLAN 15.4.14 A
-        stats["second_reader"] = True
-        again = ask(reviewing.second_reader_prompt(fragment, questions))
-        questions = reviewing.merge(questions, reviewing.parse_reader(again, fragment))
-        pictures = reviewing.merge(pictures, reviewing.parse_pictures(again, fragment))
+    stats["second_reader"] = True  # every chapter (PLAN 15.4.14 A)
+    again = ask(reviewing.second_reader_prompt(fragment, questions))
+    questions = reviewing.merge(questions, reviewing.parse_reader(again, fragment))
+    pictures = reviewing.merge(pictures, reviewing.parse_pictures(again, fragment))
     stats["questions"] = len(questions)
     verdicts, judged = [], ""
     if questions:
@@ -299,7 +303,9 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
     else:
         (space / filename).write_bytes(fragment.encode("utf-8"))
     # the review's revision and the viewpoint pass came after the checks: one last look, sent back once
-    closing = closing_problems(fragment, (details or {}).get("pictures") or [])
+    background = [question for question in (details or {}).get("questions") or []
+                  if (question.get("verdict") or {}).get("kind") == reviewing.BACKGROUND]
+    closing = closing_problems(fragment, (details or {}).get("pictures") or [], background)
     if closing:
         progress("收尾", number, total)
         fixed = write(chapter_write.revision_prompt(base, closing, filename, fragment))

@@ -15,9 +15,8 @@ from prometheus.report.markdown_export import report_to_markdown
 
 ANSWERED, BACKGROUND, NOT_THERE = "原文有答案", "术语或背景", "原文没有"
 KINDS = (ANSWERED, BACKGROUND, NOT_THERE)
-QUESTION_FLOOR = 5.0   # questions a thousand characters of the chapter under which a second reader looks (D-46)
 SUPPLEMENT_MIN = 80    # characters of a supplement under which it is a sentence or two (D-46)
-PICTURE_REACH = 3      # blocks after the quoted one where the picture asked for may stand
+REACH = 3              # blocks after the quoted one where the picture or the supplement asked for may stand
 _NOT_WORDY = re.compile(r"[^一-鿿A-Za-z0-9]")
 _CJK = re.compile(r"[一-鿿]")
 _MEDIA = {"figure", "svg", "img"}
@@ -40,11 +39,6 @@ def reader_prompt(chapter: str) -> str:
         '只输出 JSON：{"questions": [{"quote": "…", "question": "…"}], "pictures": [{"quote": "…", "want": "…"}]}\n\n'
         f"本章：\n{report_to_markdown(chapter)}\n"
     )
-
-
-def needs_second_reader(questions: list, chapter: str) -> bool:
-    """Fewer questions for the chapter's length than GPT's readers asked on other videos (PLAN 15.4.14 A)."""
-    return len(questions) < QUESTION_FLOOR * len(_CJK.findall(report_to_markdown(chapter))) / 1000
 
 
 def second_reader_prompt(chapter: str, asked: list) -> str:
@@ -86,36 +80,42 @@ def thin_supplements(chapter: str) -> list:
     return found
 
 
-def missing_supplements(chapter: str, asked: list) -> list:
-    return []
-
-
-def missing_pictures(chapter: str, pictures: list) -> list:
-    """The places the reader wanted a picture with none in the next few blocks (PLAN 15.4.14 C); a place
+def _unfollowed(chapter: str, asked: list, is_answer) -> list:
+    """The items whose quoted sentence has nothing `is_answer` within REACH blocks after it; a sentence
     rewritten out of the chapter is not asked for again."""
-    sequence = []  # document order: the text of each leaf block, or None for a picture
+    sequence = []  # document order: the text of each leaf block, or None for an answer
     for node in parse_html(chapter).walk():
-        inside = any(ancestor.tag in _MEDIA for ancestor in list(node.ancestors())[1:])
-        if node.tag in _MEDIA and not inside:
+        inside = any(is_answer(ancestor) for ancestor in list(node.ancestors())[1:])
+        if is_answer(node) and not inside:
             sequence.append(None)
         elif node.tag in _BLOCKS and not inside and not any(child.tag in _BLOCKS for child in node.walk()):
             sequence.append(_norm(node.text()))
     missing = []
-    for picture in pictures:
-        quote = _norm(picture["quote"])
+    for item in asked:
+        quote = _norm(item["quote"])
         at = next((index for index, text in enumerate(sequence) if text and quote and quote in text), None)
         if at is None:
             continue
         after, blocks = [], 0
-        for item in sequence[at + 1:]:
-            if item is not None:
+        for entry in sequence[at + 1:]:
+            if entry is not None:
                 blocks += 1
-                if blocks > PICTURE_REACH:
+                if blocks > REACH:
                     break
-            after.append(item)
+            after.append(entry)
         if None not in after:
-            missing.append(picture)
+            missing.append(item)
     return missing
+
+
+def missing_supplements(chapter: str, asked: list) -> list:
+    """Background questions with no supplement after the sentence they asked about (PLAN 15.4.14 F)."""
+    return _unfollowed(chapter, asked, lambda node: node.tag == "aside" and "supplement" in node.classes())
+
+
+def missing_pictures(chapter: str, pictures: list) -> list:
+    """The places the reader wanted a picture with none in the next few blocks (PLAN 15.4.14 C)."""
+    return _unfollowed(chapter, pictures, lambda node: node.tag in _MEDIA)
 
 
 def _quoted(text: str, chapter: str, key: str, field: str) -> list:
