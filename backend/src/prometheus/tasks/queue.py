@@ -49,7 +49,7 @@ class TaskQueue:
 
     def enqueue_mindmap(self, item_id) -> None:
         """Rerun only the mind map of a finished item; mindmap_status stays NULL until it ends."""
-        items_store.update_item(self.data_dir, item_id, mindmap_status=None)
+        items_store.update_item(self.data_dir, item_id, mindmap_status=None, mindmap_error=None)
         with self._lock:
             if item_id not in self._mindmap_reruns:
                 self._mindmap_reruns.append(item_id)

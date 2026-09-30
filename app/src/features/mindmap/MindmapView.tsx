@@ -156,6 +156,7 @@ function Canvas({ item, refresh }: ReaderProps) {
     return (
       <div className="page">
         <p className={failed ? "notice danger" : "notice"}>{text}</p>
+        {failed && item.mindmap_error && <p className="muted mind-reason">原因：{item.mindmap_error}</p>}
         {(failed || legacy) && (
           <button type="button" className="btn" style={{ marginTop: 14 }} onClick={regenerate}>
             重新生成导图
