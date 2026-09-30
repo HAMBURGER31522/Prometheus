@@ -91,6 +91,16 @@ def test_a_frame_used_or_declined_with_a_reason_is_fine():
     assert checks.check_chapter(no_reason, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)["unused_frames"] == ["f_000030.jpg"]
 
 
+def test_a_frame_written_as_its_file_name_only_is_named_so():
+    """R7g (PLAN 15.4.14 G ③): sonnet wrote 「frames/f_000131.jpg」 as text in a figure and twice answered
+    that the frame was already in; the page showed the path, not the picture."""
+    as_text = GOOD.replace("</section>", '<figure class="report-figure">frames/f_000030.jpg<figcaption>颜色对比</figcaption>'
+                                         "</figure></section>")
+    result = checks.check_chapter(as_text, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)
+    problem = next(problem for problem in result["problems"] if "f_000030.jpg" in problem)
+    assert "只写文件名页面上不显示图" in problem and '<img src="frames/f_000030.jpg"' in problem
+
+
 def test_a_point_is_split_into_its_items_without_the_lead_in():
     """PLAN 15.4.11a-2: lists and reasons are checked item by item (user 2026-09-29)."""
     assert checks.point_items("展示图表有两个原因：一是让学习者更清楚接下来会学什么，二是强制系统把推理讲清楚") == [
@@ -112,6 +122,24 @@ def test_an_item_left_out_of_a_list_is_named():
 
 def test_a_clean_chapter_has_no_problems():
     assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["problems"] == []
+
+
+def test_the_writing_materials_in_the_text_are_sent_back_but_not_in_attributes():
+    """R7g (PLAN 15.4.14 D): 「候选帧已逐张查看」「转写单元 unit-000033」「（K022）」 reached readers, while
+    data-points and data-source-units are where the ids belong."""
+    leaked = GOOD.replace("</section>", "<p>候选帧已逐张查看，没有选用；本章依据转写单元 unit-000033 整理（K022）。</p></section>")
+    check = checks.check_chapter(leaked, ["K001", "K002"], POINTS, TRANSCRIPT)
+    assert set(check["process"]) == {"候选帧", "转写单元", "unit-000033", "K022"}
+    assert any("处理过程" in problem and "候选帧" in problem for problem in check["problems"])
+    assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["process"] == []
+
+
+def test_limiting_sentences_are_listed_only_when_they_crowd_the_chapter():
+    """R7g (15.4.14 E): a 「不能据此断定」 now and then is fine; ten a page is a hedge on every claim."""
+    crowded = "<section><p>" + "这件事不能据此断定。" * 5 + "水温讲清楚了。" * 20 + "</p></section>"
+    calm = "<section><p>这件事不能据此断定。" + "水温和研磨怎样一起决定萃取率讲清楚了。" * 300 + "</p></section>"
+    assert checks.hedges(crowded) == ["这件事不能据此断定。"] * 5
+    assert checks.hedges(calm) == []
 
 
 def test_the_feedback_prompt_lists_the_problems_and_keeps_the_rest():

@@ -73,7 +73,9 @@ def test_the_program_ends_when_its_launcher_is_stopped(tmp_path):
     launcher.kill()
     launcher.wait()
     time.sleep(1.5)
-    alive = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True, check=False).stdout
+    # tasklist answers in the console's code page (GBK here): read as UTF-8 its 「没有运行的任务」 was None
+    alive = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, check=False).stdout
+    alive = alive.decode("utf-8", errors="replace")
     assert str(pid) not in alive
 
 

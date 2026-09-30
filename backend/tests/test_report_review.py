@@ -3,6 +3,7 @@ is unclear from the chapter alone; then the transcript decides what can be fixed
 what a supplement may explain, and what stays as it is."""
 
 import json
+import re
 
 from prometheus.report import review
 
@@ -53,6 +54,71 @@ def test_the_reader_may_ask_for_a_picture_where_one_would_help():
     assert pictures == [{"quote": "水温和研磨一起决定萃取率", "want": "水温、研磨和萃取率的关系图"}]
     fixes = review.fixes([], [], pictures)
     assert len(fixes) == 1 and "关系图" in fixes[0] and "只画本章正文已经写到的内容" in fixes[0]
+
+
+LONG = ("<section><h2>水温</h2>" + "".join(f"<p>第{i}段讲水温和研磨怎样一起决定萃取率，浅烘和深烘各有讲究。</p>"
+                                          for i in range(40)) + "</section>")
+
+
+def test_the_second_reader_gets_the_first_list_and_never_a_number():
+    """R7g (PLAN 15.4.14 A): every chapter gets a second reader who looks for what the first one missed."""
+    first = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
+    prompt = review.second_reader_prompt(LONG, first)
+    assert "没看过视频" in prompt and "已经问过" in prompt and "讲究什么？" in prompt and "第3段讲水温" in prompt
+    assert "为什么" in prompt and "例子" in prompt and "pictures" in prompt
+    assert not re.search(r"\d+\s*条|千字", prompt)
+
+
+def test_a_background_question_left_without_its_supplement_is_found():
+    """R7g (15.4.14 F): the sonnet baseline raised 34 background questions and wrote 22 supplements."""
+    label = '<p class="supplement-label">补充说明（非视频内容）</p>'
+    chapter = (f'<section><h2>水温</h2><p>萃取率决定味道。</p><aside class="supplement">{label}<p>萃取率是溶出的比例。</p>'
+               '</aside><p>浅烘豆要用高一点的水温。</p><p>其他。</p><p>其他二。</p><p>其他三。</p></section>')
+    asked = [{"quote": "萃取率决定味道", "question": "萃取率是什么？"},
+             {"quote": "浅烘豆要用高一点的水温", "question": "浅烘是什么？"},
+             {"quote": "已经改写掉的一句", "question": "随便"}]
+    assert review.missing_supplements(chapter, asked) == [asked[1]]
+
+
+def test_the_readers_ask_about_every_term_again():
+    """R7g (PLAN 15.4.14 H): 「每段只挑最要紧的问」 cut the English run's background questions from 56 to 15 and
+    its supplements from 39 to 19 (user 2026-09-30: questions as before)."""
+    assert "每一个都要列出来" in review.reader_prompt(CHAPTER)
+    second = review.second_reader_prompt(CHAPTER, [])
+    assert "术语、人名、书名也照样列出" in second
+    for prompt in (review.reader_prompt(CHAPTER), second):
+        assert "最要紧" not in prompt and not re.search(r"\d+\s*(条|个问题)", prompt)
+
+
+def test_the_two_readers_are_merged_without_repeats():
+    first = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
+    second = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}, {"quote": "萃取率", "question": "怎么算？"}]
+    assert review.merge(first, second) == first + second[1:]
+
+
+def test_a_background_supplement_is_asked_for_in_three_steps():
+    """R7g (15.4.14 B): what it is, why it matters at this sentence, an example, a number or a source."""
+    fixes = review.fixes([{"quote": "萃取率", "question": "萃取率是什么？"}], [{"kind": "术语或背景"}])
+    assert "是什么" in fixes[0] and "为什么要紧" in fixes[0] and "具体例子、数字或出处" in fixes[0]
+
+
+def test_a_supplement_of_a_sentence_or_two_is_found():
+    label = '<p class="supplement-label">补充说明（非视频内容）</p>'
+    short = f'<aside class="supplement">{label}<p>萃取率是溶出的比例。</p></aside>'
+    full = f'<aside class="supplement">{label}<p>' + "萃取率是咖啡粉里的可溶物被水溶解出来的比例，" * 8 + "</p></aside>"
+    found = review.thin_supplements(f"<section><p>正文</p>{short}{full}</section>")
+    assert len(found) == 1 and "溶出的比例" in found[0] and "补充说明（非视频内容）" not in found[0]
+
+
+def test_a_picture_asked_for_and_not_drawn_is_found():
+    """R7g (15.4.14 C): a place the reader wanted a picture must have one close by after the revision."""
+    chapter = ('<section><h2>水温</h2><p>水温和研磨一起决定萃取率。</p><figure><svg></svg><figcaption>关系图</figcaption>'
+               '</figure><p>浅烘豆要用高一点的水温。</p><p>其他。</p><p>其他二。</p><p>其他三。</p><p>其他四。</p>'
+               '<figure><img src="frames/f_001.jpg"></figure></section>')
+    pictures = [{"quote": "水温和研磨一起决定萃取率", "want": "关系图"},
+                {"quote": "浅烘豆要用高一点的水温", "want": "温度对照"},
+                {"quote": "已经改写掉的一句", "want": "随便"}]
+    assert review.missing_pictures(chapter, pictures) == [pictures[1]]
 
 
 def test_fixes_answer_from_the_source_or_with_a_supplement_and_drop_the_rest():

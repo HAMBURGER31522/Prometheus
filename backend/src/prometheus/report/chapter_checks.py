@@ -21,6 +21,7 @@ COPY_MAX = 0.15          # pasted share of the chapter that asks for a rewrite
 THIN_BASE = 24           # the bar for a point the video only mentions (to calibrate, D-44)
 THIN_RATIO = 1.0         # the bar per unit of what the video says about the point (to calibrate, D-44)
 SOURCE_WORD = 1.5        # an English word of the source counts as this many characters of Chinese
+HEDGE_MAX = 4.0          # limiting sentences a ten thousand characters above which they crowd the chapter (D-46)
 _NOT_WORDY = re.compile(r"[^一-鿿A-Za-z0-9]")
 _CJK = re.compile(r"[一-鿿]")
 _WORD = re.compile(r"[A-Za-z0-9]+")
@@ -28,6 +29,11 @@ ITEM_MIN = 0.25          # an item of a list or a layer of a reason found in the
 _ITEM_SPLIT = re.compile(r"[；;、]|一是|二是|三是|四是|五是|其一|其二|其三|第一|第二|第三|第四|首先|其次|再次|最后")
 _FRAME_USED = re.compile(r"""src=["']frames/([^"']+)["']""")
 _FRAME_DECLINED = re.compile(r"<!--\s*不用\s*(f_\d+\.jpg)\s*[：:]\s*\S")
+_PROCESS = re.compile(r"unit-\d{3,}|(?<![A-Za-z0-9])K\d{3}(?!\d)|候选帧|候选画面|来源绑定|转写单元|本章材料|要点账本")
+_HEDGE = re.compile(r"不能据此|无法据此|不能由此|不能仅凭|不能单凭|单凭[^，。]{0,12}(?:不能|无法)"
+                    r"|不能直接(?:推出|断定|证明|等同|说明)|不能断定|不能把[^，。]{0,20}当作|并不意味着|不意味着|尚不足以"
+                    r"|不足以(?:证明|说明|断定)")
+_SENTENCE_END = re.compile(r"(?<=[。！？!?])")
 
 
 def _norm(text: str) -> str:
@@ -162,11 +168,37 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
     by_file = {frame["file"]: frame for frame in frames or []}
     for file in unused:
         frame = by_file[file]
+        if file in text:  # the file's name as text in the page: the reader sees a path (PLAN 15.4.14 G ③)
+            problems.append(f"候选帧 {file}（{frame['label']}，{frame['kind']}：{frame['what']}）只写了文件名，没有插进去："
+                            f"只写文件名页面上不显示图。用 <img src=\"frames/{file}\" alt=\"画面内容\"> 插在讲到它的段落后面，"
+                            f"图注写画面里的关键信息，并删掉单独写出的文件名")
+            continue
         problems.append(f"候选帧 {file}（{frame['label']}，{frame['kind']}：{frame['what']}）没有用上：在讲到它的段落后面配上这张图，"
                         f"图注写画面里的关键信息；如果它和已用的图是同一个画面，或者正文已经完整写出了它的信息，"
                         f"就在片段里写一行 <!-- 不用 {file}：理由 -->")
+    process = process_terms(fragment)
+    if process:
+        problems.append(process_problem(process))
     return {"missing": missing, "weak": weak, "thin": thin, "incomplete": incomplete, "unused_frames": unused,
-            "copy_ratio": copy_ratio, "chars": chars, "problems": problems}
+            "copy_ratio": copy_ratio, "chars": chars, "process": process, "problems": problems}
+
+
+def process_terms(fragment: str) -> list:
+    """The writing materials in the text a reader sees; ids in data-points / data-source-units are fine."""
+    return list(dict.fromkeys(_PROCESS.findall(parse_html(fragment).text())))
+
+
+def process_problem(terms: list) -> str:
+    return ("正文里写了处理过程（「" + "」「".join(terms) + "」）：转写单元编号、要点编号、候选帧这些是写作用的材料，"
+            "读者看不到也用不上；删掉这些说明，或者改写成读者能懂的话")
+
+
+def hedges(fragment: str) -> list:
+    """The limiting sentences, when they are more than HEDGE_MAX a ten thousand characters (PLAN 15.4.14 E)."""
+    text = parse_html(fragment).text()
+    found = [sentence.strip() for sentence in _SENTENCE_END.split(text) if _HEDGE.search(sentence)]
+    chars = len(_CJK.findall(text))
+    return found if chars and len(found) * 10000 / chars > HEDGE_MAX else []
 
 
 def feedback_prompt(problems: list, filename: str, draft: str = "") -> str:

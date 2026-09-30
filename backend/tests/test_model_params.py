@@ -64,6 +64,44 @@ def written(data_dir, pi_cli) -> dict:
     return entry
 
 
+def pi_settings(data_dir) -> dict:
+    target = paths.pi_config_dir(data_dir) / "settings.json"
+    return json.loads(target.read_text(encoding="utf-8")) if target.is_file() else {}
+
+
+def test_pi_compacts_at_seventy_percent_of_the_profiles_window(tmp_path, pi_cli):
+    """R7g (PLAN 15.4.14 I): Pi's fixed 16384 reserve put the threshold at 84k of runanytime's real 100k, and
+    one chapter read in (Chinese, estimated at a quarter of its tokens) crossed the relay's hard limit."""
+    data_dir = data_dir_with(tmp_path, {**RELAY, "context_window": 100000})
+    written(data_dir, pi_cli)
+    assert pi_settings(data_dir).get("compaction", {}).get("reserveTokens") == 30000
+    settings = store.load(data_dir)
+    settings["llm_profiles"]["items"][0]["context_window"] = None
+    store.save(data_dir, settings)
+    written(data_dir, pi_cli)  # the catalogue's 1M: compaction at 700k, not at tens of thousands
+    assert pi_settings(data_dir).get("compaction", {}).get("reserveTokens") == 300000
+
+
+def test_an_unknown_window_leaves_pis_own_reserve_and_keeps_the_other_settings(tmp_path, pi_cli):
+    data_dir = data_dir_with(tmp_path, {**RELAY, "model": UNKNOWN, "thinking": "medium"})
+    (paths.pi_config_dir(data_dir) / "settings.json").write_text(
+        json.dumps({"compaction": {"reserveTokens": 300000, "enabled": True}, "theme": "dark"}), encoding="utf-8")
+    written(data_dir, pi_cli)
+    assert pi_settings(data_dir) == {"compaction": {"enabled": True}, "theme": "dark"}
+
+
+def test_a_builtin_provider_does_not_keep_the_last_relays_reserve(tmp_path, pi_cli):
+    """A reserve larger than the window would make Pi compact on every turn."""
+    data_dir = data_dir_with(tmp_path, {**RELAY, "id": "ds", "kind": "deepseek", "model": "deepseek-flash"})
+    (paths.pi_config_dir(data_dir) / "settings.json").write_text(
+        json.dumps({"compaction": {"reserveTokens": 999999}}), encoding="utf-8")
+    pi_models.refresh_custom_provider(data_dir, pi_cli=pi_cli)
+    _source, fields = pi_models.model_fields(data_dir, {"kind": "deepseek", "model": "deepseek-flash"}, pi_cli=pi_cli)
+    reserve = pi_settings(data_dir).get("compaction", {}).get("reserveTokens")
+    window = fields.get("contextWindow")
+    assert reserve == (int(window * 0.3) if window else None)
+
+
 def test_claude_opus_4_8_runs_with_pis_own_parameters(tmp_path, pi_cli):
     entry = written(data_dir_with(tmp_path, RELAY), pi_cli)
     assert (entry.get("contextWindow"), entry.get("maxTokens")) == (1000000, 128000)

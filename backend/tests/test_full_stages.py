@@ -128,7 +128,7 @@ def test_the_plan_stage_hands_the_item_and_one_stage_of_time_to_the_planner(data
     seen = {}
     monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
     monkeypatch.setattr(workspace_mod, "pi_runner",
-                        lambda *args, deadline: seen.setdefault("left", deadline - time.monotonic()) and "runner")
+                        lambda *args, deadline, on_limit=None: seen.setdefault("left", deadline - time.monotonic()) and "runner")
 
     def fake_plan(work, ledger, run_pi, **kwargs):
         seen.update(kwargs, run_pi=run_pi)
@@ -149,7 +149,7 @@ def test_the_chapter_report_gets_the_review_setting_figures_progress_and_three_t
     monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
     monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
     monkeypatch.setattr(workspace_mod, "pi_runner",
-                        lambda *args, deadline: seen.setdefault("left", deadline - time.monotonic()) and "runner")
+                        lambda *args, deadline, on_limit=None: seen.setdefault("left", deadline - time.monotonic()) and "runner")
 
     def fake_write(work, plan, ledger, units, run_pi, ask, **kwargs):
         seen.update(kwargs, units=units)
@@ -173,6 +173,85 @@ def test_the_chapter_report_gets_the_review_setting_figures_progress_and_three_t
     assert seen["review"] is False and seen["figures"] is True and seen["progress"] is progress
     assert seen["units"] == UNITS and seen["input_json"]["platform"] == "Bilibili"
     assert 3 * 1800 - 10 < seen["left"] <= 3 * 1800
+
+
+def test_the_review_thinks_one_level_down():
+    """R7g (PLAN 15.4.14 H): the reader and the judge only ask and sort; sol 「高」 spent about an hour there."""
+    assert [workspace_mod.review_thinking(level) for level in ("max", "xhigh", "high", "medium", "low", "off")] == [
+        "xhigh", "high", "medium", "low", "low", "off"]
+
+
+def test_the_review_asks_one_level_down_and_five_chapters_are_written_at_a_time(data_dir, monkeypatch):
+    ctx = _ctx(data_dir, figures=1)
+    _depth(data_dir, "full")
+    settings = store.load(data_dir)
+    settings["llm"]["thinking"] = "high"
+    seen, thinking = {}, []
+    monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
+    monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
+    monkeypatch.setattr(workspace_mod.one_shot, "run_one_shot", lambda work, **kwargs: thinking.append(kwargs["thinking"]) or "")
+
+    def fake_write(work, plan, ledger, units, run_pi, ask, **kwargs):
+        seen.update(kwargs, ask=ask)
+        return []
+
+    def fake_finish(work, plan, problems, ledger, chapters, input_json):
+        (work / "report.html").write_text("<html></html>", encoding="utf-8")
+        return {}
+
+    monkeypatch.setattr(workspace_mod.full, "write_chapters", fake_write)
+    monkeypatch.setattr(workspace_mod.full, "finish", fake_finish)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, settings, node_exe="node.exe", pi_cli="cli.js",
+                                        figures=True, progress=lambda *args: None)
+    seen["ask"]("读者的问题")
+    seen["look"]("看图", [])
+    assert thinking == ["medium", "high"]  # the review one level down, the frames at the profile's level
+    assert seen.get("workers") == 5
+
+
+def test_a_rate_limit_in_the_review_or_the_writing_steps_the_chapters_down(data_dir, monkeypatch):
+    """R7g (PLAN 15.4.14 H): five chapters at once may run into the relay's limits; the first 429 of the run
+    brings it to three, the next to one."""
+    ctx = _ctx(data_dir, figures=1)
+    _depth(data_dir, "full")
+    seen, limited, tasks_limited = {}, iter([True, False]), iter([True, False])
+    monkeypatch.setattr(workspace_mod, "RELAY_FIRST_WAIT_S", 0)
+    monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
+    monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
+
+    def fake_one_shot(work, **kwargs):
+        if next(limited, False):
+            raise workspace_mod.one_shot.OneShotError("一次性文本调用失败（exit 1）：429 Too Many Requests")
+        return "{}"
+
+    def fake_task(workspace, prompt, **kwargs):
+        if next(tasks_limited, False):
+            raise PiRunError("Pi 调用失败：429 rate limit reached")
+        return workspace / kwargs["expect"]
+
+    monkeypatch.setattr(workspace_mod.one_shot, "run_one_shot", fake_one_shot)
+    monkeypatch.setattr(workspace_mod.pi_run, "run_task", fake_task)
+
+    def fake_write(work, plan, ledger, units, run_pi, ask, **kwargs):
+        seen.update(kwargs, ask=ask, run_pi=run_pi)
+        return []
+
+    def fake_finish(work, plan, problems, ledger, chapters, input_json):
+        (work / "report.html").write_text("<html></html>", encoding="utf-8")
+        return {}
+
+    monkeypatch.setattr(workspace_mod.full, "write_chapters", fake_write)
+    monkeypatch.setattr(workspace_mod.full, "finish", fake_finish)
+    row = items_store.get_item(data_dir, ctx.item_id)
+    workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="node.exe",
+                                        pi_cli="cli.js", figures=True, progress=lambda *args: None)
+    gate = seen["gate"]
+    assert gate.limit == 5
+    seen["ask"]("读者的问题")
+    assert gate.limit == 3
+    seen["run_pi"](data_dir, "写这一章", "ch-01.html")
+    assert gate.limit == 1
 
 
 def test_every_pi_run_gets_what_is_left_of_the_stage_time(data_dir, monkeypatch, tmp_path):
@@ -304,7 +383,7 @@ def test_the_time_limit_grows_with_the_thinking_level(data_dir, monkeypatch, thi
     monkeypatch.setattr(workspace_mod.full, "write_chapters", lambda *args, **kwargs: [])
     monkeypatch.setattr(workspace_mod.full, "finish", lambda *args: {})
     monkeypatch.setattr(workspace_mod, "pi_runner",
-                        lambda *args, deadline: seen.append(deadline - time.monotonic()) or "runner")
+                        lambda *args, deadline, on_limit=None: seen.append(deadline - time.monotonic()) or "runner")
     row = items_store.get_item(data_dir, ctx.item_id)
     workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="n", pi_cli="c",
                                         figures=False, progress=lambda *args: None)

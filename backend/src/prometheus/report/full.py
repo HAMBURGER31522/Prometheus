@@ -12,10 +12,12 @@ import hashlib
 import json
 import re
 import shutil
+import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from prometheus.agents.runs import AgentRunError
 from prometheus.figures import notes as frame_notes
 from prometheus.report import assemble as assembling
 from prometheus.report import chapter_checks, chapter_write, keypoints, viewpoints
@@ -27,6 +29,7 @@ from prometheus.report.pi_run import SKILL_DIR, PiRunError, stage_skill
 DEPTH_MD = Path(__file__).with_name("depth.md")
 FIGURES_MD = Path(__file__).parents[1] / "figures" / "figures.md"
 MAX_REVISIONS = 2
+CHAPTERS_AT_ONCE = 5  # chapters written at the same time; the count of chapters is the plan's (PLAN 15.4.14 H)
 _PROFILE = re.compile(r"^[a-z]+$")
 
 
@@ -84,6 +87,23 @@ def _usable(plan: dict) -> dict:
     return {**plan, "chapters": chapters}
 
 
+def _written(run_pi, space: Path, prompt: str, filename: str, *, unchanged_too: bool = True) -> Path:
+    """Run once more when the Agent ended without writing `filename` or, with `unchanged_too`, left it as it
+    was: a relay's refusal otherwise failed the report or dropped a revision without a word (PLAN 15.4.14 G ②)."""
+    target = space / filename
+    before = target.read_bytes() if target.is_file() else None
+    for attempt in range(2):
+        try:
+            run_pi(space, prompt, filename)
+        except (PiRunError, AgentRunError) as exc:
+            if attempt or "没有写出" not in str(exc):
+                raise
+            continue
+        if not unchanged_too or target.read_bytes() != before:
+            break
+    return target
+
+
 def run_plan(work, ledger: dict, run_pi, *, figures: bool, input_json: dict) -> tuple:
     """(plan, problems left after one redo); raises when there is no usable plan at all."""
     work = Path(work)
@@ -99,7 +119,9 @@ def run_plan(work, ledger: dict, run_pi, *, figures: bool, input_json: dict) -> 
     base = planning.plan_prompt(figures=figures)
     prompt, plan, problems = base, None, []
     for _attempt in range(2):
-        plan = planning.read_plan(run_pi(space, prompt, "plan.json").read_text(encoding="utf-8"))
+        # a redo that writes the same plan is 「still wrong」, not a loss: only a missing plan.json runs again
+        written = _written(run_pi, space, prompt, "plan.json", unchanged_too=False)
+        plan = planning.read_plan(written.read_text(encoding="utf-8"))
         problems = planning.validate_plan(plan, ledger) if plan is not None else ["plan.json 不是合法的 JSON 对象"]
         if not problems:
             break
@@ -180,16 +202,55 @@ def _failing(check: dict, points: dict, sources: dict) -> list:
             for point_id in ids]
 
 
+def closing_problems(fragment: str, pictures: list, background=()) -> list:
+    """What the last look at a finished chapter sends back once (PLAN 15.4.14 B–F): pictures the reader
+    asked for and did not get, background questions left without a supplement, supplements of a sentence
+    or two, the writing materials, crowded limits."""
+    problems = [f"读者读到「{picture['quote']}」时希望有一张图：{picture['want']}。这张图还没画：按 depth.md 画一张图示，"
+                "或者用本章候选帧里合适的那张；只画本章正文已经写到的内容"
+                for picture in reviewing.missing_pictures(fragment, pictures)]
+    problems += [f"读者读到「{question['quote']}」时问：{question['question']}。这里还没有补充说明：在这句附近加一个补充说明"
+                 "（<aside class=\"supplement\">），用通用知识解释，不写成讲者的话；按三步写透：它是什么；"
+                 "放在这句话里为什么要紧；一个具体例子、数字或出处"
+                 for question in reviewing.missing_supplements(fragment, list(background))]
+    problems += [f"这条补充说明只有一两句（「{text}」）：按三步写透——它是什么；放在这句话里为什么要紧；"
+                 "一个具体例子、数字或出处" for text in reviewing.thin_supplements(fragment)]
+    terms = chapter_checks.process_terms(fragment)
+    if terms:
+        problems.append(chapter_checks.process_problem(terms))
+    crowded = chapter_checks.hedges(fragment)
+    if crowded:
+        problems.append("下面这些限定句太密了：只有视频里确有争议、或者这里补了视频没说的事时才保留，其余改成直接讲清楚："
+                        "「" + "」「".join(crowded) + "」")
+    return problems
+
+
 def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -> tuple:
     """(fragment, check, stats, details) after the two-step review and at most one revision; the
     details keep what was asked and how it was judged, so a review that led nowhere can be read."""
-    stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False}
-    reply = ask(reviewing.reader_prompt(fragment))
+    stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False,
+             "second_reader": False, "unfinished": False}
+
+    def asked(prompt: str, readable) -> str:
+        """A reply that is not the JSON asked for (a relay's refusal) is asked once more; still not, the
+        review is marked unfinished instead of passing for 「no questions」 (PLAN 15.4.14 G ①)."""
+        for _attempt in range(2):
+            reply = ask(prompt) or ""
+            if readable(reply):
+                return reply
+        stats["unfinished"] = True
+        return ""
+
+    reply = asked(reviewing.reader_prompt(fragment), reviewing.readable_reader)
     questions, pictures = reviewing.parse_reader(reply, fragment), reviewing.parse_pictures(reply, fragment)
+    stats["second_reader"] = True  # every chapter (PLAN 15.4.14 A)
+    again = asked(reviewing.second_reader_prompt(fragment, questions), reviewing.readable_reader)
+    questions = reviewing.merge(questions, reviewing.parse_reader(again, fragment))
+    pictures = reviewing.merge(pictures, reviewing.parse_pictures(again, fragment))
     stats["questions"] = len(questions)
     verdicts, judged = [], ""
     if questions:
-        judged = ask(reviewing.judge_prompt(questions, transcript)) or ""
+        judged = asked(reviewing.judge_prompt(questions, transcript), reviewing.readable_judge)
         verdicts = reviewing.parse_judge(judged, len(questions))
     details = {"questions": [{**question, "verdict": verdict} for question, verdict in zip(questions, verdicts)]
                if verdicts else [{**question, "verdict": None} for question in questions],
@@ -234,7 +295,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
                for point_id in owned}
 
     def write(prompt: str) -> str:
-        return run_pi(space, prompt, filename).read_text(encoding="utf-8")
+        return _written(run_pi, space, prompt, filename).read_text(encoding="utf-8")
 
     def recheck(fragment: str) -> dict:
         return chapter_checks.check_chapter(fragment, owned, points, spoken, sources=sources, frames=ledger)
@@ -274,30 +335,72 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
         fragment, check = viewed, again
     else:
         (space / filename).write_bytes(fragment.encode("utf-8"))
+    # the review's revision and the viewpoint pass came after the checks: one last look, sent back once
+    background = [question for question in (details or {}).get("questions") or []
+                  if (question.get("verdict") or {}).get("kind") == reviewing.BACKGROUND]
+    closing = closing_problems(fragment, (details or {}).get("pictures") or [], background)
+    if closing:
+        progress("收尾", number, total)
+        fixed = write(chapter_write.revision_prompt(base, closing, filename, fragment))
+        again = recheck(fixed)
+        if _lost(again) <= _lost(check):
+            fragment, check = fixed, again
+        else:
+            (space / filename).write_bytes(fragment.encode("utf-8"))
     links = dict.fromkeys(viewpoints.STATS, 0)
     if verify_links is not None:  # the editor's links, opened one by one (15.4.11a-4)
         fragment, links = viewpoints.verify(fragment, verify_links)
         (space / filename).write_bytes(fragment.encode("utf-8"))
     result = {"key": key, "number": number, "id": chapter["id"], "title": chapter["title"], "points": owned,
               "fragment": fragment, "check": check, "rounds": rounds, "targeted": targeted, "review": stats,
-              "review_details": details, "links": links}
+              "review_details": details, "links": links, "closing": closing}
     _write_json(record, result)
     return result
 
 
+class Gate:
+    """How many chapters are written at the same time (PLAN 15.4.14 H): CHAPTERS_AT_ONCE, then 3, then 1 after
+    the relay limits the rate; a chapter being written finishes, the next ones wait for a place."""
+
+    STEPS = (CHAPTERS_AT_ONCE, 3, 1)
+
+    def __init__(self):
+        self.limit, self.active = CHAPTERS_AT_ONCE, 0
+        self._turn = threading.Condition()
+
+    def lower(self) -> None:
+        with self._turn:
+            self.limit = next((step for step in self.STEPS if step < self.limit), 1)
+
+    def __enter__(self):
+        with self._turn:
+            self._turn.wait_for(lambda: self.active < self.limit)
+            self.active += 1
+        return self
+
+    def __exit__(self, *exc):
+        with self._turn:
+            self.active -= 1
+            self._turn.notify_all()
+        return False
+
+
 def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, figures: bool, review: bool,
-                   progress, workers: int = 3, look=None, verify_links=None) -> list:
+                   progress, workers: int = CHAPTERS_AT_ONCE, look=None, verify_links=None, gate=None) -> list:
     """`look(prompt, files) -> reply`: a call that sees images, for the frame ledger (多配图 ①)."""
     work = Path(work)
     points = {point["id"]: point for point in ledger["points"]}
     owned = planning.assign(plan, ledger)
     attached = _attachments(plan.get("profile"), figures)
 
+    gate = gate or Gate()
+
     def one(number: int) -> dict:
         chapter = plan["chapters"][number - 1]
-        return _write_one(work, plan, number, owned.get(chapter["id"], []), points, units, run_pi, ask,
-                          attached=attached, figures=figures, review=review, progress=progress, look=look,
-                          verify_links=verify_links)
+        with gate:
+            return _write_one(work, plan, number, owned.get(chapter["id"], []), points, units, run_pi, ask,
+                              attached=attached, figures=figures, review=review, progress=progress, look=look,
+                              verify_links=verify_links)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return list(pool.map(one, range(1, len(plan["chapters"]) + 1)))
