@@ -10,6 +10,7 @@ from prometheus.ingest.links import LinkUnsupported, parse_url
 from prometheus.library import items as items_store
 from prometheus.library import publish
 from prometheus.tasks import errors
+from prometheus.tasks import outputs as outputs_mod
 
 router = APIRouter()
 
@@ -23,11 +24,17 @@ async def create_item(request: Request):
         source = parse_url(body.get("url") or "")
     except LinkUnsupported:
         return JSONResponse({"code": "URL_UNSUPPORTED"}, status_code=422)
+    try:
+        outputs, depth = outputs_mod.from_submit(body)
+    except outputs_mod.Refused as refused:
+        return JSONResponse({"code": refused.code}, status_code=422)
     state = request.app.state
     try:
+        # No report, no figures to draw (PLAN 15.4.15).
         item_id = items_store.create_item(
             state.data_dir, platform=source.platform, video_id=source.video_id,
-            source_url=source.canonical_url, figures=1 if body.get("figures") else 0,
+            source_url=source.canonical_url, figures=1 if body.get("figures") and outputs["report"] else 0,
+            outputs=outputs, depth=depth,
         )
     except sqlite3.IntegrityError:
         existing = items_store.find_by_video(state.data_dir, source.platform, source.video_id)
@@ -47,7 +54,8 @@ async def list_items(
 
 def _with_file_state(data_dir, row: dict) -> dict:
     """Flag items whose library folder was moved or deleted outside the app; say why one failed."""
-    return {**row, "files_missing": publish.files_missing(data_dir, row), **errors.view(data_dir, row)}
+    return {**row, "files_missing": publish.files_missing(data_dir, row), **errors.view(data_dir, row),
+            **outputs_mod.view(row)}
 
 
 @router.get("/api/queue")
@@ -56,7 +64,8 @@ async def queue_view(request: Request):
     active = [row for row in items_store.list_items(data_dir) if row["status"] != "done"]
     done = items_store.list_items(data_dir, status="done")
     # A failed row says why and what to do (PLAN 15.4.10).
-    return [{**row, **errors.view(data_dir, row)} for row in active + list(reversed(done[-20:]))]
+    return [{**row, **errors.view(data_dir, row), **outputs_mod.view(row)}
+            for row in active + list(reversed(done[-20:]))]
 
 
 @router.get("/api/items/{item_id}")

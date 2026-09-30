@@ -4,7 +4,7 @@ import sqlite3
 
 from prometheus import paths
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 SCHEMA_V1 = """
@@ -52,6 +52,10 @@ _ADDED_COLUMNS = (
     ("subtitle_status", "TEXT"),
     # Version 5 (PLAN 15.4.11): where a long stage is, e.g. 「写作（第 3/10 章）」; cleared with each stage.
     ("stage_detail", "TEXT"),
+    # Version 6 (PLAN 15.4.15): what this video gets and how detailed its report is; NULL = all three,
+    # at the settings' depth (items from before).
+    ("outputs", "TEXT"),             # JSON {"report": bool, "subtitles": bool, "mindmap": bool}
+    ("depth", "TEXT"),               # full | standard
 )
 
 

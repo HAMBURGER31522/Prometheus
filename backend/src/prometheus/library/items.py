@@ -1,5 +1,6 @@
 """Item persistence (PLAN 7.1)."""
 
+import json
 import sqlite3
 from datetime import UTC, datetime
 
@@ -11,6 +12,7 @@ _ITEM_FIELDS = {
     "report_title", "category_id", "figures", "status", "stage", "mindmap_status",
     "error_code", "error_message", "started_at", "finished_at",
     "library_path", "tags", "description", "transcript_source", "notice", "subtitle_status", "stage_detail",
+    "outputs", "depth",
 }
 
 
@@ -19,7 +21,7 @@ def _now() -> str:
 
 
 def create_item(data_dir, *, platform, video_id, source_url, figures=0, status="queued",
-                item_id=None):
+                item_id=None, outputs=None, depth=None):
     # Callers may pin the id (live tests reuse per-video folders); production
     # draws a fresh 32-hex id.
     item_id = item_id or paths.new_item_id()
@@ -28,8 +30,9 @@ def create_item(data_dir, *, platform, video_id, source_url, figures=0, status="
     try:
         conn.execute(
             "INSERT INTO items (id, platform, video_id, source_url, figures, status,"
-            " created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (item_id, platform, video_id, source_url, int(figures), status, _now()),
+            " created_at, outputs, depth) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (item_id, platform, video_id, source_url, int(figures), status, _now(),
+             json.dumps(outputs) if outputs is not None else None, depth),
         )
         conn.commit()
     finally:
