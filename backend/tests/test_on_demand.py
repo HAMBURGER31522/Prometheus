@@ -65,3 +65,103 @@ def test_nothing_to_make_a_map_without_its_report_or_an_unknown_depth_is_refused
     assert response.status_code == 422
     assert response.json() == {"code": code}
     assert client.get("/api/items").json() == []
+
+
+# ---------------- which steps run (E17 ①) ----------------
+
+REPORT_STEPS = {"frames", "keypoints", "plan", "report", "finalize"}
+SUBTITLE_STEPS = ["resolve", "download", "transcribe", "transcript", "subtitle_fix", "classify", "publish"]
+
+
+def _finished(client, item_id) -> list:
+    import json
+
+    from prometheus import paths
+
+    trace = paths.work_dir(client.app.state.data_dir, item_id) / "run.trace.jsonl"
+    events = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
+    return [event["stage"] for event in events if event["event"] == "end"]
+
+
+@pytest.mark.parametrize(("outputs", "skipped"), [
+    (ALL, set()),
+    ({"report": True, "subtitles": True, "mindmap": False}, {"mindmap"}),
+    ({"report": True, "subtitles": False, "mindmap": True}, {"subtitle_fix"}),
+    ({"report": True, "subtitles": False, "mindmap": False}, {"subtitle_fix", "mindmap"}),
+    (SUBTITLES, REPORT_STEPS | {"mindmap"}),
+])
+def test_each_choice_runs_only_its_steps(client, outputs, skipped):
+    from conftest import wait_for_status
+    from prometheus.tasks import runner
+
+    item_id = _submit(client, outputs=outputs, depth="standard").json()["id"]
+    wait_for_status(client, item_id, "done")
+    assert _finished(client, item_id) == [stage for stage in runner.STAGES if stage not in skipped]
+
+
+def test_the_console_counts_only_the_steps_this_video_runs(client):
+    item_id = _submit(client, outputs=SUBTITLES, depth="standard").json()["id"]
+    assert _row(client, item_id).get("stages") == SUBTITLE_STEPS
+    queued = {row["id"]: row for row in client.get("/api/queue").json()}
+    assert queued[item_id].get("stages") == SUBTITLE_STEPS
+    from prometheus.tasks import runner
+
+    old = items_store.create_item(client.app.state.data_dir, platform="bilibili", video_id="BV1old00000",
+                                  source_url="https://www.bilibili.com/video/BV1old00000/", status="done")
+    assert _row(client, old).get("stages") == runner.STAGES
+
+
+@pytest.fixture
+def data_dir(tmp_path):
+    from prometheus import paths
+    from prometheus.library import db
+
+    data_dir = tmp_path / "data"
+    paths.init_data_dir(data_dir)
+    db.init_db(data_dir)
+    return data_dir
+
+
+def _item(data_dir, video_id="BV1xJYT6EEYc", **fields):
+    return items_store.create_item(data_dir, platform="bilibili", video_id=video_id,
+                                   source_url=f"https://www.bilibili.com/video/{video_id}/", **fields)
+
+
+@pytest.mark.parametrize(("settings_depth", "item_depth", "written"), [
+    ("full", "standard", "standard"),
+    ("standard", "full", "full"),
+    ("standard", None, "standard"),
+    ("full", None, "full"),
+])
+def test_the_report_is_written_at_the_videos_own_depth(data_dir, monkeypatch, settings_depth, item_depth, written):
+    """PLAN 15.4.15-2: the switch beside the link box is for this one video; items from before follow the settings."""
+    from conftest import DUMMY_RUNTIME
+    from prometheus.settings import store
+    from prometheus.tasks import stages as stages_mod
+    from prometheus.tasks.runner import StageContext
+
+    settings = store.load(data_dir)
+    settings["report"] = {"depth": settings_depth, "review": True}
+    store.save(data_dir, settings)
+    ctx = StageContext(data_dir, _item(data_dir, depth=item_depth))
+    called = []
+    for name, label in (("run_keypoints_stage", "keypoints"), ("run_plan_stage", "plan"),
+                        ("run_full_report_stage", "full"), ("run_report_stage", "standard")):
+        monkeypatch.setattr(stages_mod.workspace_mod, name, lambda *a, label=label, **k: called.append(label))
+    impls = stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)
+    for stage in ("keypoints", "plan", "report"):
+        impls[stage](ctx)
+    assert called == (["keypoints", "plan", "full"] if written == "full" else ["standard"])
+
+
+def test_a_restart_does_not_call_a_map_nobody_asked_for_failed(data_dir):
+    """A mind map rerun cut short by quitting is marked failed; a video without a map has none to fail."""
+    from prometheus.library import db
+
+    rerun = _item(data_dir, "BV1rerun0000", status="done")  # from before R7h: all three
+    no_map = _item(data_dir, "BV1nomap0000", status="done", outputs={"report": True, "subtitles": True, "mindmap": False})
+    subtitles = _item(data_dir, "BV1subs00000", status="done", outputs=SUBTITLES)
+    db.mark_running_as_interrupted(data_dir)
+    assert items_store.get_item(data_dir, rerun)["mindmap_status"] == "failed"
+    assert items_store.get_item(data_dir, no_map)["mindmap_status"] is None
+    assert items_store.get_item(data_dir, subtitles)["mindmap_status"] is None
