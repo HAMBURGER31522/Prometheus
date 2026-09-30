@@ -8,6 +8,7 @@ import { type AgentId, type AgentRow, ApiError, type ModelInfo, type ModelProfil
 import { openExternal } from "../../shared/platform";
 import { type Option, Select } from "../../shared/Select";
 import { AGENTS, AGENT_PROTOCOL, agentProblem, agentThinking, limitHint, presetAllowed } from "./agents";
+import { listNote } from "./modelList";
 import { PRESETS, type Preset, presetFields, presetOf } from "./presets";
 import { SecretInput } from "./SecretInput";
 import { THINKING, THINKING_HINT, clampThinking, thinkingLevels, thinkingOptions } from "./thinking";
@@ -466,7 +467,9 @@ function ModelPicker({ profile, onPick, listable }: {
     setBusy(true);
     setError("");
     try {
-      setModels(await api.listModels(profile));
+      const found = await api.listModels(profile);
+      setModels(found);
+      setError(listNote(found));
       setOpen(true);
     } catch (failure) {
       setError(failureText(failure));
