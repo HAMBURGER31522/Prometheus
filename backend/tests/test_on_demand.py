@@ -146,12 +146,14 @@ def test_the_report_is_written_at_the_videos_own_depth(data_dir, monkeypatch, se
     ctx = StageContext(data_dir, _item(data_dir, depth=item_depth))
     called = []
     for name, label in (("run_keypoints_stage", "keypoints"), ("run_plan_stage", "plan"),
-                        ("run_full_report_stage", "full"), ("run_report_stage", "standard")):
+                        ("run_full_report_stage", "full"), ("run_report_stage", "standard"),
+                        ("run_standard_viewpoints", "viewpoints")):
         monkeypatch.setattr(stages_mod.workspace_mod, name, lambda *a, label=label, **k: called.append(label))
     impls = stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)
     for stage in ("keypoints", "plan", "report"):
         impls[stage](ctx)
-    assert called == (["keypoints", "plan", "full"] if written == "full" else ["standard"])
+    # 「标准」 (PLAN 15.4.15-10): VRA's one go, then the editor's pass on each chapter
+    assert called == (["keypoints", "plan", "full"] if written == "full" else ["standard", "viewpoints"])
 
 
 def test_a_restart_does_not_call_a_map_nobody_asked_for_failed(data_dir):

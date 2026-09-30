@@ -124,6 +124,12 @@ def _standard_on_agent(work: Path, settings: dict, kwargs: dict, node_exe: str, 
     return report
 
 
+def run_standard_viewpoints(data_dir, item_id: str, row: dict, settings: dict, *, node_exe: str, pi_cli: str,
+                            progress) -> None:
+    """「标准」 ② ③ (PLAN 15.4.15-10)."""
+    return None
+
+
 # ---- 完整精读 (PLAN 15.4.11): 提取要点, 规划, then the report chapter by chapter ----
 
 def full_depth(settings: dict) -> bool:
