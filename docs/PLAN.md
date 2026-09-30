@@ -670,6 +670,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | **E14** | R7e（精读完整度，15.4.11）：<br>① 离线单测：转写切块；要点校验（锚点、单元归属、两级覆盖的第一级与重问）；规划校验（归属、跳过理由、「重复」指向、跳过过多时复核）；逐章检查（`data-points` 覆盖、依据率、照抄比例、每个要点的隐藏篇幅检查）与反馈生成；提示词和反馈里不出现字数；审校两步的清单校验；拼装（占位符全部填写、章节顺序、目录、补充说明样式、通过 finalize 的检查）；分章运行器的 Pi 命令参数与 vendor PiRunner 一致；各环节轮次上限；`coverage.json`；评测打分；「标准」模式不经过新流程；<br>② live（用户的模型，会产生费用，预算约 60–80 美元，2026-09-28 由 25–45 上调；2026-09-29 用户同意英文补齐和罗素复核改用 justwoker 中转跑，累计约 90 美元，超出原预算）：先测三篇旧报告的基线；卡巴拉（104 分钟）与英文学习视频（19 分钟）用「完整」模式重新生成，每篇都满足：要点覆盖率 ≥ 95%（只认 `data-points`，不算合法跳过）；时间覆盖 ≥ 90% 且最长漏写 ≤ 2 分钟（不算跳过段）；闭卷问答得分 ≥ 80%，且比旧报告至少高 20 个百分点或达到 95%；忠实度抽检「无依据」（冒充讲者或与原文矛盾，不含讲解性补充）≤ 5%；补充说明与视频内容矛盾 0 条；图示、配图、表格、卡片等组件总数不少于旧报告。结果写进 `docs/report-eval.md`。**未达标时停下来向用户报告，不自行降低门槛**；<br>③ 用户并排阅读新旧报告并签字，记入 `docs/acceptance.md` | `uv run pytest backend/tests -q -m "not live"`；`uv run ruff check backend scripts`；live 测试与 `scripts/report-eval/`（手动触发）；用户判定 |
 | **E15** | R7f（多 Agent 后端，15.4.13）：见 15.4.13 的 Done When 1–5（离线单测；对着本机假接口的隔离实测；前端测试与截图，**停下来请用户看**；罗素 8 分钟在 Codex CLI 和 Claude Code 上各跑一整条流水线，预算约 20–35 美元；Codex 官方登录由用户手动试；检查更新） | `uv run pytest backend/tests -q -m "not live"`；`uv run pytest backend/tests -q -m agents`；`uv run ruff check backend scripts`；`npm --prefix app run test`、`npx tsc --noEmit`、`npm --prefix app run lint:design`、`npm --prefix app run e2e`；live（手动触发）；用户判定 |
 | **E16** | R7g（各模型篇幅对齐，15.4.14）：见 15.4.14 的 Done When 1–5（离线单测；罗素分别用 Claude 和 Codex 整条流水线实跑；英文 19 分钟用 Claude 做留出检验）。 |
+| **E17** | R7h（按需生成，15.4.15）：见 15.4.15 的 Done When 1–3（离线单测；前端测试与截图，**停下来请用户看**；罗素只要字幕、再补精读和导图的实跑）。 |
 
 ### 15.4 设计细节
 
@@ -1109,6 +1110,40 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 4. ~~留出检验，Claude（同 2 的接口和模型，只跑改动后的一遍）~~（并入 2：英文本身就是留出的视频）：英文 19 分钟整条流水线成功，每章都有第二位读者，补充说明条数多于 R7e 第四轮的英文版（claude-opus-4-8），E14 自动门槛照过（评判同 2）。
 5. 费用：runanytime 的 sonnet 两次约 10 美元（已花）；agentrouter 的 opus 三次（罗素基线、罗素改后、英文）按官方价约 60–90 美元，超出前停下来问；Codex 走订阅额度。
 
+#### 15.4.15 按需生成（R7h）
+
+> 用户（2026-09-30）：一小时的视频精读要跑三小时太难受；在链接框右边加三个圆圈，可以选这个视频要精读、字幕还是导图。
+> 执行 agent 查明：字幕纠错有精读时拿它当参考，没有也能纠（R6b 在不给报告的条件下验收过）；导图现在从精读的章节结构生成。
+> 用户选定：导图和精读绑在一起，字幕可以单独要；放在 R8 前的小里程碑；默认记住上次的选择；链接框旁边也能选精读的详细程度；
+> 没生成的部分在阅读页可以「现在生成」。
+
+**Goal**：提交视频时只生成需要的部分，长视频可以单独选快的档位，省时间也省钱。
+
+**规则**
+
+1. 控制台链接框右边三个圆圈：「精读」「字幕」「导图」。勾导图会自动勾上精读，取消精读也会一起取消导图；至少选一样。
+   默认记住上次提交时的选择，第一次三个都勾。
+2. 旁边「标准 / 完整」切换：默认沿用设置里的精读详细程度，只影响这一个视频；没勾精读时变灰。
+3. 流水线按勾选跳过步骤：下载、转写每次都做（字幕原文总会有）；没勾精读，跳过抽帧、要点、规划、写作、定稿和导图；
+   没勾字幕，跳过字幕纠错（字幕页显示没纠错的原文）；归类每次都做，有精读照精读，没有就用视频标题加转写的开头；
+   知识库文件夹只放生成了的文件，文件夹名用精读的标题，没有精读就用视频标题。
+4. 没有精读时字幕纠错不带参考材料。
+5. 阅读页里没生成的标签页显示「没有生成」和「现在生成」：只补缺的部分，用已有的转写，不重新下载、不重新转写；
+   补精读时导图一起补上。
+6. 旧条目三样都有，行为不变。
+
+明确不做：不写精读就出导图；不改精读和字幕纠错本身的写法。
+
+**Done When**（E17）
+
+1. 离线：`uv run pytest backend/tests -q -m "not live"` = 0，覆盖：提交参数的保存和检查（至少一样、导图必须带精读、详细程度只取
+   标准 / 完整）；每种勾选组合跑哪些步骤；没有精读时的归类、知识库文件和文件夹名；字幕纠错不带参考；「现在生成」只跑缺的步骤。
+   `uv run ruff check backend scripts` = 0，`verify.ps1` = 0。
+2. 前端：`npm --prefix app run test`、`npx tsc --noEmit`、`npm --prefix app run lint:design`、`npm --prefix app run e2e` = 0，
+   覆盖三个圆圈的联动、记住上次的选择、详细程度切换何时变灰、提交带上参数、阅读页的「没有生成」和「现在生成」。
+   截图给用户看，用户的判定记入 acceptance.md。
+3. live（当前配置：Codex 官方登录，走订阅）：罗素只勾字幕跑通，记下用时；再点「现在生成」按「标准」补上精读和导图，跑通。
+
 ### 15.5 里程碑
 
 每个里程碑在单独分支上开发，先写失败测试再实现，测试全绿后 `merge --no-ff` 到 `main` 并推送。
@@ -1129,6 +1164,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R7e | `r7e-report-depth` | 15.4.11 精读完整度（评测先行、要点账本、分章写作与拼装、逐章检查、讲清楚审校） | E14；**用户签字** |
 | R7f | `r7f-agents` | 15.4.13 多 Agent 后端（Pi / Codex CLI / Claude Code，私有副本与隔离，检查更新窗口） | E15；**先请用户看前端截图**，再做后端 |
 | R7g | `r7g-depth-parity` | 15.4.14 各模型篇幅对齐（追问下限、补充写透、要图必出图、正文不写处理过程、少写免责句） | E16 |
+| R7h | `r7h-on-demand` | 15.4.15 按需生成（精读 / 字幕 / 导图三个圆圈、每个视频的详细程度、现在生成） | E17；**先请用户看前端截图** |
 | R8 | `r8-release` | 打包、README、完整验收 | E3、E4、E8、E9 |
 
 ### 15.6 进度记录
@@ -1149,6 +1185,7 @@ live 测试（`-m live`）：一个 5–10 分钟的公开 B 站视频（选定�
 | R7e 精读完整度 | 完成 | 2026-09-29 | c907065 | E14 ①：`uv run pytest backend/tests -q -m "not live"` = 0（629 passed）、`uv run ruff check backend scripts` = 0、`verify.ps1` = 0、`npm --prefix app run test` = 0（50 passed）、`tsc --noEmit` = 0、`lint:design` = 0、`npm --prefix app run e2e` = 0（48 passed）；② live（第四轮，claude-opus-4-8「超高」评判，新旧同一评判）：英文完整重跑闭卷 84.4% → 100%、无依据 2/40；卡巴拉补写 62.5% → 91.1%、无依据 0/40；罗素补写（复核样本）75.0% → 100%、无依据 1/40；三篇要点覆盖和时间覆盖 100%、最长漏写 0 分钟、补充说明矛盾 0、组件均多于旧报告，详见 `docs/report-eval.md`；Claude 按官方价估算累计约 149 美元，超出原预算部分用户逐次同意；③ 用户并排阅读后签字（acceptance.md）。含 15.4.12 模型目录更新。红 bc0b011、f22c099、5218db9、cd162a8、d75565b、8fc159c、5662dad、c834a43、dc272fd、706668c、3d3a13a、b8d08ff、3da6803、b43545c、6372307、b5e3f85、5c48eb8、c29b139、cf7396a、0471ab6、2bb74d1、7d0c2bd、974f0ad、d6c6374、6d3cd31、900a0a8、8bda587、17b36a0、37c9ef7、5cffcff、49cc212、d19dadb、5801875、bba702b、deda512、4fbad2f、0a156b9、18a7d17、905ceba、7b694c5、28bc312、6b1383d、df58681、70cb30c → 绿 274a5f5、9b5c750、7ef3f1b、8a8d775、55f0c56、9105149、5c7bfa2、99d356e、faba458、7e10d7c、ae41083、567cfd7、e951998、aa4ac12、be0549f、4a2faa8、bcd4dc0、6ffa33d、0431e81、f58cf86、9a42c46、55a94b3、4436cc4、404eec5、20cc6d5、1092a1f、8571e7a、3c96e3f、9aeeff0、e5258f0、58de36a、c50e861、cb4af1c、70d511a、5e58d13、0670adc、0cef574、e23b026、d7ae694、dd00735、10942d4 |
 | R7f 多 Agent 后端 | 完成 | 2026-09-30 | 4982a03 | E15 ①：`uv run pytest backend/tests -q -m "not live"` = 0（714 passed；8 次完整运行里有 1 次一个测试失败，没能复现，名字没记下）、`uv run ruff check backend scripts` = 0、`verify.ps1` = 0；② `uv run pytest backend/tests -q -m agents` = 0（18 passed：隔离与对照、文件保护的诱饵测试、自检、Codex 模型列表）；③ `npm --prefix app run test` = 0（57 passed）、`tsc` = 0、`lint:design` = 0、`npm --prefix app run e2e` = 0（55 passed），用户看过截图（acceptance.md）；④ live：罗素整条流水线 Codex CLI（anyrouter gpt-6-astra「超高」）与 Claude Code（justwoker claude-opus-4-8[1m]「中」）都跑通，官方登录评分：Codex 全部过 E14 门槛，Claude Code 有 1 条补充说明与视频矛盾，用户判定如实记录照样验收；用户手动完成 Codex 官方登录，gpt-6.1-sol 跑通字幕纠错和导图；用户目录里没有运行痕迹；⑤ 真实 npm 检查并更新了应用自己的 Codex（0.159.0 → 0.159.1，自检通过）。费用按官方价约 62–65 美元，用户逐次同意。红 22eaeb7、73695b7、2aba78f、64e5098、9b6ecdd、99a5f19、96c1898、837e620、1203156、8ad507d、2d288ee、730cdc6、1c3c363、d43360e、31076b8、d60d6bc、ae4bd65、7a350a8、5eeb34d → 绿 1acaba3、7990471、b521e34、e1e7b62、d7d18d6、8c75502、1f09fee、4225913、36a74a1、65b2c22、acf4398、ca8dc21、70111ed、8786b8a、c07807a、32cdea2、0f4dadd、f82effb、310fb3a、e247ded、68fde47 |
 | R7g 各模型篇幅对齐 | 完成（用户决定收工，E16 ② 未达标） | 2026-09-30 | 9101507 | E16 ①：`uv run pytest backend/tests -q -m "not live"` = 0（746 passed；4 次整套中 1 次 test_model_profiles 的一个测试失败，没能复现）、`uv run ruff check backend scripts` = 0、`verify.ps1` = 0；② 英文 19 分钟 runanytime sonnet-4-6 改前 19916 字 / 39 条补充，改后 19093 字 / 19 条（当时读者「每段只挑最要紧的问」，之后撤回，未再跑），E14 评分未做，罗素在两个 Claude 接口上跑不了；③ 用户取消；④ 并入 ②；用户 2026-09-30 判定就此收工（acceptance.md）。R7f 的偶发测试修好（b54c531）。红 d2fc0b9、bec524b、dd20fe9、4fd2046、729e0ef、d078b33、92446f8 → 绿 aee935d、47a7d0a、2b32d40、e05973d、a127bed、add8252、9101507 |
+| R7h 按需生成 | 未开始 | | | |
 | R8 发布 | 未开始 | | | |
 
 ## 附录 A：对 vendor/video-report-agent 的修改（只允许以下各项）
