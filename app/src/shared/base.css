@@ -282,6 +282,9 @@ html[data-dragging], html[data-dragging] * { user-select: none; cursor: grabbing
 .popover [role="menuitem"]:hover, .popover [role="option"]:hover, .coverage-menu button:hover,
 .popover [role="option"][data-active] { background: var(--line); color: var(--ink); }
 .popover [role="option"][aria-selected="true"] { color: var(--accent); font-weight: 600; }
+.popover [role="option"][aria-disabled="true"], .popover [role="option"][aria-disabled="true"]:hover {
+  background: none; color: var(--muted); opacity: .55;
+}
 .toc { position: relative; }
 .toc-menu { right: 0; width: 340px; }
 .toc-num { font: 12px/1 var(--font-mono); color: var(--muted); }

@@ -126,3 +126,22 @@ def test_the_grader_thinks_at_xhigh_unless_told_otherwise(tmp_path, monkeypatch)
     assert runner.main([str(data_dir), "--out", str(tmp_path / "out")]) == 0
     assert runner.main([str(data_dir), "--out", str(tmp_path / "out"), "--thinking", "high"]) == 0
     assert seen == ["xhigh", "high"]
+
+
+def test_the_grader_asks_through_the_profiles_agent(tmp_path, monkeypatch):
+    """The grader relay failed (justwoker 403, 2026-09-30): grading through Codex CLI's official login
+    needs the grader's calls to follow the active profile's Agent, as the app's own calls do."""
+    from prometheus.settings import store
+
+    data_dir, _ = data_dir_with_item(tmp_path)
+    settings = store.load(data_dir)
+    profile = {**settings["llm_profiles"]["items"][0], "id": "login", "kind": "custom", "agent": "codex",
+               "access": "login", "base_url": "", "api_key": "", "model": "gpt-6.1-sol", "protocol": "openai"}
+    settings["llm_profiles"] = {"active": "login", "items": [profile]}
+    store.save(data_dir, settings)
+    runner = load_runner()
+    seen = {}
+    monkeypatch.setattr(runner.runtime_mod, "resolve", lambda _: type("R", (), {"node": "n", "pi_cli": "c"})())
+    monkeypatch.setattr(runner.one_shot, "run_one_shot", lambda work, **kwargs: seen.update(kwargs) or "{}")
+    runner.model_ask(data_dir, tmp_path / "work", "xhigh")("提示词")
+    assert (seen.get("agent") or {}).get("id") == "codex" and seen["agent"]["access"] == "login"

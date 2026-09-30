@@ -64,7 +64,14 @@ export const api = {
   modelCatalogue: () => json<{ updated_at: string | null }>("GET", "/api/settings/model-catalogue"),
   refreshModelCatalogue: () =>
     json<{ updated_at: string | null; providers: number; failed: string[] }>("POST", "/api/settings/model-catalogue/refresh"),
-  modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url">) =>
+  /** The Agents' versions, 「检查」「安装 / 更新」「全部更新」 and the Codex login (PLAN 15.4.13). */
+  agents: async () => (await json<{ agents: AgentRow[] }>("GET", "/api/agents")).agents,
+  checkAgents: async () => (await json<{ agents: AgentRow[] }>("POST", "/api/agents/check")).agents,
+  installAgent: async (id: AgentId) => (await json<{ agents: AgentRow[] }>("POST", `/api/agents/${id}/install`)).agents,
+  updateAllAgents: async () => (await json<{ agents: AgentRow[] }>("POST", "/api/agents/update-all")).agents,
+  codexLogin: () => json<{ logged_in: boolean }>("GET", "/api/agents/codex/login"),
+  startCodexLogin: () => json<{ logged_in: boolean }>("POST", "/api/agents/codex/login"),
+  modelInfo: (profile: Pick<ModelProfile, "kind" | "model" | "protocol" | "base_url" | "agent">) =>
     json<ModelInfo>("POST", "/api/settings/model-info", { profile }),
   installAsr: () => json<{ started: boolean }>("POST", "/api/asr-components/install"),
   lookupWord: (word: string) => json<LookupEntry>("GET", `/api/dictionary/lookup?word=${encodeURIComponent(word)}`),
@@ -190,11 +197,27 @@ export interface ModelProfile {
   /** 「高级」 (PLAN 15.4.10): the user's own numbers; null = what the catalogues say. */
   context_window: number | null;
   max_tokens: number | null;
+  /** The Agent that runs this profile and how it connects (PLAN 15.4.13). */
+  agent: AgentId;
+  access: "key" | "login";
+}
+
+export type AgentId = "pi" | "codex" | "claude";
+
+/** One row of the update window (PLAN 15.4.13); latest is null until 「检查」. */
+export interface AgentRow {
+  id: AgentId;
+  name: string;
+  installed: boolean;
+  version: string | null;
+  latest: string | null;
 }
 
 /** What Pi's bundled catalogue (source "pi") or the models.dev snapshot knows about a profile's model (PLAN 15.4.10). */
 export interface ModelInfo {
-  source: "pi" | "models.dev" | null;
+  source: "pi" | "models.dev" | "codex" | null;
+  /** Codex's own list (PLAN 15.4.13): the thinking levels this model takes there. */
+  levels?: string[] | null;
   context_window: number | null;
   max_tokens: number | null;
   thinking_level_map: Record<string, string | null> | null;

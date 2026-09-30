@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { type Settings, api } from "../../shared/api";
 import { pickDirectory, pickFile } from "../../shared/platform";
 import { ScrollArea } from "../../shared/ScrollArea";
+import { AgentUpdates } from "./AgentUpdates";
 import { ModelProfiles } from "./ModelProfiles";
 import { SecretInput } from "./SecretInput";
 
@@ -21,6 +22,7 @@ export function SettingsPage() {
   const [asr, setAsr] = useState<{ state: string; detail: string } | null>(null);
   const [dataDir, setDataDir] = useState<string | null>(null);
   const [catalogue, setCatalogue] = useState("");
+  const [updates, setUpdates] = useState(false);
 
   useEffect(() => {
     api.settings().then(setSettings).catch(() => setStatus("读取设置失败"));
@@ -94,7 +96,11 @@ export function SettingsPage() {
             <span className="muted" data-testid="model-catalogue">
               {catalogue || "模型目录："}
             </span>
+            <button type="button" className="btn" onClick={() => setUpdates(true)}>
+              检查更新
+            </button>
           </div>
+          {updates && <AgentUpdates onClose={() => setUpdates(false)} />}
           <div className="row" style={{ marginTop: 16 }}>
             <button
               type="button"

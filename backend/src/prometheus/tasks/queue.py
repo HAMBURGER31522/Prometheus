@@ -85,6 +85,11 @@ class TaskQueue:
             return True
         return False
 
+    def busy(self) -> bool:
+        """A task is running (PLAN 15.4.13: the Agents are not updated under it)."""
+        with self._lock:
+            return self._current is not None
+
     def is_running(self, item_id) -> bool:
         with self._lock:
             current = self._current

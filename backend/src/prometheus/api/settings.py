@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from prometheus import paths
+from prometheus.agents import rules, runs
 from prometheus.llm import capability, catalogue_update, model_list, pi_models
 from prometheus.llm.one_shot import OneShotError, run_one_shot
 from prometheus.runtime import RuntimeConfigError
@@ -39,6 +40,9 @@ async def put_settings(request: Request):
     protocols += [p.get("protocol", "openai") for p in (body.get("llm_profiles") or {}).get("items", [])]
     if any(protocol not in pi_models.PROTOCOL_APIS for protocol in protocols):
         return JSONResponse({"code": "INVALID_PROTOCOL"}, status_code=422)
+    for profile in (body.get("llm_profiles") or {}).get("items", []):
+        if code := rules.problem(profile):  # the Agent and how it connects (PLAN 15.4.13)
+            return JSONResponse({"code": code, "profile_id": profile.get("id")}, status_code=422)
     stored = store.load(state.data_dir)
     store.save(state.data_dir, store.restore_secrets(body, stored))
     saved = store.load(state.data_dir)
@@ -64,6 +68,8 @@ def list_models(request: Request, body: dict):
     """「获取模型列表」 for one profile (PLAN 15.4.8): only ever on the user's click."""
     state = request.app.state
     profile = dict(body.get("profile") or {})
+    if profile.get("agent") == "codex" and profile.get("access") == "login":  # the account's list (15.4.13)
+        return {"models": [model["id"] for model in state.agents.codex_models()]}
     profile["api_key"] = store.stored_key(state.data_dir, profile)
     proxy = store.load(state.data_dir)["network"].get("proxy", "")
 
@@ -102,7 +108,15 @@ def model_info(request: Request, body: dict):
     """What Pi's bundled catalogue or the models.dev snapshot knows about one profile's model
     (PLAN 15.4.10): the page lists the thinking levels and pre-fills 「高级」 from it."""
     state = request.app.state
-    source, fields = pi_models.model_fields(state.data_dir, dict(body.get("profile") or {}), pi_cli=_pi_cli(state))
+    profile = dict(body.get("profile") or {})
+    # 「claude-opus-4-8[1m]」 is claude-opus-4-8 asked for with its 1M window (Claude Code's own suffix)
+    profile["model"] = str(profile.get("model") or "").removesuffix("[1m]")
+    source, fields = pi_models.model_fields(state.data_dir, profile, pi_cli=_pi_cli(state))
+    if profile.get("agent") == "codex":  # Codex says which levels each of its models takes (15.4.13)
+        known = next((model for model in state.agents.codex_models() if model["id"] == profile.get("model")), None)
+        if known:  # the limits a blank 「高级」 box means: the same catalogue (agents/runs.py _limits)
+            return {"source": "codex", "levels": known["levels"], "context_window": fields.get("contextWindow"),
+                    "max_tokens": fields.get("maxTokens"), "thinking_level_map": None}
     return {
         "source": source, "context_window": fields.get("contextWindow"), "max_tokens": fields.get("maxTokens"),
         "thinking_level_map": fields.get("thinkingLevelMap"),
@@ -121,11 +135,14 @@ def test_model(request: Request):
             probe_dir, prompt="回复两个字：可用", provider=llm["provider"],
             model=llm["model"], api_key=llm.get("api_key") or "",
             thinking=llm.get("thinking") or "low",
-            node_exe=str(found.node), pi_cli=str(found.pi_cli), agent_dir=probe_dir,
+            node_exe=str(found.node), pi_cli=str(found.pi_cli), agent_dir=probe_dir, agent=runs.agent_of(llm),
         )
-    except OneShotError as exc:
+    except (OneShotError, runs.AgentRunError) as exc:
         return JSONResponse({"ok": False, "detail": str(exc)[:200]}, status_code=200)
-    images = capability.query_supports_images(found.node, found.pi_cli, state.data_dir, llm)
+    if llm.get("agent", "pi") != "pi":  # Pi's own capability query does not speak for the other Agents
+        images = bool((llm.get("custom") or {}).get("supports_images"))
+    else:
+        images = capability.query_supports_images(found.node, found.pi_cli, state.data_dir, llm)
     return JSONResponse(
         {"ok": True, "detail": f"{reply[:60]} · 支持看图：{'是' if images else '否'}"},
         status_code=200,

@@ -35,4 +35,5 @@ dev = [
 [tool.pytest.ini_options]
 markers = [
     "live: tests that call real services and cost money (deselect with -m 'not live')",
+    "agents: runs the app's own Codex CLI and Claude Code against a local fake API; only with -m agents",
 ]

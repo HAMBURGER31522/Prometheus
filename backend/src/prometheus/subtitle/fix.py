@@ -168,13 +168,14 @@ def _reference(data_dir, item_id: str, row: dict) -> str:
 
 
 def _ask_model(data_dir, llm: dict, *, node_exe: str, pi_cli: str):
+    from prometheus.agents import runs
     from prometheus.llm import one_shot
 
     def ask(prompt: str) -> str:
         return one_shot.run_one_shot(
             paths.pi_config_dir(data_dir), prompt=prompt, provider=llm["provider"], model=llm["model"],
             api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
-            node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+            node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir), agent=runs.agent_of(llm),
         )
     return ask
 

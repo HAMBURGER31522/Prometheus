@@ -28,6 +28,9 @@ from prometheus.tasks.stages import build_real_impls
 STAGES = ("keypoints", "plan", "report", "finalize", "publish")
 PATCH = ("patch", "finalize", "publish")
 WITH_FRAMES = ("download", "frames", *STAGES)
+# E15 ④ (PLAN 15.4.13): every model stage of the whole pipeline, in its order, from the kept transcript
+PIPELINE = ("download", "frames", "keypoints", "plan", "report", "finalize", "subtitle_fix", "mindmap", "classify",
+            "publish")
 one_shot_call = one_shot.run_one_shot  # the real call; tests put a fake here
 
 
@@ -37,6 +40,7 @@ def main(argv=None, impls=None) -> int:
     parser.add_argument("items", nargs="+")
     parser.add_argument("--frames", action="store_true")
     parser.add_argument("--patch", action="store_true")
+    parser.add_argument("--pipeline", action="store_true")
     args = parser.parse_args(argv)
     data_dir = args.data_dir.resolve()  # Pi runs elsewhere: relative paths would point astray
     db.init_db(data_dir)  # an older data dir gets the new columns, as the app does at startup
@@ -62,7 +66,8 @@ def main(argv=None, impls=None) -> int:
     original, one_shot.run_one_shot = one_shot.run_one_shot, tallied
     try:
         for row in rows:
-            _rewrite(data_dir, row, impls, calls, frames=args.frames, patching=args.patch)
+            _rewrite(data_dir, row, impls, calls, frames=args.frames or args.pipeline, patching=args.patch,
+                     pipeline=args.pipeline)
     finally:
         one_shot.run_one_shot = original
     return 0
@@ -85,11 +90,12 @@ def _real_impls(data_dir) -> dict:
     return {**impls, "patch": patch}
 
 
-def _rewrite(data_dir, row: dict, impls: dict, calls: list, *, frames: bool, patching: bool = False) -> None:
+def _rewrite(data_dir, row: dict, impls: dict, calls: list, *, frames: bool, patching: bool = False,
+             pipeline: bool = False) -> None:
     started, work = time.monotonic(), paths.work_dir(data_dir, row["id"])
     since, calls[:] = evaluation.pi_events_offsets(work), []
-    stages = PATCH if patching else WITH_FRAMES if frames else STAGES
-    if not row.get("tags"):  # items from before tags (15.4.10) get them on the way; the category stays
+    stages = PIPELINE if pipeline else PATCH if patching else WITH_FRAMES if frames else STAGES
+    if not row.get("tags") and not pipeline:  # items from before tags (15.4.10) get them on the way; the category stays
         stages = (*stages[:-1], "classify", stages[-1])
     ctx = runner.StageContext(data_dir, row["id"])
     if frames:

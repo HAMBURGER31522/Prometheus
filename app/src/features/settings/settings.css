@@ -37,7 +37,7 @@
 .eye svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .model-picker { position: relative; }
 .model-pop { left: 0; right: 0; }
-.field-error { color: var(--danger); }
+.field-error, .field small.field-error { color: var(--danger); }
 
 /* 常用供应商 (PLAN 15.4.10): one row of buttons at the top of the editor. */
 .presets { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -63,3 +63,32 @@
 .advanced .row { align-items: flex-start; }
 .advanced .row > .field { flex: 1; min-width: 200px; margin-bottom: 6px; }
 .advanced > small { color: var(--muted); font-size: 12px; }
+
+/* Agent and 接入方式 (PLAN 15.4.13): side by side at the top of the editor. */
+.agent-row { align-items: flex-start; max-width: 720px; }
+.agent-row > .field { flex: 1; min-width: 240px; }
+.agent-state { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--muted); }
+.access { display: flex; gap: 16px; align-items: center; min-height: 36px; }
+.access label { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); }
+.access input { accent-color: var(--accent); }
+.access label:has(input:disabled) { color: var(--muted); opacity: .6; }
+.preset:disabled, .preset:disabled:hover { border-color: var(--line); color: var(--muted); opacity: .5; }
+.select-button:disabled, .select-button:disabled:hover { border-color: var(--line); color: var(--muted); }
+.input:disabled { color: var(--muted); background: var(--line); }
+
+/* 检查更新 (PLAN 15.4.13, after v2rayN): one row per Agent. */
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: var(--scrim);
+  animation: scrim-in var(--dur-effects) var(--ease-effects);
+}
+@keyframes scrim-in { from { opacity: 0; } }
+.dialog { width: min(640px, calc(100vw - 48px)); display: grid; gap: 12px; animation: pop-in var(--dur-spatial) var(--ease-spatial); }
+.settings .dialog > h2, .dialog p { margin: 0; }
+.agent-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.agent-line {
+  display: grid; grid-template-columns: 110px 1fr 1fr 80px auto auto; gap: 10px; align-items: center;
+  padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+.agent-line .muted { font-size: 13px; }
+.agent-line [data-state="new"] { color: var(--accent); font-weight: 600; }

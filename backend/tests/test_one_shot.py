@@ -9,9 +9,11 @@ from prometheus.llm.one_shot import ONE_SHOT_FLAGS, OneShotError, run_one_shot
 LONG_PROMPT = "讲解要点。" * 2000  # > 9000 chars
 
 
+# Pi runs contained (PLAN 15.4.13): its own folder is the one place it may write.
 FAKE_JS = """const fs = require("fs");
-fs.writeFileSync("argv.json", JSON.stringify(process.argv.slice(2)));
-fs.writeFileSync("stdin.txt", fs.readFileSync(0, "utf8"));
+const own = process.env.PI_CODING_AGENT_DIR;
+fs.writeFileSync(own + "/argv.json", JSON.stringify(process.argv.slice(2)));
+fs.writeFileSync(own + "/stdin.txt", fs.readFileSync(0, "utf8"));
 console.log("分类结果文本");
 """
 
@@ -32,9 +34,9 @@ def test_long_prompt_travels_via_stdin(tmp_path):
         agent_dir=agent_dir,
     )
     assert out == "分类结果文本"
-    argv = json.loads((tmp_path / "argv.json").read_text(encoding="utf-8"))
+    argv = json.loads((agent_dir / "argv.json").read_text(encoding="utf-8"))
     assert LONG_PROMPT not in " ".join(argv)
-    stdin_text = (tmp_path / "stdin.txt").read_text(encoding="utf-8")
+    stdin_text = (agent_dir / "stdin.txt").read_text(encoding="utf-8")
     assert stdin_text == LONG_PROMPT
 
 
@@ -45,7 +47,7 @@ def test_command_carries_all_no_flags_and_model_args(tmp_path):
         api_key="sk-y", thinking="high", node_exe="node.exe", pi_cli=str(executable),
         agent_dir=tmp_path / "agent2",
     )
-    argv = json.loads((tmp_path / "argv.json").read_text(encoding="utf-8"))
+    argv = json.loads((tmp_path / "agent2" / "argv.json").read_text(encoding="utf-8"))
     for flag in ONE_SHOT_FLAGS:
         assert flag in argv
     assert argv[argv.index("--provider") + 1] == "zhipu"
@@ -64,9 +66,9 @@ def test_images_ride_along_as_at_files_after_the_options(tmp_path):
         tmp_path, prompt="看图", provider="custom", model="m", api_key="sk-z", thinking="medium",
         node_exe="node.exe", pi_cli=str(executable), agent_dir=tmp_path / "agent3", files=frames,
     )
-    argv = json.loads((tmp_path / "argv.json").read_text(encoding="utf-8"))
+    argv = json.loads((tmp_path / "agent3" / "argv.json").read_text(encoding="utf-8"))
     assert argv[-2:] == [f"@{frames[0]}", f"@{frames[1]}"]
-    assert (tmp_path / "stdin.txt").read_text(encoding="utf-8") == "看图"
+    assert (tmp_path / "agent3" / "stdin.txt").read_text(encoding="utf-8") == "看图"
 
 
 # Pi's print mode writes the provider's error message to stderr and exits 1 (dist/modes/print-mode.js).

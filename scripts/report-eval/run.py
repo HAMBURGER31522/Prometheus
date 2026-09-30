@@ -17,6 +17,7 @@ from pathlib import Path
 
 from prometheus import paths
 from prometheus import runtime as runtime_mod
+from prometheus.agents import runs
 from prometheus.library import items as items_store
 from prometheus.llm import one_shot
 from prometheus.report import evaluation
@@ -56,8 +57,9 @@ def model_ask(data_dir: Path, work: Path, thinking: str):
                     work, prompt=prompt, provider=llm["provider"], model=llm["model"],
                     api_key=llm.get("api_key") or "", thinking=thinking,
                     node_exe=str(runtime.node), pi_cli=str(runtime.pi_cli), agent_dir=paths.pi_config_dir(data_dir),
+                    agent=runs.agent_of(llm),  # the profile's Agent, as the app's own calls (PLAN 15.4.13)
                 )
-            except one_shot.OneShotError as exc:
+            except (one_shot.OneShotError, runs.AgentRunError) as exc:
                 if attempt:
                     print(f"  调用失败，跳过：{str(exc)[:160]}", file=sys.stderr)
         return ""

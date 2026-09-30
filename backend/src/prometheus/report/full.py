@@ -265,6 +265,15 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
             fragment, check, transcript, ask,
             lambda fixes: write(chapter_write.revision_prompt(base, fixes, filename, fragment)), recheck)
         (space / filename).write_bytes(fragment.encode("utf-8"))
+    # every chapter ends with an editor's-viewpoint pass of its own, as --patch does: one-go runs wrote
+    # 0–5 boxes where this pass wrote 12–34 (user 2026-09-30); undone if it loses a point
+    progress("编者观点", number, total)
+    viewed = write(chapter_write.viewpoint_prompt(DEPTH_MD.read_text(encoding="utf-8"), fragment, filename))
+    again = recheck(viewed)
+    if _lost(again) <= _lost(check):
+        fragment, check = viewed, again
+    else:
+        (space / filename).write_bytes(fragment.encode("utf-8"))
     links = dict.fromkeys(viewpoints.STATS, 0)
     if verify_links is not None:  # the editor's links, opened one by one (15.4.11a-4)
         fragment, links = viewpoints.verify(fragment, verify_links)

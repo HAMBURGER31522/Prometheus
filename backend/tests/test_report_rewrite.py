@@ -157,3 +157,26 @@ def test_patch_needs_the_kept_ledger(tmp_path):
     ran = []
     assert load_script().main([str(data_dir), item_id, "--patch"], impls={"patch": lambda ctx: ran.append(1)}) == 2
     assert ran == []
+
+
+def test_pipeline_runs_every_model_stage_of_the_whole_pipeline_again(tmp_path):
+    """E15 ④ (PLAN 15.4.13): a whole run on another Agent — the 完整 report with pictures, subtitles,
+    the mind map and classification — from the kept transcript; the video comes back for the frames."""
+    from prometheus import paths
+
+    data_dir, item_id = finished_item(tmp_path)
+    work = paths.work_dir(data_dir, item_id)
+    ran = []
+
+    def download(ctx):
+        ran.append("download")
+        (work / "video.mp4").write_bytes(b"video")
+
+    stages = ("resolve", "transcribe", "frames", "keypoints", "plan", "report", "finalize", "subtitle_fix", "mindmap",
+              "classify", "publish")
+    impls = {stage: (lambda ctx, stage=stage: ran.append(stage)) for stage in stages}
+    impls["download"] = download
+    assert load_script().main([str(data_dir), item_id, "--pipeline"], impls=impls) == 0
+    assert ran == ["download", "frames", "keypoints", "plan", "report", "finalize", "subtitle_fix", "mindmap",
+                   "classify", "publish"]
+    assert items_store.get_item(data_dir, item_id)["figures"] == 1 and not (work / "video.mp4").exists()

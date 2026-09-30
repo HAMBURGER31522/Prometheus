@@ -4,10 +4,12 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 
 from prometheus import paths
+from prometheus.agents import contain, runs
 from prometheus.llm import one_shot
 from prometheus.report import full, patch, pi_run, viewpoints
 from prometheus.report.chunks import load_units
@@ -78,8 +80,48 @@ def run_report_stage(data_dir, item_id: str, row: dict, settings: dict, *,
         figures=figures, model_supports_images=model_supports_images,
     )
     kwargs["agent_dir"] = paths.pi_config_dir(data_dir)
+    if runs.agent_of(settings["llm"])["id"] != "pi":
+        return _standard_on_agent(work, settings, kwargs, node_exe, pi_cli)
+    # run contained: writable only in the item's work folder and Pi's own folder (PLAN 15.4.13)
+    kwargs["command_prefix"] = [*contain.prefix([work, kwargs["agent_dir"]], temp=kwargs["agent_dir"] / "tmp"),
+                                *kwargs["command_prefix"]]
     runner = PiRunner(**kwargs)
     return asyncio.run(runner.run(work))
+
+
+# VRA's PiRunner request for the standard report (vendor/video-report-agent pi.py), for the Agents it
+# cannot start; the staged skill and the checks afterwards are the same (PLAN 15.4.13).
+STANDARD_TEMPLATE = "report-template.html"
+STANDARD_PROMPT = (
+    "读取 transcript.md 和 input.json，按照 video-report skill 生成完整报告，写入 report.html。"
+    f"读取 assets/{STANDARD_TEMPLATE} 作为本次唯一模板，"
+    "原样保留其中的 {{VIDEO_DESCRIPTION}} 占位符一次，"
+    "放在题头之后、正文之前；不要读取、改写或自行生成视频简介，运行时会按原始元数据填充。"
+    "本任务 report_mode=standard，是任务自身保存的不可变输入；不根据当前配置或视频内容重新选择模式。"
+    "本次只读取 modes/standard.md 这一份模式文件，不读取另一模式。"
+    "Profile 只指导内容关系表达，不覆盖所选模式的展开程度。"
+    "只使用当前模式的模板、样式与组件，不读取或混入另一模式的视觉资源。"
+    # VRA gives Pi this in its system prompt (vendor pi.py); finalize rejects reports that load outside files
+    "The supplied transcript is complete; generate a self-contained report.html."
+)
+
+
+def _standard_on_agent(work: Path, settings: dict, kwargs: dict, node_exe: str, pi_cli: str) -> Path:
+    """The 「标准」 report through Codex CLI or Claude Code: VRA's workspace, request and checks."""
+    from video_report_agent.report_content import fill_video_description
+
+    pi_run.stage_skill(work)
+    (work / "assets").mkdir(exist_ok=True)
+    for extra in kwargs.get("extra_files") or []:
+        shutil.copy2(extra, work / Path(extra).name)
+    report = pi_run.run_task(work, STANDARD_PROMPT + (kwargs.get("extra_prompt") or ""), expect="report.html",
+                             llm=_llm(settings), prefix=[node_exe, pi_cli], agent_dir=kwargs["agent_dir"],
+                             timeout=kwargs["timeout"])
+    fill_video_description(report, work)
+    html = report.read_text(encoding="utf-8").lower()
+    if "<html" not in html or "</html>" not in html or "<body" not in html:
+        raise runs.AgentRunError("report.html is not a complete HTML document")
+    return report
 
 
 # ---- 完整精读 (PLAN 15.4.11): 提取要点, 规划, then the report chapter by chapter ----
@@ -105,7 +147,7 @@ def _patient(call, deadline=None):
     for attempt in range(RELAY_RETRIES + 1):
         try:
             return call()
-        except (pi_run.PiRunError, one_shot.OneShotError) as exc:
+        except (pi_run.PiRunError, one_shot.OneShotError, runs.AgentRunError) as exc:
             if attempt == RELAY_RETRIES or errors.classify("report", str(exc)) not in _RELAY_FAILURES:
                 raise
             wait = min(RELAY_FIRST_WAIT_S * 2 ** attempt, RELAY_LONGEST_WAIT_S)
@@ -119,7 +161,15 @@ def _patient(call, deadline=None):
 def _llm(settings: dict) -> dict:
     llm = settings["llm"]
     return {"provider": llm["provider"], "model": llm["model"], "thinking": llm.get("thinking") or "medium",
-            "api_key": llm.get("api_key") or ""}
+            "api_key": llm.get("api_key") or "", **_agent(settings)}
+
+
+def _agent(settings: dict) -> dict:
+    """The profile's Agent for pi_run.run_task (PLAN 15.4.13); Pi when the settings predate them."""
+    agent = runs.agent_of(settings["llm"])
+    return {"agent": agent["id"], "access": agent["access"], "base_url": agent["base_url"],
+            "context_window": agent["context_window"], "max_tokens": agent["max_tokens"],
+            "protocol": agent["protocol"]}
 
 
 def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
@@ -130,6 +180,7 @@ def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
         return _patient(lambda: one_shot.run_one_shot(
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
+            agent=runs.agent_of(llm),
         ))
 
     return ask
@@ -143,7 +194,7 @@ def model_look(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
         return _patient(lambda: one_shot.run_one_shot(
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
-            files=files,
+            files=files, agent=runs.agent_of(llm),
         ))
 
     return look
