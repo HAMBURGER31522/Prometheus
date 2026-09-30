@@ -41,6 +41,7 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
     base = prompt.build_prompt(outline)
     errors: list = []
     parsed = None
+    kept = None  # the latest (tree, small problems) with nothing worse (PLAN 15.4.15-11)
     for _ in range(TRIES):
         feedback = "\n\n上次输出的问题：" + "；".join(errors) if errors else ""
         if errors and parsed is not None:  # edit the last tree: a fresh one slips elsewhere
@@ -53,14 +54,25 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
             items_store.update_item(data_dir, item_id, mindmap_status="failed", mindmap_error=reason)
             return False
         parsed = tree.parse_tree(text)
-        errors = ["没有找到包含 root 的 JSON 对象"] if parsed is None else tree.validate_tree(parsed, outline)
+        if parsed is None:
+            errors = ["没有找到包含 root 的 JSON 对象"]
+        else:
+            major, minor = tree.check_tree(parsed, outline)
+            errors = major + minor
+            if not major:
+                kept = (parsed, minor)
         if not errors:
             break
-    if errors:  # the map page says which checks it failed (PLAN 15.4.15-9)
+    small: list = []
+    if errors and kept is not None:  # only small problems left: the map is kept with them
+        parsed, small = kept
+    elif errors:  # the map page says which checks it failed (PLAN 15.4.15-9)
         reason = ("没通过检查：" + "；".join(errors))[:REASON_CHARS]
         items_store.update_item(data_dir, item_id, mindmap_status="failed", mindmap_error=reason)
         return False
     parsed["root"].pop("summary", None)  # the root is the title only; not worth a retry
+    if small:
+        parsed["problems"] = small
     try:
         parsed, stats = enrich.enrich_tree(parsed, html, ask=ask)
         parsed["enrichment"] = stats
