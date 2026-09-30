@@ -109,7 +109,7 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 
 ## 7. 新窗口的开场白（复制给新会话）
 
-> 继续 Prometheus 项目（F:\project\Prometheus）。先读 docs/HANDOFF.md，再按 AGENTS.md 读 docs/PLAN.md 和 docs/DECISIONS.md。R1–R7f 已完成，下一步是 R8：先把 R8 的规格和 HANDOFF 第 9、11 节记下的事对一遍，有缺口先问我，确认后再开分支按红绿做。预览用 HANDOFF 第 2 节的方法启动。
+> 继续 Prometheus 项目（F:\project\Prometheus）。先读 docs/HANDOFF.md（重点第 1、14、15 节），再按 AGENTS.md 读 docs/PLAN.md（重点 15.4.16、15.4.17）和 docs/DECISIONS.md（D-47、D-48）。R1–R8 已合并推送；现在在分支 r9-publish 上做 R9 发布整理，从 HANDOFF 第 15 节的第 1 步接着做，按那里的顺序做完。我不在旁边看，需要定的按推荐项定，定了什么写进 PLAN / DECISIONS；规矩照旧：先写失败的测试单独提交 (red) 再实现；不向 venlacy、justwoker 发探测请求；Key 绝不进仓库，推送前跑 tmp/key_scan_all.py；8766 的预览后端不要自己重启；回答用中文、用简单的词。
 
 ## 8. R7d 进行中的注意事项（2026-09-28）
 
