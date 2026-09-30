@@ -1,6 +1,6 @@
 // 设置 · 模型 · Agent (PLAN 15.4.13): which Agent runs a profile and what it takes. The backend
 // refuses the same combinations (backend/src/prometheus/agents/rules.py); the page says why first.
-import type { AgentId, ModelProfile } from "../../shared/api";
+import type { AgentId, ModelInfo, ModelProfile } from "../../shared/api";
 import type { Option } from "../../shared/Select";
 import type { Preset } from "./presets";
 
@@ -41,4 +41,8 @@ export function presetAllowed(preset: Preset, agent: AgentId): boolean {
 export function agentThinking(agent: AgentId): { unavailable: string[]; note: string | null } {
   if (agent === "claude") return { unavailable: ["off"], note: "Claude Code 没有「关」这一档，最低是「低」" };
   return { unavailable: [], note: null };
+}
+
+export function limitHint(_info: ModelInfo | null, _agent: AgentId): string {
+  return "";
 }

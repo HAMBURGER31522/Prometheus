@@ -128,3 +128,23 @@ def test_the_apps_own_codex_lists_its_models(tmp_path):
     tools = Path(os.environ.get("PROMETHEUS_TOOLS") or "E:/tools/Prometheus-Desktop")
     found = codex_app.models(tools, tmp_path / "config")
     assert found and all(model["id"] and set(model["levels"]) <= set(codex_app.OURS) for model in found)
+
+
+def test_the_settings_page_gets_the_catalogues_limits_for_codex_and_1m_names_are_looked_up_without_the_suffix(
+        client_factory, tmp_path, monkeypatch):
+    """The 「高级」 boxes pre-fill with what a blank box means (user 2026-09-28: 「方框里暗色的就是推荐参数」):
+    for Codex the catalogue's numbers next to Codex's own levels; 「claude-opus-4-8[1m]」 is claude-opus-4-8."""
+    from prometheus.llm import pi_models
+
+    client = client_factory(data_dir=tmp_path / "data", fake=False)
+    looked = []
+    monkeypatch.setattr(codex_app, "models", lambda tools_root, config_root: [
+        {"id": "gpt-6-astra", "levels": ["low", "medium", "high", "xhigh", "max"], "images": True}])
+    monkeypatch.setattr(pi_models, "model_fields", lambda data_dir, profile, pi_cli=None: looked.append(profile["model"]) or (
+        "pi", {"contextWindow": 272000 if "gpt" in profile["model"] else 1000000, "maxTokens": 128000}))
+    codex = {**CODEX_PROFILE, "access": "key", "base_url": "https://relay.example/v1", "model": "gpt-6-astra"}
+    info = client.post("/api/settings/model-info", json={"profile": codex}, headers=AUTH).json()
+    assert (info["source"], info["levels"][-1], info["context_window"], info["max_tokens"]) == ("codex", "max", 272000, 128000)
+    claude = {**CODEX_PROFILE, "agent": "claude", "access": "key", "protocol": "anthropic", "model": "claude-opus-4-8[1m]"}
+    info = client.post("/api/settings/model-info", json={"profile": claude}, headers=AUTH).json()
+    assert info["context_window"] == 1000000 and "claude-opus-4-8" in looked and "claude-opus-4-8[1m]" not in looked
