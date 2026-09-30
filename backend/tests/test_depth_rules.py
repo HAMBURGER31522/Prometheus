@@ -76,3 +76,14 @@ def test_its_examples_give_nothing_away_about_the_evaluation_samples():
     # The closed-book questions come from these three videos: no example may touch them.
     for topic in ("卡巴拉", "罗素", "微分", "一对一", "AI", "战争", "学习"):
         assert topic not in RULES, topic
+
+
+def test_only_what_the_video_says_goes_into_a_persons_mouth():
+    """Russell on Claude Code (2026-09-30): 「所以罗素说……赢家也是灰烬」 and the like were the writer's own
+    explanation put in the subject's mouth; the grader marked them unsupported (user 2026-09-30)."""
+    assert "只能是视频里真有的话" in RULES and "不要借人物之口" in RULES and "编者口吻" in RULES
+
+
+def test_it_gives_the_powershell_way_to_run_python():
+    """modes/standard.md gives the bash form, which PowerShell cannot run (user 2026-09-30)."""
+    assert "& $env:VIDEO_REPORT_PYTHON" in RULES

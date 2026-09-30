@@ -343,3 +343,18 @@ def test_the_editors_links_are_verified_and_counted_in_the_coverage(tmp_path):
     assert "example.org/gone" not in html and "Coffee_roasting" in html
     assert coverage["viewpoints"] == {"points": 2, "links": 4, "kept": 2, "dropped": 2, "unsourced": 0,
                                       "unreachable": 2, "unrelated": 0}
+
+
+def test_every_chapter_ends_with_an_editors_viewpoint_pass(tmp_path):
+    """One-go runs wrote 0–5 viewpoint boxes where a pass of their own wrote 12–34 (R7e patch,
+    R7f Russell): every chapter now gets that pass, after the review (user 2026-09-30)."""
+    _ledger, plan, _chapters, _coverage, pi, _model = pipeline(tmp_path)
+    for number in range(1, len(plan["chapters"]) + 1):
+        runs = pi.runs(f"ch-{number:02d}.html")
+        assert "加编者观点" in runs[-1] and not any("加编者观点" in prompt for prompt in runs[:-1])
+
+
+def test_a_viewpoint_pass_that_loses_a_point_is_undone(tmp_path):
+    pi = Pi(chapter=lambda prompt, attempt: section(prompt, leave_out=("K001",) if "加编者观点" in prompt else ()))
+    _ledger, _plan, _chapters, coverage, pi, _model = pipeline(tmp_path, pi=pi, review=False)
+    assert any("加编者观点" in prompt for prompt in pi.runs("ch-01.html")) and coverage["uncovered"] == []
