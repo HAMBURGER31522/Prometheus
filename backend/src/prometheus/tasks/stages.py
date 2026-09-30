@@ -230,10 +230,11 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         row = _row(data_dir, ctx)
         settings = store.load(data_dir)
         figures, supports_images = _figures(ctx, row, settings)
-        if _full(row, settings):
-            def progress(step: str, number: int, total: int) -> None:
-                items_store.update_item(data_dir, ctx.item_id, stage_detail=f"{step}（第 {number}/{total} 章）")
 
+        def progress(step: str, number: int, total: int) -> None:
+            items_store.update_item(data_dir, ctx.item_id, stage_detail=f"{step}（第 {number}/{total} 章）")
+
+        if _full(row, settings):
             workspace_mod.run_full_report_stage(
                 data_dir, ctx.item_id, row, settings, node_exe=_node_exe(), pi_cli=_pi_cli(),
                 figures=figures and supports_images, progress=progress,
@@ -244,6 +245,9 @@ def build_real_impls(data_dir, runtime=None) -> dict:
             node_exe=_node_exe(), pi_cli=_pi_cli(),
             figures=figures, model_supports_images=supports_images,
         )
+        # 「标准」 (PLAN 15.4.15-10): the editor's in-depth view on every chapter, and a jump TOC
+        workspace_mod.run_standard_viewpoints(data_dir, ctx.item_id, row, settings, node_exe=_node_exe(),
+                                              pi_cli=_pi_cli(), progress=progress)
 
     def finalize(ctx):
         work = _work(data_dir, ctx)
