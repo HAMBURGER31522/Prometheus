@@ -7,6 +7,7 @@
 - R1–R7g 全部完成并合并到 `main`，已推送。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。R7d–R7g 的注意事项见第 8–12 节。
 - **R7h（按需生成）进行中，暂停在控制台界面这一步，见第 13 节**；做完 R7h 再做 R8。
 - 按 PLAN §15.5，下一个里程碑是 **R8**：打包（安装包 ≤ 300MB，`PROMETHEUS_FORBID_DEV_PATHS=1` 冒烟）、README 全面重写、完整真实验收（E3 用 BV1yPb46xExH、E4 取消、E9 CI），最后请用户试用安装版，给出 E7 界面观感的最终判定。R8 还要带上第 9 节、第 11 节记下的几件事（耗时和 token 表、控制台的用时提示、随包 npm）。
+- **用户 2026-09-30 要求**：装好安装版以后，由 agent 帮用户把预览数据同步过去：`acceptance-output/r7-data` 里的设置（`.prometheus/config/settings.json`，含各份配置的 Key）、Codex 官方登录（`.prometheus/config/codex/`）和文章（三个分类文件夹、`index.json`、`llms.txt`、`.prometheus/prometheus.db`，以及条目缓存）。整个目录 4.9G，大头是本地转写模型和缓存。同步前先看安装版的数据目录在哪、里面有没有东西，别覆盖；Key 不进任何命令输出和文档。
 - 第 5 节是 R7d 之前的界面修改流程，已经做完；以后有新的界面意见，照同样的流程走。
 
 ## 2. 界面预览（给用户看、自己截图都用这个）
