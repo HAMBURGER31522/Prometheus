@@ -5,7 +5,7 @@
 ## 1. 现在做到哪了
 
 - R1–R8 全部完成并合并到 `main`，已推送。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。R7d–R8 的注意事项见第 8–14 节。
-- **下一个是 R9（发布整理，PLAN 15.4.17）**：仓库只放该放的（docs/、AGENTS.md、CLAUDE.md 只留在本机）、数据目录的 `说明.txt`、README 重写（草稿在 `tmp/README.draft.md`）、GitHub Release v1.0.0、用 video-shotcraft 做宣传片（不进仓库）。用户 2026-09-30 要求无人工监督做完，需要定的按推荐。
+- **R9（发布整理，PLAN 15.4.17）进行中，见第 15 节**。用户 2026-09-30 要求无人工监督做完，需要定的按推荐项定，定了什么写进 PLAN / DECISIONS。
 - 按 PLAN §15.5，下一个里程碑是 **R8**：打包（安装包 ≤ 300MB，`PROMETHEUS_FORBID_DEV_PATHS=1` 冒烟）、README 全面重写、完整真实验收（E3 用 BV1yPb46xExH、E4 取消、E9 CI），最后请用户试用安装版，给出 E7 界面观感的最终判定。R8 还要带上第 9 节、第 11 节记下的几件事（耗时和 token 表、控制台的用时提示、随包 npm）。
 - **用户 2026-09-30 要求**：装好安装版以后，由 agent 帮用户把预览数据同步过去：`acceptance-output/r7-data` 里的设置（`.prometheus/config/settings.json`，含各份配置的 Key）、Codex 官方登录（`.prometheus/config/codex/`）和文章（三个分类文件夹、`index.json`、`llms.txt`、`.prometheus/prometheus.db`，以及条目缓存）。整个目录 4.9G，大头是本地转写模型和缓存。同步前先看安装版的数据目录在哪、里面有没有东西，别覆盖；Key 不进任何命令输出和文档。
 - 第 5 节是 R7d 之前的界面修改流程，已经做完；以后有新的界面意见，照同样的流程走。
@@ -213,3 +213,24 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **还要注意**：pid 22228（`acceptance-output\installed\resources\runtime\python\python.exe`）是 2026-09-26 安装冒烟被强杀后留下的孤儿后台，程序本体早已卸载，注册表里没有安装记录；HANDOFF 旧版说它是用户装的安装版，是误会。没动它，用户可以在任务管理器里结束它。
 - **预览后端**：8766 的真实数据预览后端在 R8 期间被 Claude Code 因内存紧张关掉了，没有重启（规矩：先告诉用户）。要用时按第 2 节的命令启动。
 - **还没做的**：控制台链接框下的用时 / 费用估计（第 9 节记的 R8 事项）没有做：条目没有记下是哪个模型跑的，估计没有依据；README 里放了用时参考表代替。
+
+## 15. R9 进行中（2026-09-30 暂停）：发布整理
+
+分支 `r9-publish`（未推送），规格 PLAN 15.4.17。`main` 最后一次推送是 7f16331（R8 合并），暂停时它的 CI 还在跑，先查结果（没有 `gh`：用 `curl https://api.github.com/repos/HAMBURGER31522/Prometheus/actions/runs?per_page=5`；看失败日志用 `tmp/_gh.py GET <jobs/…/logs 的完整 URL> <输出文件>`，它用 git 保存的 github.com 凭据，不打印）。
+
+**已做**：数据目录根下的 `说明.txt`（红 c065140 → 绿 af1f661，`library/guide.py`，数据目录打开时写入、文字变了就重写）。
+
+**接下来按这个顺序做**（能用测试表达的照样先红后绿）：
+1. **仓库只放该放的**（执行 agent 已定，理由见 15.4.17）：
+   - `docs/` 整个只留在本机：先在 `docs/` 里 `git init` 一个本机仓库，把现在的 PLAN、DECISIONS、HANDOFF、acceptance、各评测记录、screenshots 提交进去（保留以后的历史，不推送）；
+   - `.gitignore` 加 `docs/`、`AGENTS.md`、`CLAUDE.md`，然后 `git rm -r --cached docs AGENTS.md CLAUDE.md`（文件留在磁盘上；CLAUDE.md 必须留在仓库根目录，Claude Code 只从根目录读它）；
+   - README 用的图放 `.github/assets/`（console.png、report.png、mindmap.png、subtitles.png），从 `acceptance-output/r8-installed-results/shots/`（安装版真实截图）或 `docs/screenshots/r7h/` 里挑，**截图里不能有任何 Key**；
+   - 改本机的 AGENTS.md：说明 docs/ 和它自己只在本机、提交文档改动到 docs/ 的本机仓库；以后 PLAN 的进度记录也记在那里。
+   - 代码（包括 scripts/ 里的评测、验收脚本，app/scripts/ 里的截图脚本）都保留在仓库里；只有注释里提到 docs/，没有测试或 CI 读 docs/。
+2. **README**：草稿在 `tmp/README.draft.md`（不入库），已按查证改过：转写方案对比（R5 实测 + 公开资料：Qwen3-ASR、Nemotron 3.5 ASR、Whisper large-v3、MOSS-Transcribe-Diarize + CrispASR、FunASR 的 Fun-ASR-Nano / SenseVoice）、流程图、技术栈、标准和完整、用时参考、常见问题、隐私、构建。定稿前再核一遍：安装后的体积（「软件本身约 600 MB」是估计，装一次量一下 `resources\runtime` 或者删掉这句）、SHA256、Release 链接。另加 `CHANGELOG.md`（1.0.0 这一版有什么）和 `.github/ISSUE_TEMPLATE/bug_report.md`（中文，写明附上 backend.log）。
+3. **GitHub Release v1.0.0**：没有 `gh`，用 `tmp/_gh.py`：`POST https://api.github.com/repos/HAMBURGER31522/Prometheus/releases`（tag v1.0.0、目标 main、中文说明），再用返回的 upload_url 上传 `E:\tools\Prometheus-Desktop\release\Prometheus_1.0.0_x64-setup.exe` 和 `SHA256SUMS.txt`。先合并 R9 再发（这样 README 已经是新的）。**注意**：R9 如果改了后端代码（说明.txt 已经改了），发布前要重新 `scripts/package.ps1` 出包，并至少跑一次 `scripts/acceptance/installed-live.ps1`（约 25 分钟，走 Codex 订阅）或者确认改动与安装版无关后说明理由。
+4. **宣传片**：video-shotcraft 已克隆到 `F:\project\_promo-work\video-shotcraft`（不入库）。按它的 SKILL.md 选「自主自由创作」模式（用户无人工监督），读 `references/pipeline.md` 走八个阶段；Remotion 的 `npm install` 放在工作文件夹里，不装全局，不装 C 盘。画面用真实截图：`acceptance-output/r8-installed-results/shots/`、`docs/screenshots/r7h/`；需要活页面时用假流水线后端（`node app/scripts/e2e-backend.mjs`，端口 8765）加 Vite。**8766 的真实数据预览后端被 Claude Code 因内存紧张关掉过，规矩是不自己重启，要用先问用户**。成片放 `F:\project\Prometheus-宣传片\`（只留一个命名好的视频），过程文件和缓存移进回收站（PowerShell：`Add-Type -AssemblyName Microsoft.VisualBasic` 后 `[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(路径, 'OnlyErrorDialogs', 'SendToRecycleBin')`），不进仓库。
+5. **Done When**（15.4.17）：`git ls-files` 里没有 `docs/*.md`、截图、AGENTS.md、CLAUDE.md；`tmp/key_scan_all.py` = 0；离线测试全绿（`tmp/_r7h_done.ps1` 跑七项）、CI 绿；远程 main 与本地一致；Release 页面能下载，SHA256 一致；宣传片能播放、文件夹里只有它。进度记录写进本机 docs 仓库的 PLAN §15.6。
+6. 最后把装好后同步数据（第 1 节那条）告诉用户：用户说要自己装，装好后再帮他从 `acceptance-output/r7-data` 同步设置、Codex 登录和文章。
+
+**这次会话留下的本机文件**（都不入库）：`tmp/README.draft.md`、`tmp/_gh.py`、`tmp/_r7h_done.ps1`（七项 Done When）、`tmp/_r7h_counts.py`（读结果数）、`acceptance-output/r8-installed-results/`（安装版实测截图、精读、backend.log）。
