@@ -1,6 +1,8 @@
 // Which parts a video gets (PLAN 15.4.15): the report, the subtitles, the mind map. The mind map is drawn from
 // the report's chapters, so it comes with the report; at least one part is always made.
-export type Outputs = { report: boolean; subtitles: boolean; mindmap: boolean };
+import type { Outputs } from "../../shared/api";
+
+export type { Outputs };
 type Storage = { getItem(key: string): string | null; setItem(key: string, value: string): void };
 
 export const ALL: Outputs = { report: true, subtitles: true, mindmap: true };

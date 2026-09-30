@@ -1,9 +1,10 @@
 // 控制台 (PLAN 9 / 15.4.5): paste a Bilibili or YouTube link, watch the queue.
 import { type CSSProperties, type FormEvent, useEffect, useState } from "react";
 
-import { ApiError, type ItemRow, api, itemTitle } from "../../shared/api";
+import { ApiError, type ItemRow, type ReportDepth, api, itemTitle } from "../../shared/api";
 import { useNav } from "../../shared/NavContext";
 import { ScrollArea } from "../../shared/ScrollArea";
+import { type Outputs, loadOutputs, saveOutputs, toggleOutput } from "./outputs";
 import { STAGES, stageText } from "./stages";
 
 const STATUS: Record<ItemRow["status"], string> = {
@@ -19,20 +20,40 @@ const ADD_ERRORS: Record<string, string> = {
   URL_UNSUPPORTED: "只支持 B 站和 YouTube 的视频链接。",
 };
 
+const OUTPUT_LABELS: { key: keyof Outputs; label: string }[] = [
+  { key: "report", label: "精读" },
+  { key: "subtitles", label: "字幕" },
+  { key: "mindmap", label: "导图" },
+];
+const DEPTHS: { value: ReportDepth; label: string }[] = [
+  { value: "standard", label: "标准" },
+  { value: "full", label: "完整" },
+];
+
 export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () => Promise<void> }) {
   const [url, setUrl] = useState("");
   const [figures, setFigures] = useState(true);
+  const [outputs, setOutputs] = useState<Outputs>(() => loadOutputs(localStorage));
+  const [depth, setDepth] = useState<ReportDepth>("full");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    api.settings().then((s) => setFigures(s.figures_default)).catch(() => undefined);
+    api
+      .settings()
+      .then((s) => {
+        setFigures(s.figures_default);
+        setDepth(s.report.depth);
+      })
+      .catch(() => undefined);
   }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setMessage("");
     try {
-      await api.addItem(url.trim(), figures);
+      // No report, no figures to draw: the switch shows off, and that is what is sent.
+      await api.addItem(url.trim(), { figures: figures && outputs.report, outputs, depth });
+      saveOutputs(localStorage, outputs);
       setUrl("");
       await reload();
     } catch (error) {
@@ -61,20 +82,57 @@ export function ConsolePage({ queue, reload }: { queue: ItemRow[]; reload: () =>
             value={url}
             onChange={(event) => setUrl(event.target.value)}
           />
-          <label className="switch-label">
-            <button
-              type="button"
-              role="switch"
-              className="switch"
-              aria-checked={figures}
-              aria-label="配图"
-              onClick={() => setFigures(!figures)}
-            />
-            配图
-          </label>
+          <div className="outputs" role="group" aria-label="生成哪些">
+            {OUTPUT_LABELS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                className="output"
+                aria-pressed={outputs[key]}
+                onClick={() => setOutputs(toggleOutput(outputs, key))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button type="submit" className="btn primary" disabled={!url.trim()}>
             开始
           </button>
+          <div className="importer-options" data-off={!outputs.report || undefined}>
+            <span className="muted">精读</span>
+            <div
+              className="segmented two"
+              role="radiogroup"
+              aria-label="精读详细程度"
+              style={{ "--i": depth === "full" ? 1 : 0 } as CSSProperties}
+            >
+              <span className="thumb" aria-hidden="true" />
+              {DEPTHS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={depth === value}
+                  disabled={!outputs.report}
+                  onClick={() => setDepth(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="switch-label">
+              <button
+                type="button"
+                role="switch"
+                className="switch"
+                aria-checked={figures && outputs.report}
+                aria-label="配图"
+                disabled={!outputs.report}
+                onClick={() => setFigures(!figures)}
+              />
+              配图
+            </label>
+          </div>
         </form>
         {message && (
           <p className="notice danger" role="alert" style={{ marginTop: 10 }}>

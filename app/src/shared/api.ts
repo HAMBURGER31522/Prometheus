@@ -81,7 +81,9 @@ export const api = {
   dataDir: () => json<{ data_dir: string | null }>("GET", "/api/app/data-dir"),
   setDataDir: (dataDir: string) => json<{ data_dir: string }>("PUT", "/api/app/data-dir", { data_dir: dataDir }),
 
-  addItem: (url: string, figures: boolean) => json<{ id: string }>("POST", "/api/items", { url, figures }),
+  /** What this video gets (PLAN 15.4.15): the three circles and the report's depth, for this video only. */
+  addItem: (url: string, options: { figures: boolean; outputs: Outputs; depth: ReportDepth }) =>
+    json<{ id: string }>("POST", "/api/items", { url, ...options }),
   items: () => json<ItemRow[]>("GET", "/api/items"),
   item: (id: string) => json<ItemRow>("GET", `/api/items/${id}`),
   moveItem: (id: string, categoryId: number) => json<ItemRow>("PATCH", `/api/items/${id}`, { category_id: categoryId }),
@@ -223,6 +225,11 @@ export interface ModelInfo {
   thinking_level_map: Record<string, string | null> | null;
 }
 
+/** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was. */
+export type ReportDepth = "full" | "standard";
+/** Which parts a video gets (PLAN 15.4.15); the mind map comes with the report. */
+export type Outputs = { report: boolean; subtitles: boolean; mindmap: boolean };
+
 export interface Settings {
   /** The saved model profiles (PLAN 15.4.8); `llm` is the active one, derived by the backend. */
   llm_profiles: { active: string; items: ModelProfile[] };
@@ -238,7 +245,7 @@ export interface Settings {
   network: { proxy: string; youtube_cookies_file: string };
   figures_default: boolean;
   /** 精读详细程度 (PLAN 15.4.11): full = 完整, standard = VRA as it was; review = 讲清楚审校 in 完整. */
-  report: { depth: "full" | "standard"; review: boolean };
+  report: { depth: ReportDepth; review: boolean };
 }
 
 /** coverage.json of a 完整 report (PLAN 15.4.11): what was written, skipped with a reason, or left out. */
