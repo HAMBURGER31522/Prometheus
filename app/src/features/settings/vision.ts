@@ -6,7 +6,8 @@ const vision = new Set<string>(snapshot.vision);
 const text = new Set<string>(snapshot.text);
 
 export function visionOf(model: string): boolean | null {
-  const id = model.trim().split("/").pop()?.toLowerCase() ?? "";
+  // 「claude-opus-4-8[1m]」: Claude Code's suffix for the 1M window, not part of the model's name
+  const id = model.trim().replace(/\[1m\]$/i, "").split("/").pop()?.toLowerCase() ?? "";
   if (vision.has(id)) return true;
   if (text.has(id)) return false;
   return null;

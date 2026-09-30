@@ -109,12 +109,14 @@ def model_info(request: Request, body: dict):
     (PLAN 15.4.10): the page lists the thinking levels and pre-fills 「高级」 from it."""
     state = request.app.state
     profile = dict(body.get("profile") or {})
+    # 「claude-opus-4-8[1m]」 is claude-opus-4-8 asked for with its 1M window (Claude Code's own suffix)
+    profile["model"] = str(profile.get("model") or "").removesuffix("[1m]")
+    source, fields = pi_models.model_fields(state.data_dir, profile, pi_cli=_pi_cli(state))
     if profile.get("agent") == "codex":  # Codex says which levels each of its models takes (15.4.13)
         known = next((model for model in state.agents.codex_models() if model["id"] == profile.get("model")), None)
-        if known:
-            return {"source": "codex", "levels": known["levels"], "context_window": None, "max_tokens": None,
-                    "thinking_level_map": None}
-    source, fields = pi_models.model_fields(state.data_dir, profile, pi_cli=_pi_cli(state))
+        if known:  # the limits a blank 「高级」 box means: the same catalogue (agents/runs.py _limits)
+            return {"source": "codex", "levels": known["levels"], "context_window": fields.get("contextWindow"),
+                    "max_tokens": fields.get("maxTokens"), "thinking_level_map": None}
     return {
         "source": source, "context_window": fields.get("contextWindow"), "max_tokens": fields.get("maxTokens"),
         "thinking_level_map": fields.get("thinkingLevelMap"),

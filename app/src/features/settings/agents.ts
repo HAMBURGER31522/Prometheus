@@ -43,6 +43,14 @@ export function agentThinking(agent: AgentId): { unavailable: string[]; note: st
   return { unavailable: [], note: null };
 }
 
-export function limitHint(_info: ModelInfo | null, _agent: AgentId): string {
-  return "";
+/** What the 「高级」 boxes hold, or what an empty box means, for each Agent (PLAN 15.4.13). */
+export function limitHint(info: ModelInfo | null, agent: AgentId): string {
+  if (info?.source === "pi") return "按随包 Pi 的模型目录预填，可以手动改。";
+  if (info?.source === "models.dev") return "按 models.dev 的数据预填，可以手动改。";
+  if (info?.source === "codex" && info.context_window) return "按模型目录预填，可以手动改；思考档位按 Codex 自己的列表。";
+  if (agent === "codex") return "目录里没有这个模型：留空时 Codex CLI 用它自己的默认；接口的上限更小时请填上。";
+  if (agent === "claude") {
+    return "目录里没有这个模型：留空时 Claude Code 用它自己的默认（Claude 模型名不带「[1m]」只有 200k）；接口的上限不同时请填上。";
+  }
+  return "目录里没有这个模型：留空就按 Pi 的默认（上下文 128000，输出 16384）。";
 }

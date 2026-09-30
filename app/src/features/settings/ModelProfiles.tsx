@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { type AgentId, type AgentRow, ApiError, type ModelInfo, type ModelProfile, type Settings, api } from "../../shared/api";
 import { openExternal } from "../../shared/platform";
 import { type Option, Select } from "../../shared/Select";
-import { AGENTS, AGENT_PROTOCOL, agentProblem, agentThinking, presetAllowed } from "./agents";
+import { AGENTS, AGENT_PROTOCOL, agentProblem, agentThinking, limitHint, presetAllowed } from "./agents";
 import { PRESETS, type Preset, presetFields, presetOf } from "./presets";
 import { SecretInput } from "./SecretInput";
 import { THINKING, THINKING_HINT, clampThinking, thinkingLevels, thinkingOptions } from "./thinking";
@@ -292,7 +292,7 @@ function ProfileEditor({ initial, onSave, onCancel }: {
             <LimitField label="最大输出（token）" value={profile.max_tokens} known={info?.max_tokens ?? null}
               onChange={(max_tokens) => update({ max_tokens })} />
           </div>
-          <small>{limitSource(info)}</small>
+          <small>{limitHint(info, profile.agent)}</small>
         </details>
       )}
       {problem && (login || !custom) && <small className="field-error" role="alert">{problem}</small>}
@@ -329,12 +329,6 @@ function LimitField({ label, value, known, onChange }: {
       />
     </label>
   );
-}
-
-function limitSource(info: ModelInfo | null): string {
-  if (info?.source === "pi") return "按随包 Pi 的模型目录预填，可以手动改。";
-  if (info?.source === "models.dev") return "按 models.dev 的数据预填，可以手动改。";
-  return "目录里没有这个模型：留空就按 Pi 的默认（上下文 128000，输出 16384）。";
 }
 
 function hostOf(url: string): string {
