@@ -50,6 +50,8 @@ def generate_for_item(data_dir, item_id: str, row: dict, llm: dict, *,
         try:
             text = ask(base + feedback)
         except Exception as exc:  # noqa: BLE001 - PLAN 8.3: a mind map failure never fails the item
+            if kept is not None:  # a tree with only small problems is already there: keep it
+                break
             reason = f"调用出错：{type(exc).__name__}: {exc}"[:REASON_CHARS]
             items_store.update_item(data_dir, item_id, mindmap_status="failed", mindmap_error=reason)
             return False
