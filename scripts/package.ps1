@@ -25,6 +25,11 @@ $PythonDir = Split-Path -Parent $env:PROMETHEUS_PYTHON
 New-Item -ItemType Directory -Force -Path "$Runtime\python", "$Runtime\node", "$Runtime\pi", "$Runtime\ffmpeg" | Out-Null
 Copy-Item -Recurse -Force "$PythonDir\*" "$Runtime\python\"
 Copy-Item -Force $env:PROMETHEUS_NODE "$Runtime\node\node.exe"
+# npm next to node.exe (PLAN 15.4.16): installing Codex CLI / Claude Code and the update check run it (agents/versions.py).
+$NodeDir = Split-Path -Parent $env:PROMETHEUS_NODE
+New-Item -ItemType Directory -Force -Path "$Runtime\node\node_modules" | Out-Null
+Copy-Item -Recurse -Force "$NodeDir\node_modules\npm" "$Runtime\node\node_modules\npm"
+Copy-Item -Force "$NodeDir\npm.cmd" "$Runtime\node\npm.cmd"
 Copy-Item -Recurse -Force "$env:PROMETHEUS_TOOLS\pi\*" "$Runtime\pi\"
 Copy-Item -Force "$env:PROMETHEUS_FFMPEG\*.exe" "$Runtime\ffmpeg\"
 Copy-Item -Force "$env:PROMETHEUS_FFMPEG\*.dll" "$Runtime\ffmpeg\"
@@ -53,7 +58,8 @@ Step "4/7 verify packaged assets"
 $Required = @(
     "$SitePackages\video_report_agent\skills\video-report\SKILL.md",
     "$SitePackages\video_report_agent\skills\video-report\assets\report-template.html",
-    "$SitePackages\video_report_agent\defaults\models.json"
+    "$SitePackages\video_report_agent\defaults\models.json",
+    "$Runtime\node\node_modules\npm\bin\npm-cli.js"
 )
 foreach ($Asset in $Required) {
     if (-not (Test-Path $Asset)) { throw "missing packaged asset: $Asset" }
