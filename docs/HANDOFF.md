@@ -1,11 +1,10 @@
-# 交接说明（2026-09-30，R7g 合并之后）
+# 交接说明（2026-09-30，R7h 合并之后）
 
 给新开的会话用：读完这份，再按 `AGENTS.md` 的「开工前必读」读 `docs/PLAN.md` 和 `docs/DECISIONS.md`，就能接着做。这份文件是某一时刻的快照，以 PLAN 的进度记录（§15.6）和 git 历史为准。
 
 ## 1. 现在做到哪了
 
-- R1–R7g 全部完成并合并到 `main`，已推送。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。R7d–R7g 的注意事项见第 8–12 节。
-- **R7h（按需生成）进行中，暂停在控制台界面这一步，见第 13 节**；做完 R7h 再做 R8。
+- R1–R7h 全部完成并合并到 `main`，已推送。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。R7d–R7h 的注意事项见第 8–13 节。
 - 按 PLAN §15.5，下一个里程碑是 **R8**：打包（安装包 ≤ 300MB，`PROMETHEUS_FORBID_DEV_PATHS=1` 冒烟）、README 全面重写、完整真实验收（E3 用 BV1yPb46xExH、E4 取消、E9 CI），最后请用户试用安装版，给出 E7 界面观感的最终判定。R8 还要带上第 9 节、第 11 节记下的几件事（耗时和 token 表、控制台的用时提示、随包 npm）。
 - **用户 2026-09-30 要求**：装好安装版以后，由 agent 帮用户把预览数据同步过去：`acceptance-output/r7-data` 里的设置（`.prometheus/config/settings.json`，含各份配置的 Key）、Codex 官方登录（`.prometheus/config/codex/`）和文章（三个分类文件夹、`index.json`、`llms.txt`、`.prometheus/prometheus.db`，以及条目缓存）。整个目录 4.9G，大头是本地转写模型和缓存。同步前先看安装版的数据目录在哪、里面有没有东西，别覆盖；Key 不进任何命令输出和文档。
 - 第 5 节是 R7d 之前的界面修改流程，已经做完；以后有新的界面意见，照同样的流程走。
@@ -174,7 +173,7 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **查到但没做的**：已有测试 `test_a_viewpoint_pass_that_loses_a_point_is_undone` 的条件永远不成立（假 Pi 在编者观点那一步收到的是第一次的提示词），测的是空；Claude Code 和 Codex 的事件要等运行结束才写进日志，运行中看不到进度（Pi 是边跑边写）；「获取上下文长度」按钮大多数接口拿不到，只能当可选项；Pi 压缩在实际运行里为什么没触发还没确诊，下次实跑失败时先把章节工作区整个复制出来再重试。
 - **用户的新想法（待写规格）**：精读、字幕、导图可以分开选，不是每个视频都要三样。事实：字幕纠错有精读时拿它当参考（人名、术语更准），没有也能纠（R6b 在不给报告的条件下测过：whisper 8.17% → 7.01%，必剪 6.17% → 5.86%）；导图现在从精读的章节结构生成，不写精读就要改成从转写或要点账本生成。
 
-## 13. R7h 进行中（2026-09-30 暂停）：按需生成
+## 13. R7h 之后（2026-09-30，已合并）：按需生成
 
 分支 `r7h-on-demand`（未推送）。规格 PLAN 15.4.15 / E17，用户已确认。做到：规格（e7c6e23）；三个圆圈的联动逻辑 `app/src/features/console/outputs.ts`（红 34452c3 → 绿 61ed34c：勾导图带上精读、取消精读带走导图、至少留一样、localStorage 记住上次选择，第一次三个都勾）。
 
@@ -194,3 +193,10 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 6. 前端单测、端到端测试（三个圆圈联动、记住选择、切换变灰、提交带参数、「没有生成」和「现在生成」），截图请用户看，结论记进 acceptance.md。
 7. live：当前配置（Codex 官方登录，走订阅），用户 2026-09-30 定用 BV1EJ4m1t7Zs（不删罗素）：① 只勾字幕；② 阅读页「现在生成」按「标准」补精读和导图；③ 删掉重交，只勾精读和导图（标准）；每次记下用时。
 8. Done When 逐条跑、写进 PLAN 进度记录，合并推送（推送前跑 `tmp/key_scan_all.py` 查 Key）。
+
+**R7h 做完以后（2026-09-30）**：上面 1–8 步都做完了，实现选择见 DECISIONS D-47，实跑结果见 acceptance.md 的 E17。另外几件：
+- 「标准」现在是 VRA 的精读（请求里要求按精读表达、分章、每章写时间范围）加每章一次编者观点（置信度 + 核实过的链接）和补上的跳转目录（`report/standard.py`）。**用户决定不实跑**，还没在真实模型上跑过；R8 完整验收或下一次有人用「标准」时，看篇幅、编者观点条数和目录，有问题先看 `stage_detail` 停在哪章。
+- 导图最多试 3 次，失败原因在条目的 `mindmap_error`，导图页显示；只剩小问题时照样保存，小问题在 mindmap.json 的 `problems` 里。
+- 本地中文转写（FunASR）修了两句时间重叠的老问题（R6 起就有，BV1EJ4m1t7Zs 撞上了）。
+- 预览数据：BV1EJ4m1t7Zs（「大语言模型怎样学会接续文本」，分类「人工智能」）是第三次实跑的条目，只有精读和导图、没有纠错字幕；「现在生成」那一版（标准、配图）另存在 `acceptance-output/report-eval/r7h/现在生成-标准-配图/`。当前配置已切回 `chatgpt-codex`（gpt-6.1-sol「高」），新加的 `chatgpt-codex-luna`（gpt-6-luna「超高」）留在列表里。改动前的 prometheus.db 和 settings.json 备份在 `tmp/r7h/backup-preview/`。
+- 设置页 Claude Code 的「目录里查不到这个模型名」提示已按用户给的话改写。
