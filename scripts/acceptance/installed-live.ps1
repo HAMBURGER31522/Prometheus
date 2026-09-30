@@ -61,7 +61,11 @@ function Api($method, $path, $body = $null, $timeout = 60) {
         $request.Body = [Text.Encoding]::UTF8.GetBytes(($body | ConvertTo-Json -Depth 8 -Compress))
         $request.ContentType = "application/json; charset=utf-8"
     }
-    $r = Invoke-WebRequest @request
+    try {
+        $r = Invoke-WebRequest @request
+    } catch [System.Net.WebException] {
+        throw ("{0} {1} -> {2} {3}" -f $method, $path, $_.Exception.Message, $_.ErrorDetails.Message)
+    }
     return ([Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray()) | ConvertFrom-Json)
 }
 
@@ -94,8 +98,9 @@ try {
     Say "data dir: the $Profile profile, standard depth by default, figures on; Codex login; models by hard link"
     $config = "$DataDir\.prometheus\config"
     New-Item -ItemType Directory -Force -Path "$config\codex" | Out-Null
-    $preview = [IO.File]::ReadAllText("$Preview\.prometheus\config\settings.json") | ConvertFrom-Json
-    $chosen = $preview.llm_profiles.items | Where-Object { $_.id -eq $Profile }
+    # not $preview: PowerShell names ignore case, and the [string] parameter $Preview would turn it into text
+    $previewSettings = [IO.File]::ReadAllText("$Preview\.prometheus\config\settings.json") | ConvertFrom-Json
+    $chosen = $previewSettings.llm_profiles.items | Where-Object { $_.id -eq $Profile }
     if (-not $chosen) { throw "profile $Profile not in the preview settings" }
     $settings = [ordered]@{
         llm_profiles = [ordered]@{ active = $Profile; items = @($chosen) }
