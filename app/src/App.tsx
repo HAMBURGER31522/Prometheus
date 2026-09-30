@@ -8,6 +8,7 @@ import { ReportView } from "./features/report/ReportView";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { SubtitleView } from "./features/subtitle/SubtitleView";
 import { type ItemRow, api } from "./shared/api";
+import { FirstRun, Starting, useStartup } from "./shared/FirstRun";
 import { LibraryPage } from "./shared/LibraryPage";
 import { NavProvider, useNav } from "./shared/NavContext";
 import { ZoomProvider } from "./shared/ReaderTools";
@@ -89,6 +90,9 @@ function Shell() {
 }
 
 export default function App() {
+  const [startup, chosen] = useStartup();
+  if (startup.phase === "starting") return <Starting />;
+  if (startup.phase === "choose") return <FirstRun suggested={startup.suggested} onChosen={chosen} />;
   return (
     <NavProvider>
       <ZoomProvider>

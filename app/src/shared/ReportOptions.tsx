@@ -14,13 +14,25 @@ export function useReportChoice() {
   const [depth, setDepth] = useState<ReportDepth>("full");
   const [figures, setFigures] = useState(true);
   useEffect(() => {
-    api
-      .settings()
-      .then((s) => {
-        setFigures(s.figures_default);
-        setDepth(s.report.depth);
-      })
-      .catch(() => undefined);
+    // Asked again until it answers: the installed app's page can load before its backend is up.
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () =>
+      api
+        .settings()
+        .then((s) => {
+          if (!alive) return;
+          setFigures(s.figures_default);
+          setDepth(s.report.depth);
+        })
+        .catch(() => {
+          if (alive) timer = setTimeout(load, 1000);
+        });
+    load();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
   }, []);
   return { depth, setDepth, figures, setFigures };
 }

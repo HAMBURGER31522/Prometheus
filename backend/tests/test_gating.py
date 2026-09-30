@@ -52,7 +52,7 @@ def test_data_dir_gating(client_factory, tmp_path):
 
     read = client.get("/api/app/data-dir", headers={"Authorization": f"Bearer {TOKEN}"})
     assert read.status_code == 200
-    assert read.json() == {"data_dir": None}
+    assert read.json()["data_dir"] is None  # plus a suggested place for a first launch (PLAN 15.4.16)
 
     target = tmp_path / "fresh-data"
     set_response = client.put(
