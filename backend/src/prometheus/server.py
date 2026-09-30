@@ -23,7 +23,7 @@ from prometheus.api import dictionary as dictionary_api
 from prometheus.api import items as items_api
 from prometheus.api import settings as settings_api
 from prometheus.fake.pipeline import build_impls as build_fake_impls
-from prometheus.library import db, migrate
+from prometheus.library import db, guide, migrate
 from prometheus.llm import catalogue_update, pi_models
 from prometheus.settings import store
 from prometheus.subtitle import paragraphs as subtitle_paragraphs
@@ -77,6 +77,7 @@ class AppState:
         # Data dirs from before the readable library (M0-M8) move over first.
         migrate.migrate_legacy_layout(self.data_dir)
         paths.init_data_dir(self.data_dir)
+        guide.write(self.data_dir)  # 说明.txt for whoever opens the folder (PLAN 15.4.17)
         db.init_db(self.data_dir)
         pi_models.ensure_models_json(self.data_dir)
         pi_models.refresh_custom_provider(self.data_dir, pi_cli=self._pi_cli())
