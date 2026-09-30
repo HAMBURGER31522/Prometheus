@@ -311,3 +311,10 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 - **用量**：Claude Code 的 result 事件和 Codex 的 turn.completed 事件记在工作区的 `agent.events.jsonl`，和 Pi 的一起算进 rewrite.py 打印的花费；Codex 的输入数包含缓存命中的部分，分开记。
 - **失败原因**：两个 CLI 的报错都转成「<Agent> 调用失败：<状态码> <原文>」，状态码放在「：」后面，现有的归类规则就能认出 Key 无效、限流等；接口连不上、流被切断的几种说法归到「模型没有回应」，也会触发中转重试。
 - **内存**：Claude Code 一个进程约 0.2–0.4 GB（本机长会话实测 396 MB），3 章同时写约 1 GB；先保持 3 章，真实运行后看情况再调。
+- **「Pi 有的另外两个也要有」逐项核对**（2026-09-30，用户指出上下文漏了之后重新全查一遍；此前只对照了技能、规则、工具、隔离、一次性调用参数和 VRA 的扩展这六项，漏掉了 Pi 从 models.json 拿到的模型参数）：
+  - 上下文窗口和最大输出：Pi 从 models.json 拿（用户在「高级」里填的优先，否则按模型目录）。现在 Codex CLI 用 `model_context_window`（并在 80% 处压缩）和 `model_max_output_tokens`，Claude Code 用 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`；「高级」空着时查同一个模型目录。Claude Code 的上下文由模型名决定：用 Key 运行时，Claude 模型名不带「[1m]」只有 200k（anyrouter 因此回过「请启用 1m 上下文」），所以目录里是 1M 的模型自动加「[1m]」。用户自己的 Claude Code 显示 1M，是因为它用账户登录，默认档不同。
+  - 模型目录里 gpt-6-astra 是 272000、claude-opus-4-8 是 1000000。anyrouter 的 gpt-6-astra 是它自己说的 1M 部署，runanytime 是标准的 272k：runanytime 上两章在修改时被拒（context_length_exceeded），因为 Codex 不知道这个上限、没有提前压缩。同一模型在不同接口上限不同，所以按接口填「高级」，空着就按模型。
+  - `VIDEO_REPORT_PYTHON`、`PYTHONUTF8`：Pi 的运行环境里有，技能的 modes/standard.md 告诉模型可以用 `"$VIDEO_REPORT_PYTHON" draw.py` 画图；现在另外两个的写作任务也有。
+  - 能不能看图：Pi 查它自己的目录；另外两个用配置里的「模型能看图」（之前误查 Pi 的目录，Codex 那次因此一张截图都没有）。
+  - 已经一致的：思考档位、阶段时限和按档位放大、中转重试、用量、失败原因、隔离、不联网的部分、「标准」模式的附加文件。
+  - 做不到一样的：Pi 的一次性调用完全没有工具；Codex 的一次性调用仍然提供 shell，但只读模式和文件保护都挡住它，实际用不了。
