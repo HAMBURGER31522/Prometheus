@@ -56,9 +56,15 @@ def claude_command(exe, *, model: str, thinking: str, tools) -> list:
     return command + ["--tools", ""]
 
 
+def _anthropic_base(base_url: str) -> str:
+    """Claude Code appends /v1/messages itself, as Pi does (llm/pi_models.custom_base_url)."""
+    base = (base_url or "").rstrip("/")
+    return base[: -len("/v1")] if base.endswith("/v1") else base
+
+
 def claude_env(env: dict, *, config_root, base_url: str, api_key: str) -> dict:
     return {**clean_env(env), "CLAUDE_CONFIG_DIR": str(Path(config_root) / "claude"),
-            "ANTHROPIC_BASE_URL": base_url, "ANTHROPIC_API_KEY": api_key,
+            "ANTHROPIC_BASE_URL": _anthropic_base(base_url), "ANTHROPIC_API_KEY": api_key,
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
             "CLAUDE_CODE_MAX_RETRIES": str(RETRIES)}
 
