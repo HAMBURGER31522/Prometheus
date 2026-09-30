@@ -187,6 +187,8 @@ def build_real_impls(data_dir, runtime=None) -> dict:
     def _figures(ctx, row, settings) -> tuple:
         """(frames exist, the model sees images): Pi (built-in and custom alike) is asked only with frames."""
         figures = bool(row["figures"]) and (_work(data_dir, ctx) / "frames" / "frames.json").is_file()
+        if agent_runs.agent_of(settings["llm"])["id"] != "pi":  # Pi's catalogue cannot speak for them (15.4.13)
+            return figures, figures and bool((settings["llm"].get("custom") or {}).get("supports_images"))
         return figures, figures and capability.query_supports_images(
             _node_exe(), _pi_cli(), data_dir, settings["llm"],
         )
