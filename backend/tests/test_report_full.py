@@ -136,6 +136,24 @@ def test_a_plan_still_wrong_after_the_redo_is_kept_with_its_problems(tmp_path):
     assert len(pi.runs("plan.json")) == 2 and any("没有归属章节" in problem for problem in problems)
 
 
+class RefusedPlan(Pi):
+    """The first planning run ends without writing plan.json (runanytime refused it, R7g)."""
+
+    def __call__(self, workspace, prompt, expect):
+        if expect == "plan.json" and not any(name == expect for name, _ in self.calls):
+            self.calls.append((expect, prompt))
+            raise PiRunError("Pi 结束了，但没有写出 plan.json")
+        return super().__call__(workspace, prompt, expect)
+
+
+def test_a_planning_run_that_left_nothing_is_run_once_more(tmp_path):
+    """R7g (PLAN 15.4.14 G ②): one refusal at the first planning turn failed the whole report."""
+    ledger = full.run_keypoints(tmp_path, make_units(), Model())
+    pi = RefusedPlan()
+    plan, problems = full.run_plan(tmp_path, ledger, pi, figures=False, input_json=INPUT)
+    assert len(pi.runs("plan.json")) == 2 and plan["title"] == "手冲咖啡" and problems == []
+
+
 def test_an_unreadable_plan_fails_the_report(tmp_path):
     pi = Pi(plans=("这不是 JSON", "还不是"))
     ledger = full.run_keypoints(tmp_path, make_units(), Model())
