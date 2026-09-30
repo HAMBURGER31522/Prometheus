@@ -140,3 +140,10 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **用户的工作习惯**：需要用户定的事用弹窗问（AskUserQuestion），附推荐项；改规格要先问、得到同意再写进 PLAN；回答要说清楚改了什么、为什么。
 - **README 要用的耗时数据**（用户 2026-09-29 要求）：`docs/report-eval.md` 的「耗时」一节，gpt-6-luna（ChatGPT 订阅经本机 CPA）在「最高」「超高」下各视频长度的实测时间。R8 重写 README 时写进去。
 - **当前模型**：预览数据的配置已切回 justwoker 中转（claude-opus-4-8，「中」）；CPA 的 gpt-6-luna 配置保留但不用（用户 2026-09-29：先别用 Codex 订阅）。模型目录已从 pi.dev 更新过。
+
+## 10. R7f 真实跑通的两份配置（2026-09-30，截图 `docs/screenshots/r7f/10-…`、`11-…`）
+
+- **Codex CLI + anyrouter**（`anyrouter · Codex CLI`）：Agent 选 Codex CLI，接入方式「接口 + Key」，平台选「自定义」，接口地址 `https://anyrouter.top/v1`，协议 OpenAI 兼容，模型 `gpt-6-astra`，模型能看图打开，思考强度「超高」。「高级」按模型目录预填 272000 / 128000；anyrouter 自己说它的 gpt-6-astra 是 1M，想用满就把上下文窗口改成 1000000。要求 Codex 0.153 以上（应用自己的是 0.159.1）。整条流水线（完整精读、字幕、导图、归类）跑通，用时 38.5 分钟；中途 anyrouter 多次限流，都由重试接住。
+- **Claude Code + justwoker**（`justwoker · Claude Code`）：Agent 选 Claude Code，接口地址 `https://api.justwoker.icu/v1`（应用会去掉末尾的 /v1 再交给 Claude Code），协议 Anthropic，模型 `claude-opus-4-8[1m]`（也可以只写 `claude-opus-4-8`，目录里是 1M 的模型会自动加 `[1m]`），思考强度「中」。整条流水线跑通，用时 25 分钟，截图 5 张。「超高」在 justwoker 上每章都被网关 100 秒超时（524）切断。2026-09-30 之后 justwoker 返回 403，用户说它坏了。
+- anyrouter 的 Claude 模型当时用不了：claude-opus-5-5 被拒（「claude 模型供应难以保证」），claude-sonnet-5 要带 `[1m]`，带上后规划阶段一直 429。
+- runanytime（`https://runanytime.hxi.me/v1`，Key 在本地设置里）：`gpt-6-astra` 和 `gpt-5.6-sol` 都能答；gpt-6-astra 是标准的 272k 上下文，没带上限时两章修改被拒（context_length_exceeded），已修（Codex 现在按上限提前压缩）。
