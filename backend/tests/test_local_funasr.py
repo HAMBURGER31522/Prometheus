@@ -1,5 +1,7 @@
 """FunASR ONNX output to subtitle segments (PLAN 15.4.4, D-39)."""
 
+from itertools import pairwise
+
 from prometheus.transcribe.local_funasr import attach_punctuation, build_segments
 
 
@@ -122,7 +124,7 @@ def test_a_sentence_break_between_two_words_of_one_spread_timestamp_does_not_ove
     times = [[0, 100], [0, 100], [100, 300], [300, 400]]  # three timestamps spread over four words
     segments = build_segments(tokens, times, "对。啊，好的。", offset_s=0)
     assert "".join(s["text"] for s in segments) == "对。啊，好的。"
-    for before, after in zip(segments, segments[1:], strict=False):
+    for before, after in pairwise(segments):
         assert after["start"] >= before["end"] and after["end"] > after["start"]
     _accepted_by_vra(segments)
 

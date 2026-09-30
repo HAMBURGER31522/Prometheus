@@ -73,8 +73,29 @@ def _fit(times_ms: list, count: int) -> list:
     return [times_ms[min(index * len(times_ms) // count, len(times_ms) - 1)] for index in range(count)]
 
 
+def _no_overlap(segments: list) -> list:
+    """Paraformer's last word can run past its VAD span, and _fit gives neighbours one timestamp, so a
+    sentence could start before the one before it ends; VRA rejects that (BV1EJ4m1t7Zs, 2026-09-30).
+    The later start becomes the boundary; a sentence left with no time of its own joins the one before."""
+    fixed: list = []
+    for segment in segments:
+        segment = dict(segment)
+        previous = fixed[-1] if fixed else None
+        if previous is not None and segment["start"] < previous["end"]:
+            if segment["start"] > previous["start"]:
+                previous["end"] = segment["start"]
+            elif segment["end"] > previous["end"]:
+                segment["start"] = previous["end"]
+            else:
+                space = " " if _is_word(segment["text"][:1]) and _is_word(previous["text"][-1:]) else ""
+                previous["text"] += space + segment["text"]
+                continue
+        fixed.append(segment)
+    return fixed
+
+
 def build_segments(tokens: list, times_ms: list, punctuated: str, *, offset_s: float) -> list:
-    """Sentences at 。！？；, long ones (> 30 characters or > 8 s) cut again at ，、."""
+    """Sentences at 。！？；, long ones (> 30 characters or > 8 s) cut again at ，、; none overlapping."""
     times_ms = _fit(times_ms, len(tokens))
     items = list(zip(tokens, attach_punctuation(tokens, punctuated), times_ms, strict=True))
     segments = []
@@ -88,7 +109,7 @@ def build_segments(tokens: list, times_ms: list, punctuated: str, *, offset_s: f
                 "end": round(offset_s + part[-1][2][1] / 1000, 3),
                 "text": _join(part),
             })
-    return segments
+    return _no_overlap(segments)
 
 
 def transcribe_array(audio, *, vad, asr, punc, sample_rate: int = 16000) -> list:
