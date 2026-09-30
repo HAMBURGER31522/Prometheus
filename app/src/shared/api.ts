@@ -146,6 +146,11 @@ export interface ItemRow {
   transcript_source: string | null;
   notice: string | null;
   files_missing: boolean;
+  /** What this video gets and its report's depth (PLAN 15.4.15); null depth = the settings'. */
+  outputs: Outputs;
+  depth: ReportDepth | null;
+  /** The steps its run goes through, in order: the console counts these. */
+  stages: string[];
 }
 
 export interface CategoryRow {
