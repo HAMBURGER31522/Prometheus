@@ -1,12 +1,12 @@
-# 交接说明（2026-09-27，R7c 合并之后）
+# 交接说明（2026-09-30，R7f 合并之后）
 
 给新开的会话用：读完这份，再按 `AGENTS.md` 的「开工前必读」读 `docs/PLAN.md` 和 `docs/DECISIONS.md`，就能接着做。这份文件是某一时刻的快照，以 PLAN 的进度记录（§15.6）和 git 历史为准。
 
 ## 1. 现在做到哪了
 
-- R1–R7c 全部完成并合并到 `main`（R7c 的合并 commit 是 b4c029c，`main` 最新是 9710974，已推送）。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。
-- 按 PLAN §15.5，下一个里程碑是 **R8**：打包（安装包 ≤ 300MB，`PROMETHEUS_FORBID_DEV_PATHS=1` 冒烟）、README 全面重写、完整真实验收（E3 用 BV1yPb46xExH、E4 取消、E9 CI），最后请用户试用安装版，给出 E7 界面观感的最终判定。
-- **但用户在 R8 之前有新的界面修改意见。** 处理方式见第 5 节：先写规格、用户确认，再开分支按红绿做。
+- R1–R7f 全部完成并合并到 `main`，已推送。每个里程碑的 Done When 结果都记在 `docs/PLAN.md` §15.6。R7d–R7f 的注意事项见第 8–11 节。
+- 按 PLAN §15.5，下一个里程碑是 **R8**：打包（安装包 ≤ 300MB，`PROMETHEUS_FORBID_DEV_PATHS=1` 冒烟）、README 全面重写、完整真实验收（E3 用 BV1yPb46xExH、E4 取消、E9 CI），最后请用户试用安装版，给出 E7 界面观感的最终判定。R8 还要带上第 9 节、第 11 节记下的几件事（耗时和 token 表、控制台的用时提示、随包 npm）。
+- 第 5 节是 R7d 之前的界面修改流程，已经做完；以后有新的界面意见，照同样的流程走。
 
 ## 2. 界面预览（给用户看、自己截图都用这个）
 
@@ -107,7 +107,7 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 
 ## 7. 新窗口的开场白（复制给新会话）
 
-> 继续 Prometheus 项目（F:\project\Prometheus）。先读 docs/HANDOFF.md，再按 AGENTS.md 读 docs/PLAN.md 和 docs/DECISIONS.md。R1–R7c 已完成，下一步本来是 R8，但我先有一些界面修改意见：先听我说完，按 HANDOFF 第 5 节把意见写成规格给我确认，确认后再开分支按红绿做。预览用 HANDOFF 第 2 节的方法启动。
+> 继续 Prometheus 项目（F:\project\Prometheus）。先读 docs/HANDOFF.md，再按 AGENTS.md 读 docs/PLAN.md 和 docs/DECISIONS.md。R1–R7f 已完成，下一步是 R8：先把 R8 的规格和 HANDOFF 第 9、11 节记下的事对一遍，有缺口先问我，确认后再开分支按红绿做。预览用 HANDOFF 第 2 节的方法启动。
 
 ## 8. R7d 进行中的注意事项（2026-09-28）
 
@@ -147,3 +147,17 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **Claude Code + justwoker**（`justwoker · Claude Code`）：Agent 选 Claude Code，接口地址 `https://api.justwoker.icu/v1`（应用会去掉末尾的 /v1 再交给 Claude Code），协议 Anthropic，模型 `claude-opus-4-8[1m]`（也可以只写 `claude-opus-4-8`，目录里是 1M 的模型会自动加 `[1m]`），思考强度「中」。整条流水线跑通，用时 25 分钟，截图 5 张。「超高」在 justwoker 上每章都被网关 100 秒超时（524）切断。2026-09-30 之后 justwoker 返回 403，用户说它坏了。
 - anyrouter 的 Claude 模型当时用不了：claude-opus-5-5 被拒（「claude 模型供应难以保证」），claude-sonnet-5 要带 `[1m]`，带上后规划阶段一直 429。
 - runanytime（`https://runanytime.hxi.me/v1`，Key 在本地设置里）：`gpt-6-astra` 和 `gpt-5.6-sol` 都能答；gpt-6-astra 是标准的 272k 上下文，没带上限时两章修改被拒（context_length_exceeded），已修（Codex 现在按上限提前压缩）。
+
+## 11. R7f 之后（2026-09-30，已合并）
+
+规格 PLAN 15.4.13 / E15，实现选择 DECISIONS D-45。每个配置可以选 Agent：Pi、Codex CLI、Claude Code。
+
+- **私有副本**：Codex CLI 和 Claude Code 装在 `E:\tools\Prometheus-Desktop\agents\`（codex、claude 两个 npm 目录），配置目录在 `<数据目录>/.prometheus/config/codex`、`…/claude`。子进程从干净的环境变量启动（去掉继承来的 `ANTHROPIC_*`、`CLAUDE*`、`CODEX_*`、`OPENAI_*`），用户自己的 Claude Code、Codex、superpowers 都碰不到。
+- **文件保护**：三个 Agent 都在 Windows 低完整性级别下运行（`backend/src/prometheus/agents/contain.py`），只能写这次运行的工作目录和自己的配置目录。开发测试用假模型接口 `agents/fake_api.py`（提示词里的 `DELETE:`、`OUTSIDE:`、`WRITE:`、`HTML:` 让它去做对应的事）。
+- **测试**：`uv run pytest backend/tests -q -m agents` 会启动真实的 CLI 副本（对假接口，不花钱），默认的 `-m "not live"` 会跳过它们，要单独跑。
+- **更新**：设置页「检查更新」。更新先装到 `E:\tools\Prometheus-Desktop\.staging`，自检（Pi 还要跑 VRA 的 PiRunner）通过才替换旧版本。现在用的是系统里的 npm；R8 打包时要把 npm 一起带上。
+- **当前配置**：预览数据的当前配置是 `chatgpt-codex`（「ChatGPT · Codex CLI（官方登录）」，gpt-6.1-sol，「高」），走用户的 ChatGPT 订阅。另外两份跑通过的配置见第 10 节。justwoker 返回 403，已坏。
+- **罗素条目现在的内容**：精读是 Claude Code（justwoker，claude-opus-4-8[1m]「中」）那次的，字幕纠错和导图是官方登录那次的。R7e 版本的精读在 `acceptance-output/report-eval/r7f/russell-before-r7f.html`，Codex（anyrouter）那篇在同一目录。
+- **还没验证的**：Codex、Claude Code 输出到上限被截断时的表现；Codex 在中转上自动压缩上下文的表现（Russell 没用到）。
+- **不稳定的单测**：8 次完整后端测试里有 1 次一个测试失败，重跑就过，名字没记下。以后遇到用 `-rf` 跑，把名字记下来再查。
+- **Claude Code 那篇有 1 条补充说明与视频矛盾**（E15 ④），用户决定如实记录、照样验收。之后加的三条规则（谁说的就是谁说的、每章都跑编者观点、PowerShell 下的 Python 写法）见 PLAN 15.4.13 末尾，还没在真实视频上跑过。
