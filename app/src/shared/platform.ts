@@ -1,4 +1,7 @@
 // Tauri capability wrappers; browser and E2E runs use fixed stand-ins (PLAN 9.4).
+// Tauri 2 is told apart by its own injected flag (isTauri) and reached through invoke, not the
+// window.__TAURI__ global it only sets with withGlobalTauri (the installed app fell back to port 8765).
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export interface BackendInfo {
   port: number;
@@ -9,18 +12,16 @@ const E2E = import.meta.env.VITE_E2E === "1";
 
 type TauriWindow = Window & {
   __PROMETHEUS_BACKEND__?: BackendInfo;
-  __TAURI__?: { core?: { invoke: (cmd: string) => Promise<BackendInfo> }; invoke?: (cmd: string) => Promise<BackendInfo> };
   __lastOpenedExternal?: string;
 };
 
-const inTauri = () => !E2E && Boolean((window as TauriWindow).__TAURI__);
+const inTauri = () => !E2E && isTauri();
 
 export async function backendInfo(): Promise<BackendInfo> {
   if (E2E) return { port: 8765, token: "e2e" };
   const w = window as TauriWindow;
   if (w.__PROMETHEUS_BACKEND__) return w.__PROMETHEUS_BACKEND__;
-  const invoke = w.__TAURI__?.core?.invoke ?? w.__TAURI__?.invoke;
-  if (invoke) return invoke("backend_info");
+  if (inTauri()) return invoke<BackendInfo>("backend_info");
   // Plain browser during development: ?port=&token=, else the dev backend.
   const params = new URLSearchParams(window.location.search);
   return { port: Number(params.get("port") ?? 8765), token: params.get("token") ?? "e2e" };
