@@ -60,6 +60,10 @@ def child_pids(parent: int | None = None) -> list[int]:
     return _children_windows(parent) if sys.platform == "win32" else _children_posix(parent)
 
 
+def child_processes(parent: int | None = None) -> list[tuple[int, str]]:
+    return [(pid, "") for pid in child_pids(parent)]
+
+
 def kill_tree(pid: int) -> None:
     if sys.platform == "win32":
         subprocess.run(
