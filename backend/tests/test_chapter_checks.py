@@ -91,6 +91,16 @@ def test_a_frame_used_or_declined_with_a_reason_is_fine():
     assert checks.check_chapter(no_reason, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)["unused_frames"] == ["f_000030.jpg"]
 
 
+def test_a_frame_written_as_its_file_name_only_is_named_so():
+    """R7g (PLAN 15.4.14 G ③): sonnet wrote 「frames/f_000131.jpg」 as text in a figure and twice answered
+    that the frame was already in; the page showed the path, not the picture."""
+    as_text = GOOD.replace("</section>", '<figure class="report-figure">frames/f_000030.jpg<figcaption>颜色对比</figcaption>'
+                                         "</figure></section>")
+    result = checks.check_chapter(as_text, ["K001", "K002"], POINTS, TRANSCRIPT, frames=FRAMES)
+    problem = next(problem for problem in result["problems"] if "f_000030.jpg" in problem)
+    assert "只写文件名页面上不显示图" in problem and '<img src="frames/f_000030.jpg"' in problem
+
+
 def test_a_point_is_split_into_its_items_without_the_lead_in():
     """PLAN 15.4.11a-2: lists and reasons are checked item by item (user 2026-09-29)."""
     assert checks.point_items("展示图表有两个原因：一是让学习者更清楚接下来会学什么，二是强制系统把推理讲清楚") == [

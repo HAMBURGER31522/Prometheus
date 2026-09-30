@@ -207,7 +207,7 @@ def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -
     """(fragment, check, stats, details) after the two-step review and at most one revision; the
     details keep what was asked and how it was judged, so a review that led nowhere can be read."""
     stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False,
-             "second_reader": False}
+             "second_reader": False, "unfinished": False}
     reply = ask(reviewing.reader_prompt(fragment))
     questions, pictures = reviewing.parse_reader(reply, fragment), reviewing.parse_pictures(reply, fragment)
     stats["second_reader"] = True  # every chapter (PLAN 15.4.14 A)

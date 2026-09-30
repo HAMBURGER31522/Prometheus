@@ -78,7 +78,10 @@ class Pi:
             first = next(text for name, text in self.calls if name == expect)
             # a targeted run and the viewpoint pass rewrite the draft: the chapter comes from the first prompt
             later = "只补" in prompt or "加编者观点" in prompt
-            (workspace / expect).write_text(self.chapter(first if later else prompt, attempt), encoding="utf-8")
+            # every run leaves its mark, as a real one never writes the same bytes twice (R7g: an unchanged
+            # file means the run did nothing and gets one more go)
+            text = self.chapter(first if later else prompt, attempt) + f"<!-- run {len(self.calls)} -->"
+            (workspace / expect).write_text(text, encoding="utf-8")
         return workspace / expect
 
     def runs(self, expect):
@@ -184,7 +187,7 @@ def test_the_review_sends_answers_found_in_the_source_back_once(tmp_path):
     assert len(runs) == 2 and "烘焙到什么程度" in runs[1] and "中深烘" in runs[1]
     # one question on a short chapter is below the bar: a second reader looked and found nothing new (R7g)
     assert chapters[0]["review"] == {"questions": 1, "answered": 1, "background": 0, "revised": True,
-                                     "reverted": False, "second_reader": True}
+                                     "reverted": False, "second_reader": True, "unfinished": False}
     reader = next(prompt for prompt in model.prompts if "没看过视频" in prompt)
     assert "第0句原话" not in reader  # the reader never sees the transcript
 
@@ -457,6 +460,74 @@ def test_the_closing_problems_name_what_to_fix_and_never_a_threshold():
     assert "不能据此断定" in joined and "为什么要紧" in joined and "为什么不能断定？" in joined
     for threshold in (review.SUPPLEMENT_MIN, chapter_checks.HEDGE_MAX):
         assert str(threshold) not in joined
+
+
+REFUSAL = "Sorry, I wasn't able to respond to that. Is there something else I can help with?"
+
+
+class Refusing(Model):
+    """Readers and the judge refuse the first `times` times (a relay's content filter, R7g)."""
+
+    def __init__(self, times=1):
+        super().__init__()
+        self.left = {"reader": times, "judge": times}
+
+    def __call__(self, prompt: str) -> str:
+        kind = "reader" if "没看过视频" in prompt else "judge" if "逐条判断" in prompt else None
+        if kind and self.left[kind] > 0:
+            self.left[kind] -= 1
+            self.prompts.append(prompt)
+            return REFUSAL
+        return super().__call__(prompt)
+
+
+def test_a_refused_reader_or_judge_is_asked_again(tmp_path):
+    """R7g (PLAN 15.4.14 G ①): a refusal was read as 「no questions」 and two chapters got no supplements."""
+    _l, _p, chapters, _c, pi, model = pipeline(tmp_path, model=Refusing(times=1))
+    first_readers = [p for p in model.prompts if "没看过视频" in p and "已经问过" not in p]
+    assert len(first_readers) == 3  # chapter 1 asked twice, chapter 2 once
+    assert chapters[0]["review"]["questions"] == 1 and chapters[0]["review"]["answered"] == 1
+    assert chapters[0]["review"]["unfinished"] is False
+
+
+def test_a_review_that_stays_refused_is_marked_unfinished(tmp_path):
+    _l, _p, chapters, coverage, _pi, _m = pipeline(tmp_path, model=Refusing(times=99))
+    assert chapters[0]["review"]["unfinished"] is True and chapters[0]["review"]["questions"] == 0
+    assert coverage["chapters"][0]["review"]["unfinished"] is True
+
+
+class Silent(Pi):
+    """Chapter 1's first write, then its viewpoint pass, end without touching the file (a refusal)."""
+
+    def __init__(self, *, stubborn=False):
+        super().__init__()
+        self.stubborn, self.skipped = stubborn, []
+
+    def __call__(self, workspace, prompt, expect):
+        target = workspace / expect
+        first_write = expect == "ch-01.html" and not any(name == expect for name, _ in self.calls)
+        viewpoint = expect == "ch-01.html" and "加编者观点" in prompt
+        seen = sum(1 for kind in self.skipped if kind == ("write" if first_write else "viewpoint"))
+        if (first_write and not self.skipped) or (viewpoint and (self.stubborn or not seen)):
+            self.calls.append((expect, prompt))
+            self.skipped.append("write" if first_write else "viewpoint")
+            if not target.is_file():
+                raise PiRunError(f"Pi 结束了，但没有写出 {expect}")
+            return target
+        return super().__call__(workspace, prompt, expect)
+
+
+def test_a_writing_run_that_left_nothing_is_run_once_more(tmp_path):
+    """R7g (15.4.14 G ②): chapter 1's first write was refused and the whole report failed."""
+    _l, _p, chapters, coverage, pi, _m = pipeline(tmp_path, pi=Silent(), review=False)
+    runs = pi.runs("ch-01.html")
+    assert sum("加编者观点" in prompt for prompt in runs) == 2 and coverage["uncovered"] == []
+    assert pi.skipped == ["write", "viewpoint"]
+
+
+def test_a_run_that_changes_nothing_twice_is_left_as_it_is(tmp_path):
+    _l, _p, _chapters, _c, pi, _m = pipeline(tmp_path, pi=Silent(stubborn=True), review=False)
+    assert sum("加编者观点" in prompt for prompt in pi.runs("ch-01.html")) == 2
 
 
 def test_a_viewpoint_pass_that_loses_a_point_is_undone(tmp_path):
