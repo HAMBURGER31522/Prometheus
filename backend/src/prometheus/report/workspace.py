@@ -141,14 +141,19 @@ RELAY_RETRIES = 10
 RELAY_FIRST_WAIT_S = 10
 RELAY_LONGEST_WAIT_S = 120
 _RELAY_FAILURES = ("MODEL_TIMEOUT", "MODEL_RATE_LIMITED", "MODEL_BUSY")
+_LIMITED = ("MODEL_RATE_LIMITED", "MODEL_BUSY")
 
 
-def _patient(call, deadline=None):
+def _patient(call, deadline=None, on_limit=None):
+    """`on_limit()`: told of every rate limit or busy relay, so fewer chapters run at once (PLAN 15.4.14 H)."""
     for attempt in range(RELAY_RETRIES + 1):
         try:
             return call()
         except (pi_run.PiRunError, one_shot.OneShotError, runs.AgentRunError) as exc:
-            if attempt == RELAY_RETRIES or errors.classify("report", str(exc)) not in _RELAY_FAILURES:
+            code = errors.classify("report", str(exc))
+            if on_limit is not None and code in _LIMITED:
+                on_limit()
+            if attempt == RELAY_RETRIES or code not in _RELAY_FAILURES:
                 raise
             wait = min(RELAY_FIRST_WAIT_S * 2 ** attempt, RELAY_LONGEST_WAIT_S)
             if deadline is not None and deadline - time.monotonic() < wait + 60:  # room for the retry itself
@@ -180,7 +185,7 @@ def review_thinking(level: str) -> str:
     return _ONE_DOWN.get(level, level)
 
 
-def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str, *, thinking=None):
+def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str, *, thinking=None, on_limit=None):
     """ask(prompt) -> reply: one-shot calls (key points, the review) with the configured model; `thinking`
     overrides the profile's level."""
     llm = _llm(settings)
@@ -190,12 +195,12 @@ def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str, *, thi
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=thinking or llm["thinking"], node_exe=node_exe, pi_cli=pi_cli,
             agent_dir=paths.pi_config_dir(data_dir), agent=runs.agent_of(llm),
-        ))
+        ), on_limit=on_limit)
 
     return ask
 
 
-def model_look(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
+def model_look(data_dir, work, settings: dict, node_exe: str, pi_cli: str, *, on_limit=None):
     """look(prompt, files) -> reply: a one-shot call with images attached (the frame ledger)."""
     llm = _llm(settings)
 
@@ -204,12 +209,12 @@ def model_look(data_dir, work, settings: dict, node_exe: str, pi_cli: str):
             work, prompt=prompt, provider=llm["provider"], model=llm["model"], api_key=llm["api_key"],
             thinking=llm["thinking"], node_exe=node_exe, pi_cli=pi_cli, agent_dir=paths.pi_config_dir(data_dir),
             files=files, agent=runs.agent_of(llm),
-        ))
+        ), on_limit=on_limit)
 
     return look
 
 
-def pi_runner(data_dir, settings: dict, node_exe: str, pi_cli: str, *, deadline: float):
+def pi_runner(data_dir, settings: dict, node_exe: str, pi_cli: str, *, deadline: float, on_limit=None):
     """run_pi(workspace, prompt, expect) for report/full.py: each run gets what is left of its stage's time."""
     llm = _llm(settings)
 
@@ -221,7 +226,7 @@ def pi_runner(data_dir, settings: dict, node_exe: str, pi_cli: str, *, deadline:
                                agent_dir=paths.pi_config_dir(data_dir), timeout=left)
 
     def run(workspace, prompt: str, expect: str):
-        return _patient(lambda: once(workspace, prompt, expect), deadline)
+        return _patient(lambda: once(workspace, prompt, expect), deadline, on_limit)
 
     return run
 
@@ -232,12 +237,13 @@ def run_keypoints_stage(data_dir, item_id: str, settings: dict, *, node_exe: str
     full.run_keypoints(work, units, model_ask(data_dir, work, settings, node_exe, pi_cli))
 
 
-def _planned(data_dir, work, row: dict, settings: dict, node_exe: str, pi_cli: str, *, figures: bool, seconds: float):
+def _planned(data_dir, work, row: dict, settings: dict, node_exe: str, pi_cli: str, *, figures: bool, seconds: float,
+             on_limit=None):
     """The ledger and the plan, both kept from their own stages unless their inputs changed."""
     ask = model_ask(data_dir, work, settings, node_exe, pi_cli)
     units = load_units(work / "canonical-transcript.jsonl")
     ledger = full.run_keypoints(work, units, ask)
-    run_pi = pi_runner(data_dir, settings, node_exe, pi_cli, deadline=time.monotonic() + seconds)
+    run_pi = pi_runner(data_dir, settings, node_exe, pi_cli, deadline=time.monotonic() + seconds, on_limit=on_limit)
     plan, problems = full.run_plan(work, ledger, run_pi, figures=figures, input_json=build_input_json(row))
     return units, ledger, plan, problems, ask, run_pi
 
@@ -261,15 +267,16 @@ def run_full_report_stage(data_dir, item_id: str, row: dict, settings: dict, *, 
                           figures: bool, progress):
     """Chapters, checks, review, assembly: work/report.html for finalize (15.4.11)."""
     work = paths.work_dir(data_dir, item_id)
+    gate = full.Gate()  # five chapters at a time, fewer once the relay limits the rate (PLAN 15.4.14 H)
     units, ledger, plan, problems, _ask, run_pi = _planned(
         data_dir, work, row, settings, node_exe, pi_cli, figures=figures,
-        seconds=_times(settings) * pi_timeout_seconds(row.get("duration_s") or 0.0))
+        seconds=_times(settings) * pi_timeout_seconds(row.get("duration_s") or 0.0), on_limit=gate.lower)
     proxy = settings["network"].get("proxy", "")
-    review_ask = model_ask(data_dir, work, settings, node_exe, pi_cli, thinking=review_thinking(_llm(settings)["thinking"]))
+    review_ask = model_ask(data_dir, work, settings, node_exe, pi_cli, thinking=review_thinking(_llm(settings)["thinking"]),
+                           on_limit=gate.lower)
     chapters = full.write_chapters(work, plan, ledger, units, run_pi, review_ask, figures=figures,
                                    review=review_on(settings), progress=progress, workers=full.CHAPTERS_AT_ONCE,
-                                   gate=full.Gate(),
-                                   look=model_look(data_dir, work, settings, node_exe, pi_cli),
+                                   gate=gate, look=model_look(data_dir, work, settings, node_exe, pi_cli, on_limit=gate.lower),
                                    verify_links=lambda url: viewpoints.open_page(url, proxy=proxy))
     full.finish(work, plan, problems, ledger, chapters, build_input_json(row))
     return work / "report.html"

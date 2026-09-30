@@ -128,7 +128,7 @@ def test_the_plan_stage_hands_the_item_and_one_stage_of_time_to_the_planner(data
     seen = {}
     monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
     monkeypatch.setattr(workspace_mod, "pi_runner",
-                        lambda *args, deadline: seen.setdefault("left", deadline - time.monotonic()) and "runner")
+                        lambda *args, deadline, on_limit=None: seen.setdefault("left", deadline - time.monotonic()) and "runner")
 
     def fake_plan(work, ledger, run_pi, **kwargs):
         seen.update(kwargs, run_pi=run_pi)
@@ -149,7 +149,7 @@ def test_the_chapter_report_gets_the_review_setting_figures_progress_and_three_t
     monkeypatch.setattr(workspace_mod.full, "run_keypoints", lambda work, units, ask: EMPTY_LEDGER)
     monkeypatch.setattr(workspace_mod.full, "run_plan", lambda work, ledger, run_pi, **kwargs: ({"chapters": []}, []))
     monkeypatch.setattr(workspace_mod, "pi_runner",
-                        lambda *args, deadline: seen.setdefault("left", deadline - time.monotonic()) and "runner")
+                        lambda *args, deadline, on_limit=None: seen.setdefault("left", deadline - time.monotonic()) and "runner")
 
     def fake_write(work, plan, ledger, units, run_pi, ask, **kwargs):
         seen.update(kwargs, units=units)
@@ -383,7 +383,7 @@ def test_the_time_limit_grows_with_the_thinking_level(data_dir, monkeypatch, thi
     monkeypatch.setattr(workspace_mod.full, "write_chapters", lambda *args, **kwargs: [])
     monkeypatch.setattr(workspace_mod.full, "finish", lambda *args: {})
     monkeypatch.setattr(workspace_mod, "pi_runner",
-                        lambda *args, deadline: seen.append(deadline - time.monotonic()) or "runner")
+                        lambda *args, deadline, on_limit=None: seen.append(deadline - time.monotonic()) or "runner")
     row = items_store.get_item(data_dir, ctx.item_id)
     workspace_mod.run_full_report_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="n", pi_cli="c",
                                         figures=False, progress=lambda *args: None)

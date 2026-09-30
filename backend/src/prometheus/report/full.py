@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 import shutil
+import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -358,16 +359,29 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
 
 
 class Gate:
+    """How many chapters are written at the same time (PLAN 15.4.14 H): CHAPTERS_AT_ONCE, then 3, then 1 after
+    the relay limits the rate; a chapter being written finishes, the next ones wait for a place."""
+
+    STEPS = (CHAPTERS_AT_ONCE, 3, 1)
+
     def __init__(self):
-        self.limit = CHAPTERS_AT_ONCE
+        self.limit, self.active = CHAPTERS_AT_ONCE, 0
+        self._turn = threading.Condition()
 
     def lower(self) -> None:
-        pass
+        with self._turn:
+            self.limit = next((step for step in self.STEPS if step < self.limit), 1)
 
     def __enter__(self):
+        with self._turn:
+            self._turn.wait_for(lambda: self.active < self.limit)
+            self.active += 1
         return self
 
     def __exit__(self, *exc):
+        with self._turn:
+            self.active -= 1
+            self._turn.notify_all()
         return False
 
 
@@ -379,11 +393,14 @@ def write_chapters(work, plan: dict, ledger: dict, units: list, run_pi, ask, *, 
     owned = planning.assign(plan, ledger)
     attached = _attachments(plan.get("profile"), figures)
 
+    gate = gate or Gate()
+
     def one(number: int) -> dict:
         chapter = plan["chapters"][number - 1]
-        return _write_one(work, plan, number, owned.get(chapter["id"], []), points, units, run_pi, ask,
-                          attached=attached, figures=figures, review=review, progress=progress, look=look,
-                          verify_links=verify_links)
+        with gate:
+            return _write_one(work, plan, number, owned.get(chapter["id"], []), points, units, run_pi, ask,
+                              attached=attached, figures=figures, review=review, progress=progress, look=look,
+                              verify_links=verify_links)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return list(pool.map(one, range(1, len(plan["chapters"]) + 1)))
