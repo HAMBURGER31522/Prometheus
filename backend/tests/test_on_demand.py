@@ -254,10 +254,12 @@ def test_without_a_report_the_subtitles_are_corrected_without_reference(data_dir
 FILLED_REPORT = ["keypoints", "plan", "report", "finalize", "mindmap", "publish"]
 
 
-def _done(client, outputs):
+def _done(client, outputs, video="BV1xJYT6EEYc"):
+    """A finished item; each video once (a second submit of a link answers 409 with the first item)."""
     from conftest import wait_for_status
 
-    item_id = _submit(client, outputs=outputs, depth="standard").json()["id"]
+    item_id = client.post("/api/items", json={"url": f"https://www.bilibili.com/video/{video}/", "figures": False,
+                                              "outputs": outputs, "depth": "standard"}).json()["id"]
     wait_for_status(client, item_id, "done")
     return item_id
 
@@ -313,7 +315,7 @@ def test_filling_in_the_report_with_figures_downloads_only_the_picture_and_clean
     response = _fill(client, item_id, only="report", depth="full", figures=True)
     assert response.status_code == 200
     row = _settled(client, item_id, lambda row: row["outputs"]["report"])
-    assert row["outputs"] == {"report": True, "subtitles": False, "mindmap": True}
+    assert row["outputs"] == ALL  # the subtitles were there, the report brought its map
     assert (row["status"], row["depth"], row["figures"]) == ("done", "full", 1)
     assert _runs(client, item_id)[-1] == ["video", "frames", *FILLED_REPORT]
     folder = client.app.state.data_dir / row["library_path"]
@@ -344,7 +346,7 @@ def test_filling_in_the_map_needs_its_report(client):
     row = _settled(client, item_id, lambda row: row["mindmap_status"] == "ok")
     assert row["outputs"] == ALL
     assert _runs(client, item_id)[-1] == ["mindmap", "publish"]
-    no_report = _done(client, SUBTITLES)
+    no_report = _done(client, SUBTITLES, video="BV1bZhQ6VEQK")
     response = _fill(client, no_report, only="mindmap")
     assert (response.status_code, response.json()) == (409, {"code": "NO_REPORT"})
 
@@ -355,7 +357,7 @@ def test_filling_in_what_is_there_an_unknown_depth_or_an_unfinished_item_is_refu
     assert (response.status_code, response.json()) == (409, {"code": "ALREADY_MADE"})
     response = _fill(client, full, only="subtitles")
     assert (response.status_code, response.json()) == (409, {"code": "ALREADY_MADE"})
-    subtitles = _done(client, SUBTITLES)
+    subtitles = _done(client, SUBTITLES, video="BV1bZhQ6VEQK")
     response = _fill(client, subtitles, only="report", depth="deep", figures=False)
     assert (response.status_code, response.json()) == (422, {"code": "DEPTH_INVALID"})
     items_store.update_item(client.app.state.data_dir, subtitles, status="failed")
@@ -410,7 +412,7 @@ def test_a_waiting_fill_in_shows_as_waiting(client, monkeypatch):
     import threading
     import time
 
-    first = _done(client, SUBTITLES)
+    first = _done(client, {"report": True, "subtitles": False, "mindmap": True})
     release = threading.Event()
     monkeypatch.setitem(client.app.state.queue.impls, "resolve", lambda ctx: release.wait(timeout=10))
     other = client.post("/api/items", json={"url": "https://www.bilibili.com/video/BV1bZhQ6VEQK/", "figures": False})
