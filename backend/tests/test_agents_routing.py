@@ -178,3 +178,26 @@ def test_an_incomplete_page_from_another_agent_fails_as_it_does_for_pi(data_dir,
     with pytest.raises(runs.AgentRunError, match="complete HTML"):
         workspace_mod.run_report_stage(data_dir, item_id, items_store.get_item(data_dir, item_id),
                                        store.load(data_dir), node_exe="node.exe", pi_cli="cli.js")
+
+
+def test_whether_another_agent_sees_images_comes_from_the_profile_not_pis_catalogue(data_dir, monkeypatch):
+    """Russell on Codex (2026-09-29) came out without a single screenshot: Pi's catalogue was asked
+    whether a model it does not run can see images, and said no."""
+    item_id = items_store.create_item(data_dir, platform="bilibili", video_id="BV1xJYT6EEYc",
+                                      source_url="https://www.bilibili.com/video/BV1xJYT6EEYc/", figures=1)
+    work = paths.work_dir(data_dir, item_id)
+    (work / "frames").mkdir(parents=True)
+    (work / "frames" / "frames.json").write_text("[]", encoding="utf-8")
+    seen = {}
+    monkeypatch.setattr(stages_mod.capability, "query_supports_images",
+                        lambda *args: pytest.fail("Pi's catalogue asked about another Agent's model"))
+    monkeypatch.setattr(stages_mod.workspace_mod, "full_depth", lambda settings: True)
+    monkeypatch.setattr(stages_mod.workspace_mod, "run_full_report_stage",
+                        lambda *args, **kwargs: seen.update(kwargs) or work / "report.html")
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](StageContext(data_dir, item_id))
+    assert seen["figures"] is False  # the profile above says the model cannot see images
+    settings = store.load(data_dir)
+    settings["llm_profiles"]["items"][0]["supports_images"] = True
+    store.save(data_dir, settings)
+    stages_mod.build_real_impls(data_dir, runtime=DUMMY_RUNTIME)["report"](StageContext(data_dir, item_id))
+    assert seen["figures"] is True
