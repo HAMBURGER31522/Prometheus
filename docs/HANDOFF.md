@@ -171,3 +171,24 @@ export PLAYWRIGHT_BROWSERS_PATH='E:\tools\playwright-browsers'
 - **预览数据现在的样子**：罗素条目显示的是 sonnet 改前那一版（runanytime，14565 字），英文条目显示的是 sonnet 改后那一版（19093 字）；当前配置是 chatgpt-codex（官方登录）。跑改前基线用过的 git worktree 已删除，要再跑就 `git worktree add ../prometheus-main main`，用 `PYTHONPATH` 指向它的 backend/src。
 - **查到但没做的**：已有测试 `test_a_viewpoint_pass_that_loses_a_point_is_undone` 的条件永远不成立（假 Pi 在编者观点那一步收到的是第一次的提示词），测的是空；Claude Code 和 Codex 的事件要等运行结束才写进日志，运行中看不到进度（Pi 是边跑边写）；「获取上下文长度」按钮大多数接口拿不到，只能当可选项；Pi 压缩在实际运行里为什么没触发还没确诊，下次实跑失败时先把章节工作区整个复制出来再重试。
 - **用户的新想法（待写规格）**：精读、字幕、导图可以分开选，不是每个视频都要三样。事实：字幕纠错有精读时拿它当参考（人名、术语更准），没有也能纠（R6b 在不给报告的条件下测过：whisper 8.17% → 7.01%，必剪 6.17% → 5.86%）；导图现在从精读的章节结构生成，不写精读就要改成从转写或要点账本生成。
+
+## 13. R7h 进行中（2026-09-30 暂停）：按需生成
+
+分支 `r7h-on-demand`（未推送）。规格 PLAN 15.4.15 / E17，用户已确认。做到：规格（e7c6e23）；三个圆圈的联动逻辑 `app/src/features/console/outputs.ts`（红 34452c3 → 绿 61ed34c：勾导图带上精读、取消精读带走导图、至少留一样、localStorage 记住上次选择，第一次三个都勾）。
+
+**已查清的事实**
+- 流水线步骤顺序在 `backend/src/prometheus/tasks/runner.py` 的 `STAGES`：resolve、download、transcribe、transcript、frames、keypoints、plan、report、finalize、subtitle_fix、mindmap、classify、publish。`run_item(ctx, impls, stages=...)` 可以只跑其中一部分。
+- 字幕纠错 `subtitle/fix.py` 的 `_reference()`：有精读就拿它当参考，没有就返回空串照样纠（R6b 就是在不给报告的条件下验收的）。
+- 导图 `mindmap/generate.py` 读精读 HTML 的章节结构，所以导图必须和精读绑在一起。
+- 归类 `tasks/stages.py` 的 `classify` 读已发布精读的标题、导语和各章标题；没有精读时要改成视频标题（`source_title`）加转写开头。
+- 提交接口 `api/items.py` 的 `create_item` 现在只收 `url`、`figures`；前端 `api.addItem(url, figures)` 只有控制台一个调用者。
+
+**接下来按这个顺序做**（每步先写失败的测试、单独提交 `(red)`，再写实现）
+1. 控制台界面。半成品补丁在 `tmp/r7h-console-wip.patch`（`git apply` 即可），还缺：`api.ts` 加 `export type ReportDepth = "full" | "standard"`，`addItem(url, { figures, outputs, depth })`；`console.css` 加三个圆圈（胶囊按钮，`aria-pressed`，按下时实心圆点加强调色）、两格的分段切换（`.segmented.two .thumb` 宽度按 2 格算）、第二行的 `.importer-options`（没勾精读时变灰）。排法：第一行链接框、三个圆圈、「开始」；第二行「精读：标准 / 完整」和「配图」。颜色只能用 tokens.css，过渡曲线只能用 motion.css（`lint:design` 会查）。**截图给用户看，确认后再做后端。**
+2. 后端提交参数：`items` 表加列保存 outputs 和 depth（旧条目视为三样都要、按设置的档位）；检查至少一样、导图必须带精读、depth 只取 standard / full。
+3. 流水线按条目的 outputs 选步骤；精读的档位用条目自己的 depth，而不是设置里的。
+4. 没有精读时：归类用视频标题加转写开头；发布只写有的文件，文件夹名用视频标题；字幕纠错不带参考。
+5. 阅读页：没生成的标签页显示「没有生成」和「现在生成」；接口复用 regenerate 的思路，只跑缺的步骤，不重新下载转写；补精读时导图一起补。
+6. 前端单测、端到端测试（三个圆圈联动、记住选择、切换变灰、提交带参数、「没有生成」和「现在生成」），截图请用户看，结论记进 acceptance.md。
+7. live：当前配置（Codex 官方登录，走订阅）罗素只勾字幕跑通，记下用时；再「现在生成」按「标准」补精读和导图。
+8. Done When 逐条跑、写进 PLAN 进度记录，合并推送（推送前跑 `tmp/key_scan_all.py` 查 Key）。
