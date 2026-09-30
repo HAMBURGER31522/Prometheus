@@ -94,6 +94,10 @@ export const api = {
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, figures === undefined ? {} : { figures }),
   regenerateMindmap: (id: string) =>
     json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "mindmap" }),
+  /** 「现在生成」 (PLAN 15.4.15): the missing report with its map, or the correction of the subtitles. */
+  fillReport: (id: string, depth: ReportDepth, figures: boolean) =>
+    json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "report", depth, figures }),
+  fillSubtitles: (id: string) => json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "subtitles" }),
   /** 「补全标签和摘要」(PLAN 15.4.10): classify + publish again, the category stays. */
   fillTags: (id: string) => json<{ queued: boolean }>("POST", `/api/items/${id}/regenerate`, { only: "tags" }),
   queue: () => json<ItemRow[]>("GET", "/api/queue"),

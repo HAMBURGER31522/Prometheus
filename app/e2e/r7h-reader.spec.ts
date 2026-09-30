@@ -7,14 +7,20 @@ import { API, AUTH } from "./helpers";
 
 type Outputs = { report: boolean; subtitles: boolean; mindmap: boolean };
 const SUBTITLES: Outputs = { report: false, subtitles: true, mindmap: false };
+// The files share one fake backend and later ones open 「the first item」: leave nothing behind.
+const created: string[] = [];
+test.afterAll(async ({ request }) => {
+  for (const id of created) await request.delete(`${API}/api/items/${id}`, { headers: AUTH });
+});
 
 /** A finished item made of `outputs`; each test has its own video. */
 async function made(request: APIRequestContext, video: string, outputs: Outputs): Promise<string> {
-  const created = await request.post(`${API}/api/items`, {
+  const response = await request.post(`${API}/api/items`, {
     headers: AUTH,
     data: { url: `https://www.bilibili.com/video/${video}/`, figures: false, outputs, depth: "full" },
   });
-  const id = (await created.json()).id as string;
+  const id = (await response.json()).id as string;
+  created.push(id);
   await expect
     .poll(async () => (await (await request.get(`${API}/api/items/${id}`, { headers: AUTH })).json()).status, {
       timeout: 20_000,

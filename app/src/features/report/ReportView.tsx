@@ -5,6 +5,7 @@
 // 导图's 「在精读中查看」, scrolls to the chapter of that moment (PLAN 15.4.9).
 import { type RefObject, useEffect, useRef, useState } from "react";
 
+import { FillReport } from "../../shared/FillIn";
 import { type ReaderProps } from "../../shared/LibraryPage";
 import { useNav } from "../../shared/NavContext";
 import { ReaderTools, ZoomControls, useZoom } from "../../shared/ReaderTools";
@@ -16,7 +17,12 @@ import { reportThemeVars, themeReport } from "./theme";
 
 type TocItem = { id: string; title: string };
 
-export function ReportView({ item }: ReaderProps) {
+/** A video submitted without its report says so and can make it now (PLAN 15.4.15). */
+export function ReportView(props: ReaderProps) {
+  return props.item.outputs.report ? <Report {...props} /> : <FillReport {...props} />;
+}
+
+function Report({ item }: ReaderProps) {
   const [html, setHtml] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);

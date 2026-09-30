@@ -5,7 +5,7 @@ import { ApiError, type ItemRow, api, itemTitle } from "../../shared/api";
 import { useNav } from "../../shared/NavContext";
 import { ReportOptions, useReportChoice } from "../../shared/ReportOptions";
 import { ScrollArea } from "../../shared/ScrollArea";
-import { STAGES, stageText } from "../../shared/stages";
+import { STAGES, stageText, stepOf } from "../../shared/stages";
 import { type Outputs, loadOutputs, saveOutputs, toggleOutput } from "./outputs";
 
 const STATUS: Record<ItemRow["status"], string> = {
@@ -147,8 +147,8 @@ function Failure({ row }: { row: ItemRow }) {
 
 function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }) {
   const { go } = useNav();
-  const index = STAGES.findIndex(([id]) => id === row.stage);
-  const progress = row.status === "done" ? 1 : index < 0 ? 0 : index / STAGES.length;
+  const { index, total } = stepOf(row);
+  const progress = row.status === "done" ? 1 : index < 0 ? 0 : index / total;
   const act = (action: () => Promise<unknown>) => async () => {
     await action();
     await reload();
@@ -163,14 +163,15 @@ function QueueRow({ row, reload }: { row: ItemRow; reload: () => Promise<void> }
             {stageText(row)}
             <span className="muted">
               {" "}
-              · {Math.max(index, 0) + 1}/{STAGES.length}
+              · {Math.max(index, 0) + 1}/{total}
             </span>
           </span>
         )}
         {row.status === "failed" && row.error_reason ? (
           <Failure row={row} />
         ) : (
-          row.error_message && <span className="queue-error">{row.error_message}</span>
+          // A finished row's error is a 「现在生成」 that did not take: the reader says why.
+          row.status !== "done" && row.error_message && <span className="queue-error">{row.error_message}</span>
         )}
         {row.notice && <span className="muted">{row.notice}</span>}
         <span className="progress" style={{ "--p": progress } as CSSProperties} aria-hidden="true" />

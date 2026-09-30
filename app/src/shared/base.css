@@ -266,6 +266,9 @@ html[data-dragging], html[data-dragging] * { user-select: none; cursor: grabbing
 }
 .report-options[data-off] { opacity: .45; }
 .report-options .switch-label { margin-left: 12px; }
+/* 「没有生成」 / 「现在生成」 (shared/FillIn, PLAN 15.4.15). */
+.fill-in { display: grid; gap: 14px; justify-items: start; }
+.fill-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .reader-actions { position: relative; display: flex; align-items: center; gap: 6px; flex: none; }
 .btn.icon-only { width: 32px; padding: 0; }
 .btn.icon-only svg { width: 18px; height: 18px; }
