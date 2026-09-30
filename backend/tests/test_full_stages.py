@@ -267,7 +267,7 @@ def test_every_pi_run_gets_what_is_left_of_the_stage_time(data_dir, monkeypatch,
     settings = store.load(data_dir)
     run = workspace_mod.pi_runner(data_dir, settings, "node.exe", "cli.js", deadline=time.monotonic() + 100)
     assert run(tmp_path, "任务", "plan.json") == tmp_path / "plan.json"
-    assert 90 < seen["timeout"] <= 100 and seen["prefix"] == ["node.exe", "cli.js"]
+    assert 90 < seen["timeout"] <= 100 + 1e-6 and seen["prefix"] == ["node.exe", "cli.js"]  # float rounding
     assert (seen["llm"]["provider"], seen["llm"]["model"]) == (settings["llm"]["provider"], settings["llm"]["model"])
     assert seen["agent_dir"] == paths.pi_config_dir(data_dir)
     seen.clear()
