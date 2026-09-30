@@ -354,3 +354,15 @@ macOS 支持（包括 VRA 的 MLX 转写）、问答 / RAG、标签网络、B �
 - **导图失败的原因**：第三次实跑的导图 1.8 分钟就失败，没留下原因。同一篇精读重跑一次就过；那份通过的大纲里标题 19/20 字、摘要 60/60 字，正好卡在上限上，而且这篇「标准」的第一章从 02:15 开始，开头两分钟不属于任何章节。GPT 系写得长（R7g 量过），这些上限当初按 Claude 的输出定，换成 Codex 后更容易撞线。按用户的选择改了三处：最多试 3 次；失败原因记在条目上并显示在导图页；最后只剩小问题（字数超出不到两成、要点时间落在章节空隙里但仍在视频内）时照样保存，小问题记在 mindmap.json 的 `problems` 里，前面「只有小问题」的那份优先于后面出了大问题或调用出错的那份。
 - **「标准」改成 VRA 自己的精读加编者观点**（用户先选了「完整减三样」，随即改为效仿 VRA 的精读、加编者深度解析，理由是「完整」太长）：VRA 的 standard 模式按视频长短自适应，13 分钟被写成 1461 字的短报告，也不给短报告目录。现在 VRA 的请求里加一段「按精读表达写、分章、每章写时间范围、不因为视频短就写成短报告」；写完后 `report/standard.py` 按章拆开（VRA 的章节是 `<section aria-labelledby="sN-title">` 带 section-title，`patch.split_report` 认的是完整模式的 `id="sN"`，所以另写了拆法），每章一次编者观点（只给 depth.md 里「编者观点」那一节规则，不给完整模式的其他写法），同时 5 章，链接照 15.4.11a-4 逐个核实；这一步让本章正文少了一成以上就保留原样；两章以上且没有目录时程序补 `.report-nav`、给章节加 id。用户决定不实跑（太长），在第三次实跑那篇真实报告上离线走过一遍（假 Agent 加框，不调模型）：拆出 4 章、补上 4 条目录、定稿后章节时间和编者观点样式都在。
 - **实跑**（Codex 官方登录，gpt-6-luna「超高」，用户选定）：只要字幕 6.4 分钟；「现在生成」标准 + 配图 21.8 分钟（其中写精读 15.3）；精读 + 导图标准 16.8 分钟。结果和截图见 acceptance.md。
+
+**D-48 R8 打包与安装版实测的选择（2026-09-30，规格见 PLAN 15.4.16，用户授权按推荐定）**
+
+- **不带 Codex CLI 和 Claude Code**：两者的主体是单个原生程序（codex.exe 325 MB、claude.exe 244 MB），带上安装包会超过 D8 的 300 MB。R7f 已有「未安装 → 安装」，第一次选用时从 npm 装到应用自己的运行时目录（安装版实测 48 秒）。代价：离线环境装不了这两个；覆盖安装新版本时这两个可能要重装一次。npm 从随包 node 旁的 `node_modules\npm` 来（加 16 MB）。
+- **版本 1.0.0**：第一次公开发布。Python 的两个内部包仍是 0.1.0（用户看不到，改了要重锁 uv.lock）。
+- **运行时路径去掉 `\?\`**：Tauri 的 resource_dir 带扩展长度前缀；node 从这种路径运行脚本会报 `EISDIR lstat 'F:'`，Pi 和 npm 因此在安装版里都跑不了。在后端 `runtime.plain_path` 统一去掉（`\?\UNC\` 还原成 `\主机\共享`），外壳不改。
+- **页面认桌面环境用 `@tauri-apps/api/core` 的 `isTauri()` 和 `invoke`**：原来查 `window.__TAURI__`，这个全局只有开了 `withGlobalTauri` 才有；安装版里页面以为自己在浏览器里，全部请求打到端口 8765。不开全局，用官方 API。
+- **外壳补上 dialog、opener 插件和 `capabilities/default.json`**（core、dialog、opener 各自的默认权限；opener 默认只放行 http/https/mailto/tel）。PLAN 第 4 节本来就列着这两个插件，R7 重写前端时丢了。
+- **第一次打开**：后台没有数据目录时所有接口回 409，原来界面上没有任何提示。现在先显示「正在启动…」直到后台回应；没有数据目录就显示「选择知识库放在哪里」，推荐 `文档\Prometheus 知识库`，也可以选别的文件夹。控制台的设置请求失败时每秒重试。
+- **后台日志**：外壳把后台的输出写到 `%APPDATA%\com.hamburger31522.prometheus\backend.log`（每次启动覆盖）。原来安装版的后台输出全部丢失，这次查取消卡死就是靠它。
+- **取消卡死**：外壳用「不开窗口」启动后台，后台就有一个自己的 conhost.exe 子进程；`kill_children()` 把它当任务进程杀掉后，下一个 taskkill 挂在这个死掉的控制台上不返回，取消接口又是 `async def`，整个事件循环停了 180 秒（`/api/health` 59 次全部没回应）。改为：不杀 conhost.exe；taskkill 用 CREATE_NO_WINDOW 启动；取消和删除时的取消放到线程里。开发环境里后台从终端启动，conhost 属于终端，所以一直没暴露。
+- **安装版实测怎么做**：`scripts/acceptance/installed-live.ps1` 用干净的环境变量启动安装版（去掉开发用的 PROMETHEUS_*、UV_*、HF_HOME 等，PATH 去掉开发工具目录），`PROMETHEUS_FORBID_DEV_PATHS=1`；转写模型和 CUDA 组件用硬链接从预览数据带过去（不占空间，删除只删链接；不用目录联接，PowerShell 删联接会删到目标里的内容）；通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port` 让 Playwright 接上安装版自己的窗口；正常关窗口（强杀会留下孤儿后台，2026-09-26 的 pid 22228 就是这么来的）；测前备份、测后还原 `%LOCALAPPDATA%`、`%APPDATA%` 下这个应用的文件夹。
