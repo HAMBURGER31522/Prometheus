@@ -27,6 +27,10 @@ class Runtime:
     ffprobe: Path | None
 
 
+def plain_path(value) -> Path:
+    return Path(value)
+
+
 def _from_bundle(root: Path) -> Runtime:
     return Runtime(
         node=root / "node" / "node.exe",
