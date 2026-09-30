@@ -87,3 +87,19 @@ def test_only_what_the_video_says_goes_into_a_persons_mouth():
 def test_it_gives_the_powershell_way_to_run_python():
     """modes/standard.md gives the bash form, which PowerShell cannot run (user 2026-09-30)."""
     assert "& $env:VIDEO_REPORT_PYTHON" in RULES
+
+
+def test_a_supplement_is_written_through_what_why_here_and_an_example():
+    """R7g (PLAN 15.4.14 B): Codex's supplements said what it is, why it matters at this sentence and gave
+    an example or a framework; Claude's stopped at a sentence or two of definition. No length is named."""
+    assert "为什么要紧" in RULES and "具体例子、数字或出处" in RULES
+
+
+def test_limits_are_written_only_where_the_video_is_disputed_or_the_report_adds():
+    """R7g (15.4.14 E): GPT's reports carried 10–12 「不能据此断定」 a ten thousand characters, Claude's under one."""
+    assert "不能据此断定" in RULES and "确有争议" in RULES and "直接讲清楚" in RULES
+
+
+def test_the_writing_materials_never_show_in_the_text():
+    """R7g (15.4.14 D): 「候选帧已逐张查看」「本章依据转写单元 unit-… 整理」「（K022）」 reached readers."""
+    assert "转写单元编号" in RULES and "要点编号" in RULES and "写作用的材料" in RULES

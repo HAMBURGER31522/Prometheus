@@ -55,6 +55,57 @@ def test_the_reader_may_ask_for_a_picture_where_one_would_help():
     assert len(fixes) == 1 and "关系图" in fixes[0] and "只画本章正文已经写到的内容" in fixes[0]
 
 
+LONG = ("<section><h2>水温</h2>" + "".join(f"<p>第{i}段讲水温和研磨怎样一起决定萃取率，浅烘和深烘各有讲究。</p>"
+                                          for i in range(40)) + "</section>")
+
+
+def test_a_second_reader_is_asked_only_when_the_first_asked_too_little():
+    """R7g (PLAN 15.4.14 A): Claude's readers asked about half as many questions a thousand characters as
+    GPT's on the English and Kabbalah videos."""
+    few = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
+    assert review.needs_second_reader(few, LONG) is True
+    assert review.needs_second_reader(few * 200, LONG) is False
+
+
+def test_the_second_reader_gets_the_first_list_and_never_a_number():
+    first = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
+    prompt = review.second_reader_prompt(LONG, first)
+    assert "没看过视频" in prompt and "已经问过" in prompt and "讲究什么？" in prompt and "第3段讲水温" in prompt
+    assert "为什么" in prompt and "例子" in prompt and "pictures" in prompt
+    assert str(review.QUESTION_FLOOR) not in prompt and "千字" not in prompt
+
+
+def test_the_two_readers_are_merged_without_repeats():
+    first = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}]
+    second = [{"quote": "浅烘和深烘各有讲究", "question": "讲究什么？"}, {"quote": "萃取率", "question": "怎么算？"}]
+    assert review.merge(first, second) == first + second[1:]
+
+
+def test_a_background_supplement_is_asked_for_in_three_steps():
+    """R7g (15.4.14 B): what it is, why it matters at this sentence, an example, a number or a source."""
+    fixes = review.fixes([{"quote": "萃取率", "question": "萃取率是什么？"}], [{"kind": "术语或背景"}])
+    assert "是什么" in fixes[0] and "为什么要紧" in fixes[0] and "具体例子、数字或出处" in fixes[0]
+
+
+def test_a_supplement_of_a_sentence_or_two_is_found():
+    label = '<p class="supplement-label">补充说明（非视频内容）</p>'
+    short = f'<aside class="supplement">{label}<p>萃取率是溶出的比例。</p></aside>'
+    full = f'<aside class="supplement">{label}<p>' + "萃取率是咖啡粉里的可溶物被水溶解出来的比例，" * 8 + "</p></aside>"
+    found = review.thin_supplements(f"<section><p>正文</p>{short}{full}</section>")
+    assert len(found) == 1 and "溶出的比例" in found[0] and "补充说明（非视频内容）" not in found[0]
+
+
+def test_a_picture_asked_for_and_not_drawn_is_found():
+    """R7g (15.4.14 C): a place the reader wanted a picture must have one close by after the revision."""
+    chapter = ('<section><h2>水温</h2><p>水温和研磨一起决定萃取率。</p><figure><svg></svg><figcaption>关系图</figcaption>'
+               '</figure><p>浅烘豆要用高一点的水温。</p><p>其他。</p><p>其他二。</p><p>其他三。</p><p>其他四。</p>'
+               '<figure><img src="frames/f_001.jpg"></figure></section>')
+    pictures = [{"quote": "水温和研磨一起决定萃取率", "want": "关系图"},
+                {"quote": "浅烘豆要用高一点的水温", "want": "温度对照"},
+                {"quote": "已经改写掉的一句", "want": "随便"}]
+    assert review.missing_pictures(chapter, pictures) == [pictures[1]]
+
+
 def test_fixes_answer_from_the_source_or_with_a_supplement_and_drop_the_rest():
     questions = [{"quote": "浅烘豆要用高一点的水温", "question": "高一点是多少度？"},
                  {"quote": "萃取率", "question": "萃取率是什么？"},

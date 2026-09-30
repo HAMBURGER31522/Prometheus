@@ -14,6 +14,9 @@ from prometheus.report.markdown_export import report_to_markdown
 
 ANSWERED, BACKGROUND, NOT_THERE = "原文有答案", "术语或背景", "原文没有"
 KINDS = (ANSWERED, BACKGROUND, NOT_THERE)
+QUESTION_FLOOR = 5.0   # questions a thousand characters of the chapter under which a second reader looks (D-46)
+SUPPLEMENT_MIN = 80    # characters of a supplement under which it is a sentence or two (D-46)
+PICTURE_REACH = 3      # blocks after the quoted one where the picture asked for may stand
 _NOT_WORDY = re.compile(r"[^一-鿿A-Za-z0-9]")
 
 
@@ -33,6 +36,26 @@ def reader_prompt(chapter: str) -> str:
         '只输出 JSON：{"questions": [{"quote": "…", "question": "…"}], "pictures": [{"quote": "…", "want": "…"}]}\n\n'
         f"本章：\n{report_to_markdown(chapter)}\n"
     )
+
+
+def needs_second_reader(questions: list, chapter: str) -> bool:
+    return False
+
+
+def second_reader_prompt(chapter: str, asked: list) -> str:
+    return reader_prompt(chapter)
+
+
+def merge(first: list, second: list) -> list:
+    return list(first)
+
+
+def thin_supplements(chapter: str) -> list:
+    return []
+
+
+def missing_pictures(chapter: str, pictures: list) -> list:
+    return []
 
 
 def _quoted(text: str, chapter: str, key: str, field: str) -> list:

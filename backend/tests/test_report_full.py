@@ -6,7 +6,7 @@ import json
 import re
 
 import pytest
-from prometheus.report import full
+from prometheus.report import chapter_checks, full, review
 from prometheus.report.pi_run import PiRunError
 
 INPUT = {"attribution": "Bilibili；示例UP主；《手冲咖啡》；https://www.bilibili.com/video/BV1xJYT6EEYc/"}
@@ -182,8 +182,9 @@ def test_the_review_sends_answers_found_in_the_source_back_once(tmp_path):
     _ledger, _plan, chapters, _coverage, pi, model = pipeline(tmp_path)
     runs = pi.writes("ch-01.html")
     assert len(runs) == 2 and "烘焙到什么程度" in runs[1] and "中深烘" in runs[1]
+    # one question on a short chapter is below the bar: a second reader looked and found nothing new (R7g)
     assert chapters[0]["review"] == {"questions": 1, "answered": 1, "background": 0, "revised": True,
-                                     "reverted": False}
+                                     "reverted": False, "second_reader": True}
     reader = next(prompt for prompt in model.prompts if "没看过视频" in prompt)
     assert "第0句原话" not in reader  # the reader never sees the transcript
 
@@ -357,6 +358,84 @@ def test_every_chapter_ends_with_an_editors_viewpoint_pass(tmp_path):
     for number in range(1, len(plan["chapters"]) + 1):
         runs = pi.runs(f"ch-{number:02d}.html")
         assert "加编者观点" in runs[-1] and not any("加编者观点" in prompt for prompt in runs[:-1])
+
+
+class Readers(Model):
+    """The first reader asks `first` questions; a second reader, when there is one, one new question."""
+
+    def __init__(self, first=1):
+        super().__init__()
+        self.first = first
+
+    def __call__(self, prompt: str) -> str:
+        if "没看过视频" not in prompt:
+            return super().__call__(prompt)
+        self.prompts.append(prompt)
+        quote = re.search(r"咖啡豆的烘焙和萃取之\d+", prompt).group(0)
+        if "已经问过" in prompt:
+            return json.dumps({"questions": [{"quote": quote, "question": "萃取是什么意思？"}]}, ensure_ascii=False)
+        return json.dumps({"questions": [{"quote": quote, "question": f"烘焙到什么程度{i}？"} for i in range(self.first)]},
+                          ensure_ascii=False)
+
+
+def test_a_second_reader_asks_when_the_first_asked_too_little(tmp_path):
+    """R7g (PLAN 15.4.14 A): below the bar a second reader looks for what the first one missed, and the
+    two lists are judged together."""
+    _l, _p, chapters, _c, _pi, model = pipeline(tmp_path, model=Readers(first=1))
+    second = [prompt for prompt in model.prompts if "已经问过" in prompt]
+    assert len(second) == 2 and "烘焙到什么程度0？" in second[0]
+    judge = next(prompt for prompt in model.prompts if "逐条判断" in prompt)
+    assert "烘焙到什么程度0？" in judge and "萃取是什么意思？" in judge
+    assert chapters[0]["review"]["second_reader"] is True and chapters[0]["review"]["questions"] == 2
+
+
+def test_no_second_reader_when_the_first_asked_enough(tmp_path):
+    _l, _p, chapters, _c, _pi, model = pipeline(tmp_path, model=Readers(first=30))
+    assert not any("已经问过" in prompt for prompt in model.prompts)
+    assert chapters[0]["review"]["second_reader"] is False
+
+
+class LeakyPi(Pi):
+    """The viewpoint pass writes the writing materials in; `stubborn`: the closing fix does too."""
+
+    def __init__(self, *, stubborn=False):
+        super().__init__()
+        self.stubborn = stubborn
+
+    def __call__(self, workspace, prompt, expect):
+        path = super().__call__(workspace, prompt, expect)
+        if "加编者观点" in prompt or (self.stubborn and "处理过程" in prompt):
+            leaked = path.read_text(encoding="utf-8").replace("</section>", "<p>候选帧已逐张查看，没有选用。</p></section>")
+            path.write_text(leaked, encoding="utf-8")
+        return path
+
+
+def test_what_the_closing_check_finds_goes_back_once(tmp_path):
+    """R7g (15.4.14 B–E): the review's revision and the viewpoint pass come after the chapter checks, so a
+    last look catches the writing materials, thin supplements, pictures not drawn and crowded limits."""
+    _l, _p, chapters, _c, pi, _m = pipeline(tmp_path, pi=LeakyPi(), review=False)
+    runs = pi.runs("ch-01.html")
+    assert "加编者观点" in runs[-2] and "处理过程" in runs[-1]
+    assert sum("处理过程" in prompt for prompt in runs) == 1
+    assert "候选帧" not in chapters[0]["fragment"] and chapters[0]["closing"]
+
+
+def test_the_closing_check_goes_back_only_once_even_if_the_fix_misses(tmp_path):
+    _l, _p, _chapters, _c, pi, _m = pipeline(tmp_path, pi=LeakyPi(stubborn=True), review=False)
+    assert sum("处理过程" in prompt for prompt in pi.runs("ch-01.html")) == 1
+
+
+def test_the_closing_problems_name_what_to_fix_and_never_a_threshold():
+    supplement = ('<aside class="supplement"><p class="supplement-label">补充说明（非视频内容）</p>'
+                  "<p>萃取率是溶出的比例。</p></aside>")
+    fragment = (f"<section><h2>一</h2><p>浅烘豆要用高一点的水温。</p>{supplement}"
+                "<p>" + "这件事不能据此断定。" * 5 + "</p><p>候选帧已逐张查看。</p></section>")
+    problems = full.closing_problems(fragment, [{"quote": "浅烘豆要用高一点的水温", "want": "温度对照图"}])
+    joined = "".join(problems)
+    assert len(problems) == 4 and "温度对照图" in joined and "溶出的比例" in joined and "候选帧" in joined
+    assert "不能据此断定" in joined and "为什么要紧" in joined
+    for threshold in (review.QUESTION_FLOOR, review.SUPPLEMENT_MIN, chapter_checks.HEDGE_MAX):
+        assert str(threshold) not in joined
 
 
 def test_a_viewpoint_pass_that_loses_a_point_is_undone(tmp_path):

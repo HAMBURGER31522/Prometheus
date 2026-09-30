@@ -21,6 +21,7 @@ COPY_MAX = 0.15          # pasted share of the chapter that asks for a rewrite
 THIN_BASE = 24           # the bar for a point the video only mentions (to calibrate, D-44)
 THIN_RATIO = 1.0         # the bar per unit of what the video says about the point (to calibrate, D-44)
 SOURCE_WORD = 1.5        # an English word of the source counts as this many characters of Chinese
+HEDGE_MAX = 4.0          # limiting sentences a ten thousand characters above which they crowd the chapter (D-46)
 _NOT_WORDY = re.compile(r"[^一-鿿A-Za-z0-9]")
 _CJK = re.compile(r"[一-鿿]")
 _WORD = re.compile(r"[A-Za-z0-9]+")
@@ -166,7 +167,11 @@ def check_chapter(fragment: str, owned: list, points: dict, transcript: str, *, 
                         f"图注写画面里的关键信息；如果它和已用的图是同一个画面，或者正文已经完整写出了它的信息，"
                         f"就在片段里写一行 <!-- 不用 {file}：理由 -->")
     return {"missing": missing, "weak": weak, "thin": thin, "incomplete": incomplete, "unused_frames": unused,
-            "copy_ratio": copy_ratio, "chars": chars, "problems": problems}
+            "copy_ratio": copy_ratio, "chars": chars, "process": [], "problems": problems}
+
+
+def hedges(fragment: str) -> list:
+    return []
 
 
 def feedback_prompt(problems: list, filename: str, draft: str = "") -> str:

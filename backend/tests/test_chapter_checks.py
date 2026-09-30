@@ -114,6 +114,24 @@ def test_a_clean_chapter_has_no_problems():
     assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["problems"] == []
 
 
+def test_the_writing_materials_in_the_text_are_sent_back_but_not_in_attributes():
+    """R7g (PLAN 15.4.14 D): 「候选帧已逐张查看」「转写单元 unit-000033」「（K022）」 reached readers, while
+    data-points and data-source-units are where the ids belong."""
+    leaked = GOOD.replace("</section>", "<p>候选帧已逐张查看，没有选用；本章依据转写单元 unit-000033 整理（K022）。</p></section>")
+    check = checks.check_chapter(leaked, ["K001", "K002"], POINTS, TRANSCRIPT)
+    assert set(check["process"]) == {"候选帧", "转写单元", "unit-000033", "K022"}
+    assert any("处理过程" in problem and "候选帧" in problem for problem in check["problems"])
+    assert checks.check_chapter(GOOD, ["K001", "K002"], POINTS, TRANSCRIPT)["process"] == []
+
+
+def test_limiting_sentences_are_listed_only_when_they_crowd_the_chapter():
+    """R7g (15.4.14 E): a 「不能据此断定」 now and then is fine; ten a page is a hedge on every claim."""
+    crowded = "<section><p>" + "这件事不能据此断定。" * 5 + "水温讲清楚了。" * 20 + "</p></section>"
+    calm = "<section><p>这件事不能据此断定。" + "水温和研磨怎样一起决定萃取率讲清楚了。" * 300 + "</p></section>"
+    assert checks.hedges(crowded) == ["这件事不能据此断定。"] * 5
+    assert checks.hedges(calm) == []
+
+
 def test_the_feedback_prompt_lists_the_problems_and_keeps_the_rest():
     prompt = checks.feedback_prompt(["要点 K003 没有写到"], "chapter.html")
     assert "K003" in prompt and "chapter.html" in prompt and "其余" in prompt

@@ -180,10 +180,15 @@ def _failing(check: dict, points: dict, sources: dict) -> list:
             for point_id in ids]
 
 
+def closing_problems(fragment: str, pictures: list) -> list:
+    return []
+
+
 def _review(fragment: str, check: dict, transcript: str, ask, revise, recheck) -> tuple:
     """(fragment, check, stats, details) after the two-step review and at most one revision; the
     details keep what was asked and how it was judged, so a review that led nowhere can be read."""
-    stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False}
+    stats = {"questions": 0, "answered": 0, "background": 0, "revised": False, "reverted": False,
+             "second_reader": False}
     reply = ask(reviewing.reader_prompt(fragment))
     questions, pictures = reviewing.parse_reader(reply, fragment), reviewing.parse_pictures(reply, fragment)
     stats["questions"] = len(questions)
@@ -280,7 +285,7 @@ def _write_one(work: Path, plan: dict, number: int, owned: list, points: dict, u
         (space / filename).write_bytes(fragment.encode("utf-8"))
     result = {"key": key, "number": number, "id": chapter["id"], "title": chapter["title"], "points": owned,
               "fragment": fragment, "check": check, "rounds": rounds, "targeted": targeted, "review": stats,
-              "review_details": details, "links": links}
+              "review_details": details, "links": links, "closing": []}
     _write_json(record, result)
     return result
 
