@@ -27,6 +27,7 @@ from prometheus.subtitle import fix as subtitle_fix
 from prometheus.subtitle import format as subtitle_format
 from prometheus.subtitle import paragraphs as subtitle_paragraphs
 from prometheus.subtitle import vtt
+from prometheus.tasks import outputs as outputs_mod
 from prometheus.transcribe import bcut, openai_compat
 from prometheus.transcribe import local as local_mod
 from prometheus.transcribe.audio import to_mp3, to_wav
@@ -91,6 +92,15 @@ def _from_platform_subtitle(work: Path, subtitle: Path) -> Path:
     asr_path = work / "asr.json"
     asr_path.write_text(json.dumps(run.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
     return asr_path
+
+
+# How much of the transcript files a video that has no report (PLAN 15.4.15).
+TRANSCRIPT_OPENING = 1000
+
+
+def _transcript_opening(data_dir, item_id: str) -> str:
+    segments = json.loads(paths.segments_file(data_dir, item_id).read_text(encoding="utf-8"))
+    return " ".join(segment["text"].strip() for segment in segments)[:TRANSCRIPT_OPENING]
 
 
 def _full(row: dict, settings: dict) -> bool:
@@ -240,14 +250,20 @@ def build_real_impls(data_dir, runtime=None) -> dict:
     def classify(ctx):
         settings = store.load(data_dir)
         work = _work(data_dir, ctx)
-        html = publish_mod.report_html(data_dir, ctx.item_id, _row(data_dir, ctx))
-        outline = extract_outline(html)
-        h2_titles = [section["title"] for section in outline["sections"]]
+        row = _row(data_dir, ctx)
+        report = outputs_mod.of(row)["report"]
+        if report:
+            outline = extract_outline(publish_mod.report_html(data_dir, ctx.item_id, row))
+            title, intro = outline["title"], outline["intro"][:500]
+            h2_titles = [section["title"] for section in outline["sections"]]
+        else:  # no report (PLAN 15.4.15): the video's own title and how its transcript opens
+            title, h2_titles = row["source_title"] or row["video_id"], []
+            intro = _transcript_opening(data_dir, ctx.item_id)
         existing = [c["name"] for c in categories_store.list_categories(data_dir)]
         llm = settings["llm"]
         result = classify_item(
-            work, outline["title"], outline["intro"][:500], h2_titles, existing,
-            one_shot=one_shot_mod.run_one_shot,
+            work, title, intro, h2_titles, existing,
+            one_shot=one_shot_mod.run_one_shot, transcript=not report,
             provider=llm["provider"], model=llm["model"],
             api_key=llm.get("api_key") or "", thinking=llm.get("thinking") or "low",
             node_exe=_node_exe(), pi_cli=_pi_cli(),
