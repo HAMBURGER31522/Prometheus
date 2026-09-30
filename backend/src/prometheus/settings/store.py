@@ -89,6 +89,8 @@ def _llm_view(profile: dict) -> dict:
         "custom": {"base_url": profile["base_url"], "supports_images": profile["supports_images"],
                    "protocol": profile["protocol"]},
         "agent": profile["agent"], "access": profile["access"],
+        # 「高级」: Pi takes them through models.json; Codex CLI and Claude Code on their command line (15.4.13)
+        "context_window": profile["context_window"], "max_tokens": profile["max_tokens"],
     }
 
 

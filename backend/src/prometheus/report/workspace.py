@@ -165,7 +165,8 @@ def _llm(settings: dict) -> dict:
 def _agent(settings: dict) -> dict:
     """The profile's Agent for pi_run.run_task (PLAN 15.4.13); Pi when the settings predate them."""
     agent = runs.agent_of(settings["llm"])
-    return {"agent": agent["id"], "access": agent["access"], "base_url": agent["base_url"]}
+    return {"agent": agent["id"], "access": agent["access"], "base_url": agent["base_url"],
+            "context_window": agent["context_window"], "max_tokens": agent["max_tokens"]}
 
 
 def model_ask(data_dir, work, settings: dict, node_exe: str, pi_cli: str):

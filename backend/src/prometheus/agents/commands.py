@@ -29,6 +29,9 @@ CODEX_OFF = ("plugins", "remote_plugin", "plugin_sharing", "apps", "browser_use"
 KEY_VARIABLE = "PROMETHEUS_AGENT_KEY"
 # Pi tries a failed request three times itself; the stage's relay retry comes on top (report/workspace.py).
 RETRIES = 3
+# The profile's 「上下文窗口」 is the endpoint's real limit (runanytime refused what anyrouter took,
+# 2026-09-30): Codex compacts its history at 80 % of it, well before the relay says no.
+COMPACT_AT = 0.8
 
 
 def executable(tools_root, agent_id: str) -> Path:
@@ -62,14 +65,17 @@ def _anthropic_base(base_url: str) -> str:
     return base.removesuffix("/v1")
 
 
-def claude_env(env: dict, *, config_root, base_url: str, api_key: str) -> dict:
-    return {**clean_env(env), "CLAUDE_CONFIG_DIR": str(Path(config_root) / "claude"),
+def claude_env(env: dict, *, config_root, base_url: str, api_key: str, max_tokens=None) -> dict:
+    """`max_tokens`: the profile's 「最大输出」; the context comes with the model (「[1m]」)."""
+    limit = {"CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(max_tokens)} if max_tokens else {}
+    return {**clean_env(env), **limit, "CLAUDE_CONFIG_DIR": str(Path(config_root) / "claude"),
             "ANTHROPIC_BASE_URL": _anthropic_base(base_url), "ANTHROPIC_API_KEY": api_key,
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "DISABLE_AUTOUPDATER": "1",
             "CLAUDE_CODE_MAX_RETRIES": str(RETRIES)}
 
 
-def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, base_url, images=()) -> list:
+def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, base_url, images=(), context_window=None,
+                  max_tokens=None) -> list:
     """`base_url` None: the app's own ChatGPT login instead of an endpoint and a key. A task that
     writes runs without Codex's own sandbox: on Windows it refuses every command when there is no
     window to ask in, and every run is contained instead (contain.py, user 2026-09-29)."""
@@ -85,6 +91,11 @@ def codex_command(exe, *, model: str, thinking: str, workspace, write: bool, bas
                      f'model_providers.prometheus.env_key="{KEY_VARIABLE}"',
                      f"model_providers.prometheus.request_max_retries={RETRIES}",
                      f"model_providers.prometheus.stream_max_retries={RETRIES}"]
+    if context_window:  # the endpoint's own limit: Codex compacts by the window it believes in
+        settings += [f"model_context_window={context_window}",
+                     f"model_auto_compact_token_limit={int(context_window * COMPACT_AT)}"]
+    if max_tokens:
+        settings.append(f"model_max_output_tokens={max_tokens}")
     for setting in settings:
         command += ["-c", setting]
     for feature in CODEX_OFF:

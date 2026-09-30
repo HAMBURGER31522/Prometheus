@@ -28,7 +28,8 @@ class AgentRunError(RuntimeError):
 def agent_of(llm: dict) -> dict:
     """The Agent part of the settings' ``llm`` view: which one, how it connects, where to."""
     return {"id": llm.get("agent") or "pi", "access": llm.get("access") or "key",
-            "base_url": llm.get("base_url") or (llm.get("custom") or {}).get("base_url", "")}
+            "base_url": llm.get("base_url") or (llm.get("custom") or {}).get("base_url", ""),
+            "context_window": llm.get("context_window"), "max_tokens": llm.get("max_tokens")}
 
 
 def _events(stdout: bytes) -> list:
@@ -75,11 +76,13 @@ def _start(agent: dict, *, prompt: str, model: str, api_key: str, thinking: str,
     (Path(config_root) / agent_id).mkdir(parents=True, exist_ok=True)
     if agent_id == "claude":
         command = commands.claude_command(exe, model=model, thinking=thinking, tools=tools)
-        env = commands.claude_env(os.environ, config_root=config_root, base_url=agent["base_url"], api_key=api_key)
+        env = commands.claude_env(os.environ, config_root=config_root, base_url=agent["base_url"], api_key=api_key,
+                                  max_tokens=agent.get("max_tokens"))
     else:
         signed_in = agent.get("access") == "login"
         command = commands.codex_command(exe, model=model, thinking=thinking, workspace=cwd, write=write,
-                                         base_url=None if signed_in else agent["base_url"], images=files)
+                                         base_url=None if signed_in else agent["base_url"], images=files,
+                                         context_window=agent.get("context_window"), max_tokens=agent.get("max_tokens"))
         env = commands.codex_env(os.environ, config_root=config_root, api_key=None if signed_in else api_key)
     own = Path(config_root) / agent_id
     writable = [cwd, own] if write else [own]  # everything else stays out of reach (contain.py)
