@@ -242,6 +242,27 @@ def test_without_the_profiles_numbers_the_models_own_limits_apply_as_for_pi(star
                                                if part == "-c"]
 
 
+def test_a_name_no_catalogue_knows_runs_1m_when_the_profile_says_so(started, tmp_path, monkeypatch):
+    """The settings hint (user 2026-09-30): 「如果它是 1M 的，在这里填 1000000，应用会自动加上「[1m]」」."""
+    from prometheus.llm import pi_models
+
+    calls, reply = started
+    (tmp_path / "work").mkdir()
+    monkeypatch.setattr(pi_models, "model_fields", lambda data_dir, profile, pi_cli=None: (None, {}))
+    reply["stdout"] = _stream("claude-answer")
+    runs.one_shot({**CLAUDE, "protocol": "anthropic", "context_window": 1000000}, prompt="你好",
+                  model="relay-opus-thinking", api_key="k", thinking="medium", work_dir=tmp_path / "work",
+                  config_root=tmp_path / "data" / ".prometheus" / "config", tools_root=tmp_path / "tools")
+    command = calls[0]["command"]
+    assert command[command.index("--model") + 1] == "relay-opus-thinking[1m]"
+    assert calls[0]["env"].get("CLAUDE_CODE_MAX_CONTEXT_TOKENS") == "1000000"
+    reply["stdout"] = _stream("claude-answer")
+    runs.one_shot({**CLAUDE, "protocol": "anthropic"}, prompt="你好", model="relay-opus-thinking", api_key="k",
+                  thinking="medium", work_dir=tmp_path / "work",
+                  config_root=tmp_path / "data" / ".prometheus" / "config", tools_root=tmp_path / "tools")
+    assert calls[1]["command"][calls[1]["command"].index("--model") + 1] == "relay-opus-thinking"  # left empty: 200k
+
+
 @pytest.mark.parametrize(("agent", "stream", "names"), [
     (CLAUDE, "claude-answer", ("Read", "Edit", "UTF-8")),
     (CODEX, "codex-answer", ("view_image", "apply_patch", "UTF-8")),
