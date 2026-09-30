@@ -638,3 +638,26 @@ def test_an_earlier_tree_with_small_problems_beats_a_later_broken_one(tmp_path, 
     assert len(prompts) == 3
     saved = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
     assert saved["root"]["children"][0]["label"] == "超" * 22
+
+
+def test_a_call_that_breaks_after_a_small_problem_tree_keeps_that_tree(tmp_path, monkeypatch):
+    from prometheus import paths
+    from prometheus.llm import one_shot
+
+    data_dir, item_id = _with_report(tmp_path)
+    small = good_tree(load_example())
+    small["root"]["children"][0]["label"] = "超" * 22
+    calls = []
+
+    def fake_one_shot(work_dir, *, prompt, **kwargs):
+        if "末端要点" in prompt:
+            return "{}"
+        calls.append(prompt)
+        if len(calls) > 1:
+            raise RuntimeError("Request timed out.")
+        return json.dumps(small, ensure_ascii=False)
+
+    monkeypatch.setattr(one_shot, "run_one_shot", fake_one_shot)
+    assert _generate(data_dir, item_id) is True
+    saved = json.loads(paths.mindmap_json(data_dir, item_id).read_text(encoding="utf-8"))
+    assert saved["root"]["children"][0]["label"] == "超" * 22
