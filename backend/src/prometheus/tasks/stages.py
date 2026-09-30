@@ -93,6 +93,11 @@ def _from_platform_subtitle(work: Path, subtitle: Path) -> Path:
     return asr_path
 
 
+def _full(row: dict, settings: dict) -> bool:
+    """「完整」 for this video (PLAN 15.4.15): its own depth; items from before follow the settings."""
+    return row["depth"] == "full" if row.get("depth") else workspace_mod.full_depth(settings)
+
+
 def build_real_impls(data_dir, runtime=None) -> dict:
     """``runtime``: a resolved Runtime, or a zero-argument callable returning one."""
 
@@ -195,14 +200,14 @@ def build_real_impls(data_dir, runtime=None) -> dict:
 
     def keypoints(ctx):
         settings = store.load(data_dir)
-        if workspace_mod.full_depth(settings):  # 「标准」 is the VRA run as it was (PLAN 15.4.11)
+        if _full(_row(data_dir, ctx), settings):  # 「标准」 is the VRA run as it was (PLAN 15.4.11)
             workspace_mod.run_keypoints_stage(data_dir, ctx.item_id, settings, node_exe=_node_exe(), pi_cli=_pi_cli())
 
     def plan(ctx):
         settings = store.load(data_dir)
-        if not workspace_mod.full_depth(settings):
-            return
         row = _row(data_dir, ctx)
+        if not _full(row, settings):
+            return
         workspace_mod.run_plan_stage(data_dir, ctx.item_id, row, settings, node_exe=_node_exe(), pi_cli=_pi_cli(),
                                      figures=all(_figures(ctx, row, settings)))
 
@@ -210,7 +215,7 @@ def build_real_impls(data_dir, runtime=None) -> dict:
         row = _row(data_dir, ctx)
         settings = store.load(data_dir)
         figures, supports_images = _figures(ctx, row, settings)
-        if workspace_mod.full_depth(settings):
+        if _full(row, settings):
             def progress(step: str, number: int, total: int) -> None:
                 items_store.update_item(data_dir, ctx.item_id, stage_detail=f"{step}（第 {number}/{total} 章）")
 

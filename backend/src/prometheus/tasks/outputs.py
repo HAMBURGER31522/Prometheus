@@ -6,9 +6,13 @@ correction. The mind map is drawn from the report's chapters and never comes wit
 
 import json
 
+from prometheus.tasks import runner
+
 PARTS = ("report", "subtitles", "mindmap")
 ALL = dict.fromkeys(PARTS, True)
 DEPTHS = ("full", "standard")
+# Skipped without a report (PLAN 15.4.15-3); its mind map is off then too (_valid).
+REPORT_STAGES = ("frames", "keypoints", "plan", "report", "finalize")
 
 
 class Refused(ValueError):
@@ -43,6 +47,17 @@ def from_submit(body: dict) -> tuple:
     return {part: outputs[part] for part in PARTS}, body.get("depth")
 
 
+def stages_for(outputs: dict) -> list:
+    """The steps a submitted video runs, in the queue's order."""
+    skipped = set() if outputs["report"] else set(REPORT_STAGES)
+    if not outputs["subtitles"]:
+        skipped.add("subtitle_fix")
+    if not outputs["mindmap"]:
+        skipped.add("mindmap")
+    return [stage for stage in runner.STAGES if stage not in skipped]
+
+
 def view(row: dict) -> dict:
-    """What the API adds to an item row."""
-    return {"outputs": of(row)}
+    """What the API adds to an item row: its parts, and the steps the console counts."""
+    outputs = of(row)
+    return {"outputs": outputs, "stages": stages_for(outputs)}

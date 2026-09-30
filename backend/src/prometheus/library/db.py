@@ -91,9 +91,11 @@ def mark_running_as_interrupted(data_dir) -> None:
     conn = connect(data_dir)
     try:
         conn.execute("UPDATE items SET status = 'interrupted' WHERE status = 'running'")
-        # A mind map rerun clears mindmap_status; quitting mid-run leaves it pending.
+        # A mind map rerun clears mindmap_status; quitting mid-run leaves it pending. A video
+        # that has no mind map (PLAN 15.4.15) has none to fail.
         conn.execute(
-            "UPDATE items SET mindmap_status = 'failed' WHERE status = 'done' AND mindmap_status IS NULL",
+            "UPDATE items SET mindmap_status = 'failed' WHERE status = 'done' AND mindmap_status IS NULL"
+            " AND (outputs IS NULL OR json_extract(outputs, '$.mindmap') = 1)",
         )
         conn.commit()
     finally:

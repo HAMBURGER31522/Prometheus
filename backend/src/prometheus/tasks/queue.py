@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from prometheus import paths
 from prometheus.library import items as items_store
-from prometheus.tasks import cleanup, errors, processes, runner
+from prometheus.tasks import cleanup, errors, outputs, processes, runner
 
 # 「重新生成导图」(PLAN 8.8): a finished item reruns only these and stays done.
 MINDMAP_STAGES = ("mindmap", "publish")
@@ -137,7 +137,9 @@ class TaskQueue:
             self.data_dir, item_id, status="running", stage=runner.STAGES[0], started_at=_now(),
         )
         try:
-            runner.run_item(ctx, self.impls)
+            # Only the parts this video gets (PLAN 15.4.15).
+            stages = outputs.stages_for(outputs.of(items_store.get_item(self.data_dir, item_id)))
+            runner.run_item(ctx, self.impls, stages=stages)
         except runner.TaskCancelled:
             items_store.update_item(
                 self.data_dir, item_id, status="cancelled", stage=None, finished_at=_now(),
