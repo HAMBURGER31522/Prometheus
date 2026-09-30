@@ -18,9 +18,9 @@ def data_dir(tmp_path):
     return data_dir
 
 
-def test_schema_version_is_5(data_dir):
+def test_schema_version_is_6(data_dir):
     conn = db.connect(data_dir)
-    assert db.get_schema_version(conn) == 5
+    assert db.get_schema_version(conn) == 6
 
 
 def test_version_1_database_is_upgraded_in_place(tmp_path):
@@ -39,10 +39,10 @@ def test_version_1_database_is_upgraded_in_place(tmp_path):
     conn.close()
     db.init_db(data_dir)
     conn = db.connect(data_dir)
-    assert db.get_schema_version(conn) == 5
+    assert db.get_schema_version(conn) == 6
     row = dict(conn.execute("SELECT * FROM items WHERE id = 'a'").fetchone())
     assert {"library_path", "tags", "description", "notice", "transcript_source", "subtitle_status",
-            "stage_detail"} <= set(row)
+            "stage_detail", "outputs", "depth"} <= set(row)
     assert row["video_id"] == "BV1"
 
 
