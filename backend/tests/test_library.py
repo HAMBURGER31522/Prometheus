@@ -42,7 +42,7 @@ def test_version_1_database_is_upgraded_in_place(tmp_path):
     assert db.get_schema_version(conn) == 6
     row = dict(conn.execute("SELECT * FROM items WHERE id = 'a'").fetchone())
     assert {"library_path", "tags", "description", "notice", "transcript_source", "subtitle_status",
-            "stage_detail", "outputs", "depth"} <= set(row)
+            "stage_detail", "outputs", "depth", "mindmap_error"} <= set(row)
     assert row["video_id"] == "BV1"
 
 

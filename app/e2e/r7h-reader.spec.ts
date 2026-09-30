@@ -115,3 +115,24 @@ test("补精读没成功：精读页写明上次为什么没成，还能再点",
   await expect(page.getByText("上次没有生成成功：模型没有回应")).toBeVisible();
   await expect(page.getByRole("button", { name: "现在生成" })).toBeEnabled();
 });
+
+test("导图没生成成功：导图页写明原因（PLAN 15.4.15-9）", async ({ page, request }) => {
+  const id = await made(request, "BV1R7hMapErr", { report: true, subtitles: true, mindmap: true });
+  await page.route(`${API}/api/items`, async (route) => {
+    try {
+      const response = await route.fetch();
+      const rows = (await response.json()) as Record<string, unknown>[];
+      const failed = rows.map((row) =>
+        row.id === id ? { ...row, mindmap_status: "failed", mindmap_error: "没通过检查：主题要有 3–6 个" } : row,
+      );
+      await route.fulfill({ response, json: failed });
+    } catch {
+      // The page dropped this poll: there is nobody left to answer.
+    }
+  });
+  await page.route(new RegExp(`/api/items/${id}/mindmap`), (route) => route.fulfill({ status: 404, json: {} }));
+  await open(page, "BV1R7hMapErr", "导图");
+  await expect(page.getByText("这个视频的导图没有生成成功。")).toBeVisible();
+  await expect(page.getByText("原因：没通过检查：主题要有 3–6 个")).toBeVisible();
+  await expect(page.getByRole("button", { name: "重新生成导图" })).toBeVisible();
+});

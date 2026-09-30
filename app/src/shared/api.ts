@@ -136,6 +136,8 @@ export interface ItemRow {
   /** Where a long stage is, e.g. 「写作（第 3/10 章）」 (PLAN 15.4.11). */
   stage_detail: string | null;
   mindmap_status: "ok" | "failed" | null;
+  /** Why the last mind map failed (PLAN 15.4.15-9). */
+  mindmap_error: string | null;
   subtitle_status: "ok" | "failed" | null;
   error_code: string | null;
   error_message: string | null;

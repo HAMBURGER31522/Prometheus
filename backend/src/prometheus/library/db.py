@@ -56,6 +56,7 @@ _ADDED_COLUMNS = (
     # at the settings' depth (items from before).
     ("outputs", "TEXT"),             # JSON {"report": bool, "subtitles": bool, "mindmap": bool}
     ("depth", "TEXT"),               # full | standard
+    ("mindmap_error", "TEXT"),       # why the last mind map failed (PLAN 15.4.15-9); NULL otherwise
 )
 
 

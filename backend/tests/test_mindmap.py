@@ -454,3 +454,106 @@ def test_the_retry_fixes_the_previous_tree_instead_of_starting_over(tmp_path, mo
                                       {"provider": "deepseek", "model": "m"}, node_exe="node", pi_cli="cli")
     assert len(prompts) == 2
     assert "超" * 21 in prompts[1] and "只修改这些问题" in prompts[1]
+
+
+# ---------------- three tries, and why it failed (PLAN 15.4.15-9) ----------------
+
+def _with_report(tmp_path):
+    from prometheus import paths
+
+    data_dir, item_id = _item(tmp_path)
+    report = paths.report_file(data_dir, item_id)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+    return data_dir, item_id
+
+
+def _slipped():
+    tree = good_tree(load_example())
+    tree["root"]["children"][0]["label"] = "超" * 21
+    return tree
+
+
+def _skeleton_answers(monkeypatch, answers):
+    """The skeleton calls get `answers` in turn (the last one repeats); filling calls get nothing to add."""
+    from prometheus.llm import one_shot
+
+    prompts = []
+
+    def fake_one_shot(work_dir, *, prompt, **kwargs):
+        if "末端要点" in prompt:
+            return "{}"
+        prompts.append(prompt)
+        return json.dumps(answers[min(len(prompts), len(answers)) - 1], ensure_ascii=False)
+
+    monkeypatch.setattr(one_shot, "run_one_shot", fake_one_shot)
+    return prompts
+
+
+def _generate(data_dir, item_id):
+    from prometheus.library import items as items_store
+    from prometheus.mindmap import generate
+
+    return generate.generate_for_item(data_dir, item_id, items_store.get_item(data_dir, item_id),
+                                      {"provider": "deepseek", "model": "m"}, node_exe="node", pi_cli="cli")
+
+
+def test_a_tree_that_fails_twice_gets_a_third_try_on_the_last_one(tmp_path, monkeypatch):
+    # BV1EJ4m1t7Zs (2026-09-30): two tries failed; the same report passed on the next run.
+    from prometheus.library import items as items_store
+
+    data_dir, item_id = _with_report(tmp_path)
+    prompts = _skeleton_answers(monkeypatch, [_slipped(), _slipped(), good_tree(load_example())])
+    assert _generate(data_dir, item_id) is True
+    assert len(prompts) == 3 and "只修改这些问题" in prompts[2]
+    row = items_store.get_item(data_dir, item_id)
+    assert (row["mindmap_status"], row.get("mindmap_error")) == ("ok", None)
+
+
+def test_three_failed_tries_keep_which_checks_failed(tmp_path, monkeypatch):
+    from prometheus.library import items as items_store
+
+    data_dir, item_id = _with_report(tmp_path)
+    prompts = _skeleton_answers(monkeypatch, [_slipped()])
+    assert _generate(data_dir, item_id) is False
+    assert len(prompts) == 3
+    row = items_store.get_item(data_dir, item_id)
+    assert row["mindmap_status"] == "failed"
+    reason = row.get("mindmap_error") or ""
+    assert reason.startswith("没通过检查：")
+    assert "；".join(validate_tree(_slipped(), load_example())) in reason
+
+
+def test_a_model_error_keeps_what_it_said(tmp_path, monkeypatch):
+    from prometheus.library import items as items_store
+    from prometheus.llm import one_shot
+
+    data_dir, item_id = _with_report(tmp_path)
+
+    def model_down(work_dir, *, prompt, **kwargs):
+        raise RuntimeError("502 Bad Gateway")
+
+    monkeypatch.setattr(one_shot, "run_one_shot", model_down)
+    assert _generate(data_dir, item_id) is False
+    reason = items_store.get_item(data_dir, item_id).get("mindmap_error") or ""
+    assert reason.startswith("调用出错：") and "502 Bad Gateway" in reason
+
+
+def test_regenerating_the_map_clears_the_last_reason(client, monkeypatch):
+    import threading
+
+    from conftest import BV_URL, wait_for_status
+    from prometheus.library import items as items_store
+
+    item_id = client.post("/api/items", json={"url": BV_URL, "figures": False}).json()["id"]
+    wait_for_status(client, item_id, "done")
+    data_dir = client.app.state.data_dir
+    items_store.update_item(data_dir, item_id, mindmap_status="failed", mindmap_error="没通过检查：主题太少")
+    assert client.get(f"/api/items/{item_id}").json().get("mindmap_error") == "没通过检查：主题太少"
+    release = threading.Event()
+    monkeypatch.setitem(client.app.state.queue.impls, "mindmap", lambda ctx: release.wait(timeout=10))
+    try:
+        assert client.post(f"/api/items/{item_id}/regenerate", json={"only": "mindmap"}).status_code == 200
+        assert client.get(f"/api/items/{item_id}").json().get("mindmap_error", "missing") is None
+    finally:
+        release.set()
