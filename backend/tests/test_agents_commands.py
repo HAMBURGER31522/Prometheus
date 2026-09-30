@@ -118,7 +118,9 @@ def test_the_profiles_limits_reach_codex_so_it_compacts_before_the_relay_refuses
     configs = _configs(command)
     assert "model_context_window=272000" in configs
     assert "model_auto_compact_token_limit=217600" in configs  # 80 %: compact well before the limit
-    assert "model_max_output_tokens=64000" in configs
+    # Codex has no output cap to set: 「model_max_output_tokens」 is not a key it knows (0 times in
+    # codex.exe 0.159.1) and the request carried no limit; it must not pretend otherwise.
+    assert not [setting for setting in configs if setting.startswith("model_max_output")]
     plain = _configs(commands.codex_command(Path("codex.exe"), model="m", thinking="medium", workspace=Path("W:/run"),
                                             write=False, base_url=None))
     assert not [setting for setting in plain if setting.startswith(("model_context_window", "model_max_output"))]
@@ -128,3 +130,19 @@ def test_claude_code_gets_the_profiles_maximum_output():
     env = commands.claude_env({}, config_root=CONFIG, base_url="https://relay.example", api_key="k", max_tokens=32000)
     assert env.get("CLAUDE_CODE_MAX_OUTPUT_TOKENS") == "32000"
     assert "CLAUDE_CODE_MAX_OUTPUT_TOKENS" not in commands.claude_env({}, config_root=CONFIG, base_url="u", api_key="k")
+
+
+def test_codex_writes_at_the_verbosity_pi_gets():
+    """Codex sends 「text.verbosity: low」 for its GPT models (checked against the fake API with
+    gpt-6-astra and gpt-5.6-sol); Pi sends none, so the API default, medium, applies."""
+    command = commands.codex_command(Path("codex.exe"), model="gpt-5.6-sol", thinking="xhigh", workspace=Path("W:/run"),
+                                     write=True, base_url="https://relay.example/v1")
+    assert 'model_verbosity="medium"' in _configs(command)
+
+
+def test_claude_code_is_told_a_window_that_is_not_1m():
+    """A 272k or 128k model: without CLAUDE_CODE_MAX_CONTEXT_TOKENS Claude Code compacts by its own
+    guess, too late for the relay or too early for the model."""
+    env = commands.claude_env({}, config_root=CONFIG, base_url="u", api_key="k", context_window=272000)
+    assert env.get("CLAUDE_CODE_MAX_CONTEXT_TOKENS") == "272000"
+    assert "CLAUDE_CODE_MAX_CONTEXT_TOKENS" not in commands.claude_env({}, config_root=CONFIG, base_url="u", api_key="k")

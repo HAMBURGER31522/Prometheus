@@ -162,6 +162,8 @@ def test_the_standard_report_on_another_agent_gets_vras_workspace_and_prompt(dat
                                             store.load(data_dir), node_exe="node.exe", pi_cli="cli.js")
     assert report == work / "report.html" and seen["agent"]["id"] == "claude" and seen["expect"] == "report.html"
     assert "video-report skill" in seen["prompt"] and "report-template.html" in seen["prompt"]
+    # VRA's own system text for the standard run (vendor pi.py): the report must stand alone
+    assert "The supplied transcript is complete; generate a self-contained report.html." in seen["prompt"]
     assert (work / "SKILL.md").is_file() and (work / "modes" / "standard.md").is_file()
     assert (work / "assets" / "report-template.html").is_file() and not (work / "modes" / "brief.md").exists()
 

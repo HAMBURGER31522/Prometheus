@@ -73,7 +73,7 @@ def _anthropic_base(base_url: str) -> str:
     return base.removesuffix("/v1")
 
 
-def claude_env(env: dict, *, config_root, base_url: str, api_key: str, max_tokens=None) -> dict:
+def claude_env(env: dict, *, config_root, base_url: str, api_key: str, max_tokens=None, context_window=None) -> dict:
     """`max_tokens`: the profile's 「最大输出」; the context comes with the model (「[1m]」)."""
     limit = {"CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(max_tokens)} if max_tokens else {}
     return {**clean_env(env), **limit, "CLAUDE_CONFIG_DIR": str(Path(config_root) / "claude"),

@@ -16,6 +16,16 @@ CLAUDE = {"id": "claude", "access": "key", "base_url": "https://relay.example"}
 CODEX = {"id": "codex", "access": "key", "base_url": "https://relay.example/v1"}
 
 
+def _system(command: list) -> str:
+    """The system text a run got: Claude Code's --append-system-prompt, Codex's developer_instructions."""
+    if "--append-system-prompt" in command:
+        return command[command.index("--append-system-prompt") + 1]
+    import json
+
+    found = [part for part in command if part.startswith("developer_instructions=")]
+    return json.loads(found[0].split("=", 1)[1]) if found else ""
+
+
 def _started(call) -> str:
     """The program behind the protection prefix (agents/contain.py)."""
     return call["command"][call["command"].index("--") + 1]
@@ -117,7 +127,9 @@ def test_a_task_gets_the_same_rules_and_skill_as_pi_and_leaves_its_file(started,
                         thinking="high", config_root=tmp_path / "config", tools_root=tmp_path / "tools", timeout=600)
     assert written == workspace / "ch-01.html" and len(calls) == 1
     call = calls[0]
-    assert pi_run.SYSTEM in call["input"] and "技能正文：写报告的方法。" in call["input"] and "写第 1 章" in call["input"]
+    assert "技能正文：写报告的方法。" in call["input"] and "写第 1 章" in call["input"]
+    system = _system(call["command"])  # appended to the system prompt, as Pi's --append-system-prompt
+    assert pi_run.SYSTEM in system and pi_run.SYSTEM not in call["input"]
     assert call["cwd"] == workspace and call["timeout"] == 600
     command = call["command"]
     if agent is CLAUDE:
@@ -228,3 +240,31 @@ def test_without_the_profiles_numbers_the_models_own_limits_apply_as_for_pi(star
                   tools_root=tmp_path / "tools")
     assert "model_context_window=1000000" in [calls[1]["command"][i + 1] for i, part in enumerate(calls[1]["command"])
                                                if part == "-c"]
+
+
+@pytest.mark.parametrize(("agent", "stream", "names"), [
+    (CLAUDE, "claude-answer", ("Read", "Edit", "UTF-8")),
+    (CODEX, "codex-answer", ("view_image", "apply_patch", "UTF-8")),
+])
+def test_a_task_is_told_which_of_its_tools_are_pis_read_write_edit_and_powershell(started, tmp_path, agent, stream, names):
+    """The rules and figures.md say 「用 read 工具查看候选帧」「写回整章」 in Pi's words; Codex looks at
+    images with view_image and Claude Code has no Write, and PowerShell 5.1 reads UTF-8 as GBK."""
+    calls, reply = started
+    reply["stdout"], reply["writes"] = _stream(stream), "ch-01.html"
+    _stage(tmp_path / "run")
+    runs.task(agent, tmp_path / "run", "写", expect="ch-01.html", model="m", api_key="k", thinking="medium",
+              config_root=tmp_path / "config", tools_root=tmp_path / "tools", timeout=60)
+    assert calls
+    system = _system(calls[0]["command"])
+    for name in names:
+        assert name in system
+
+
+def test_the_skill_goes_once_when_the_prompt_already_carries_it(started, tmp_path):
+    calls, reply = started
+    reply["stdout"], reply["writes"] = _stream("claude-answer"), "ch-01.html"
+    _stage(tmp_path / "run")
+    prompt = "写第 1 章\n\n=== 附件：SKILL.md ===\n技能正文：写报告的方法。"
+    runs.task(CLAUDE, tmp_path / "run", prompt, expect="ch-01.html", model="m", api_key="k", thinking="medium",
+              config_root=tmp_path / "config", tools_root=tmp_path / "tools", timeout=60)
+    assert calls and calls[0]["input"].count("技能正文：写报告的方法。") == 1
