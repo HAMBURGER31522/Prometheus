@@ -8,7 +8,7 @@ from prometheus import paths
 from prometheus.library import db
 from prometheus.library import items as items_store
 
-RUNNER = Path(__file__).parents[2] / "scripts" / "report-eval" / "run.py"
+RUNNER = Path(__file__).parents[3] / "scripts" / "report-eval" / "run.py"
 REPORT = """<html><head></head><body><main class="paper"><header class="intro"><h1>手冲咖啡</h1></header>
 <section id="s1"><h2><span class="section-title">变量</span><span class="section-time">00:00–00:10</span></h2>
 <p data-source-units="unit-000001 unit-000002">水温决定了苦味和酸味的平衡。</p></section></main></body></html>"""

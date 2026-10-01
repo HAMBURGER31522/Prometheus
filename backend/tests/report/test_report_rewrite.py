@@ -8,7 +8,7 @@ from prometheus import paths
 from prometheus.library import db
 from prometheus.library import items as items_store
 
-SCRIPT = Path(__file__).parents[2] / "scripts" / "report-eval" / "rewrite.py"
+SCRIPT = Path(__file__).parents[3] / "scripts" / "report-eval" / "rewrite.py"
 
 
 def load_script():

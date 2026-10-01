@@ -55,5 +55,6 @@ def pytest_collection_modifyitems(config, items):
         return
     skip = pytest.mark.skip(reason="runs the app's own Codex CLI and Claude Code: use -m agents")
     for item in items:
-        if "agents" in item.keywords:
+        # the mark itself: keywords also carry folder names, and tests/agents/ holds plain tests too
+        if item.get_closest_marker("agents"):
             item.add_marker(skip)

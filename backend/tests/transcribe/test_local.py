@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from prometheus.transcribe import local
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
 
 
 def test_cancel_kills_worker_subprocess(tmp_path):

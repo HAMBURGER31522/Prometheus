@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from prometheus.dictionary import ecdict
 
-SAMPLE = Path(__file__).parent / "fixtures" / "ecdict.sample.csv"
+SAMPLE = Path(__file__).parents[1] / "fixtures" / "ecdict.sample.csv"
 
 
 @pytest.fixture

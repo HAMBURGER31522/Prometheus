@@ -5,7 +5,7 @@ from pathlib import Path
 
 from prometheus.transcribe.transcript import build_transcript_md
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
 METADATA = {
     "title": "示例视频：财政再平衡三十分钟讲透",
     "uploader": "示例UP主",

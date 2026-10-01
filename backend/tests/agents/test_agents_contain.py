@@ -152,7 +152,7 @@ def test_codex_and_claude_code_tasks_run_contained_with_their_own_folders_writab
     def fake_run(command, **kwargs):
         seen.append(command)
         (Path(kwargs["cwd"]) / "ch-01.html").write_text("ok", encoding="utf-8")
-        stream = (Path(__file__).parent / "fixtures" / "agents" / f"{agent_id}-answer.jsonl").read_bytes()
+        stream = (Path(__file__).parents[1] / "fixtures" / "agents" / f"{agent_id}-answer.jsonl").read_bytes()
         return subprocess.CompletedProcess(command, 0, stream, b"")
 
     monkeypatch.setattr(runs.subprocess, "run", fake_run)

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from prometheus.mindmap import enrich, retrieve, tree
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
 HTML = (FIXTURES / "report.html").read_text(encoding="utf-8")
 TREE = json.loads((FIXTURES / "mindmap.json").read_text(encoding="utf-8"))
 

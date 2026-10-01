@@ -14,7 +14,7 @@ from prometheus.subtitle import format as subtitle_format
 from prometheus.subtitle import paragraphs
 from prometheus.subtitle.paragraphs import group_segments
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
 FINE = "segments.fine.json"
 
 

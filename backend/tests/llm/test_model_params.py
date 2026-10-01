@@ -17,7 +17,7 @@ from prometheus.runtime import Runtime
 from prometheus.settings import store
 
 AUTH = {"Authorization": "Bearer test-token"}
-FIXTURE = Path(__file__).parent / "fixtures" / "pi-catalogue"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "pi-catalogue"
 PI_AI_DATA = Path("@earendil-works") / "pi-ai" / "dist" / "providers" / "data"
 
 RELAY = {"id": "relay", "name": "Claude 中转", "kind": "custom", "base_url": "https://api.justwoker.icu/v1",

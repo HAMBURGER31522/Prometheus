@@ -11,7 +11,7 @@ from prometheus.agents import commands, runs
 from prometheus.report import pi_run
 from prometheus.tasks import errors
 
-FIXTURES = Path(__file__).parent / "fixtures" / "agents"
+FIXTURES = Path(__file__).parents[1] / "fixtures" / "agents"
 CLAUDE = {"id": "claude", "access": "key", "base_url": "https://relay.example"}
 CODEX = {"id": "codex", "access": "key", "base_url": "https://relay.example/v1"}
 
