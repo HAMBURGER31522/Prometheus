@@ -8,7 +8,9 @@ param(
     [string]$Video = "https://www.bilibili.com/video/BV1P5h16JE8n",
     [string]$CancelVideo = "https://www.bilibili.com/video/BV1EJ4m1t7Zs",
     [string]$Preview = "F:\project\Prometheus\acceptance-output\r7-data",
-    [string]$Profile = "chatgpt-codex"
+    [string]$Profile = "chatgpt-codex",
+    # emptied first: a later run gets its own folder (R9 kept R8's)
+    [string]$Results = "F:\project\Prometheus\acceptance-output\r8-installed-results"
 )
 $ErrorActionPreference = "Stop"
 $Repo = "F:\project\Prometheus"
@@ -17,7 +19,6 @@ $InstallDir = "$Root\app"
 $DataDir = "$Root\data"
 $Backup = "$Root\backup"
 $Shots = "$Root\shots"
-$Results = "$Repo\acceptance-output\r8-installed-results"
 $AppId = "com.hamburger31522.prometheus"
 $Folders = @("$env:LOCALAPPDATA\$AppId", "$env:APPDATA\$AppId")
 $Node = "E:\tools\Prometheus-Desktop\node\node.exe"   # the test harness only; the app uses its own
