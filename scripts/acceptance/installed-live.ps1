@@ -165,7 +165,7 @@ try {
     Say "drive the window: submit $Video"
     $env:PLAYWRIGHT_BROWSERS_PATH = "E:\tools\playwright-browsers"
     Push-Location "$Repo\app"
-    & $Node "scripts\acceptance\installed-live.mjs""http://127.0.0.1:$CdpPort" "http://127.0.0.1:$script:Port" $script:Token $Video $Shots
+    & $Node "scripts\acceptance\installed-live.mjs" "http://127.0.0.1:$CdpPort" "http://127.0.0.1:$script:Port" $script:Token $Video $Shots
     $driver = $LASTEXITCODE
     Pop-Location
     if ($driver -ne 0) { Fail "the window driver failed ($driver)" }
