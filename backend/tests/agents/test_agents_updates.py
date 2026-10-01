@@ -136,3 +136,40 @@ def test_the_api_reports_a_failed_update_with_its_reason(client_factory, tmp_pat
     except versions.UpdateError:
         answer = None
     assert answer is not None and answer.status_code == 409 and "保留原来的版本" in answer.json()["detail"]
+
+
+def _held(monkeypatch, path: Path, times: int) -> list:
+    """`path` refuses to be renamed `times` times, as a file a virus scanner still has open does on Windows."""
+    original = Path.rename
+    refused = []
+
+    def rename(self, target):
+        if Path(self) == path and len(refused) < times:
+            refused.append(target)
+            raise PermissionError(13, "拒绝访问。", str(self))
+        return original(self, target)
+
+    monkeypatch.setattr(versions.Path, "rename", rename)
+    return refused
+
+
+def test_a_new_copy_held_open_for_a_moment_still_goes_in(tools, monkeypatch):
+    """Installed run 2026-10-01: the swap of a just-downloaded Codex got 「拒绝访问」 once in three runs."""
+    waits = []
+    monkeypatch.setattr(versions.time, "sleep", waits.append)
+    refused = _held(monkeypatch, tools / ".staging" / "agents" / "codex", times=3)
+    agents, _checks = _agents(tools, FakeNpm())
+    rows = _by_id(agents.install("codex"))
+    assert len(refused) == 3 and len(waits) == 3
+    assert rows["codex"]["version"] == "0.159.1"
+
+
+def test_a_copy_held_for_good_keeps_the_old_version_after_a_minute_of_tries(tools, monkeypatch):
+    waits = []
+    monkeypatch.setattr(versions.time, "sleep", waits.append)
+    _held(monkeypatch, tools / ".staging" / "agents" / "codex", times=10_000)
+    agents, _checks = _agents(tools, FakeNpm())
+    with pytest.raises(versions.UpdateError, match="保留原来的版本"):
+        agents.install("codex")
+    assert 55 <= sum(waits) <= 65
+    assert _by_id(agents.rows())["codex"]["version"] == "0.151.0"
