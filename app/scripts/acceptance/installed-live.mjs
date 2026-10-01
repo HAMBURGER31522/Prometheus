@@ -1,7 +1,7 @@
 // E8 / E3 (PLAN 15.4.16): drive the INSTALLED app's own window through WebView2's debugging port.
 // Submits a real video from the console (所有三样, the settings' depth and figures), waits for it, then
 // screenshots the reader's three tabs. Started by scripts/acceptance/installed-live.ps1.
-//   node scripts/installed-live.mjs <cdp url> <api base> <token> <video url> <shots dir>
+//   node scripts/acceptance/installed-live.mjs <cdp url> <api base> <token> <video url> <shots dir>
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

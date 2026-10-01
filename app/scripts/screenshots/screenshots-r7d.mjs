@@ -1,6 +1,6 @@
 // R7d screenshots for the user (PLAN 15.4.10) on the real preview data. Never clicks
 // 「获取模型列表」 or 「测试模型」 and never saves settings: no request reaches a model relay.
-//   node scripts/screenshots-r7d.mjs <app url with ?port=&token=> <out dir> <english title regex>
+//   node scripts/screenshots/screenshots-r7d.mjs <app url with ?port=&token=> <out dir> <english title regex>
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 

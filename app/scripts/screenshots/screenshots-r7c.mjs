@@ -1,5 +1,5 @@
 // R7c screenshots for the user: rich mind map leaves, 在精读中查看, bilingual subtitles, lookup.
-//   node scripts/screenshots-r7c.mjs <app url with ?port=&token=> <out dir> <english title regex>
+//   node scripts/screenshots/screenshots-r7c.mjs <app url with ?port=&token=> <out dir> <english title regex>
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 

@@ -1,7 +1,7 @@
 // R7f: a record of the two model profiles the live runs used (PLAN 15.4.13), taken from the preview
 // on the real data. Opens each profile's editor with 「高级」 expanded; the key box's 「末 4 位」 hint
 // is blanked before the picture. Never saves, never clicks anything that calls a model.
-//   node scripts/screenshots-r7f-profiles.mjs <app url with ?port=&token=> <out dir>
+//   node scripts/screenshots/screenshots-r7f-profiles.mjs <app url with ?port=&token=> <out dir>
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 

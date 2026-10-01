@@ -1,5 +1,5 @@
 // Screenshots for the E7 review (PLAN 15.3): every page of the running dev app.
-//   node scripts/screenshots.mjs <app url with ?port=&token=> <out dir>
+//   node scripts/screenshots/screenshots.mjs <app url with ?port=&token=> <out dir>
 // The backend and Vite must already be running.
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";

@@ -1,6 +1,6 @@
 // E17 ③ (PLAN 15.4.15) on the real preview data, through the app's own pages. THIS STARTS REAL RUNS on the
 // active model profile (the user chose Codex official login, gpt-6-luna 超高, 2026-09-30). One step per call:
-//   node scripts/r7h-live.mjs <app url with ?port=&token=> <out dir> <step> [video]
+//   node scripts/acceptance/r7h-live.mjs <app url with ?port=&token=> <out dir> <step> [video]
 //   steps: subtitles  — submit the video with only 「字幕」 ticked
 //          fill       — open it, 精读 tab: 「标准」, figures on, 「现在生成」 (the report and its map)
 //          reportmap  — submit the video with 「精读」「导图」 (「标准」, figures off), no 「字幕」

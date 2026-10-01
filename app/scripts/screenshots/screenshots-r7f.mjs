@@ -1,7 +1,7 @@
 // R7f screenshots for the user (PLAN 15.4.13) on the fake backend (node scripts/e2e-backend.mjs on
 // 8765): the Agent in a model profile, the Codex login and the update window. Nothing reaches a
 // model or npm; every key on screen is empty.
-//   node scripts/screenshots-r7f.mjs <app url> <out dir>
+//   node scripts/screenshots/screenshots-r7f.mjs <app url> <out dir>
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 

@@ -1,6 +1,6 @@
 // R7h screenshots for the user (PLAN 15.4.15) on the real preview data. Only toggles the console's
 // circles and switches; never presses 「开始」, so nothing is submitted and no model is called.
-//   node scripts/screenshots-r7h.mjs <app url with ?port=&token=> <out dir>
+//   node scripts/screenshots/screenshots-r7h.mjs <app url with ?port=&token=> <out dir>
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
