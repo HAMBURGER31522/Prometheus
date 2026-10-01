@@ -20,6 +20,21 @@ from prometheus.runtime import RuntimeConfigError
 PACKAGES = {agent["id"]: agent["package"] for agent in AGENTS}
 # Where each copy lives under the tools folder; updates are staged in <tools>/.staging first.
 FOLDERS = {"pi": Path("pi"), "codex": Path("agents/codex"), "claude": Path("agents/claude")}
+# A just-downloaded copy can be held open for a while (virus scan, indexer) and Windows then refuses the
+# rename; npm retries the same way. Every half second for a minute, then the old version stays (PLAN 15.4.17-9).
+SWAP_WAIT_S = 0.5
+SWAP_TRIES = 120
+
+
+def _rename(source: Path, target: Path) -> None:
+    for attempt in range(SWAP_TRIES + 1):
+        try:
+            source.rename(target)
+            return
+        except PermissionError:
+            if attempt == SWAP_TRIES:
+                raise
+            time.sleep(SWAP_WAIT_S)
 
 
 class UnknownAgent(KeyError):
@@ -185,9 +200,9 @@ class LocalAgents:
             self._check_copy(staging_root, agent_id)
             shutil.rmtree(old, ignore_errors=True)
             if target.exists():
-                target.rename(old)
+                _rename(target, old)
             target.parent.mkdir(parents=True, exist_ok=True)
-            staged.rename(target)
+            _rename(staged, target)
         except OSError as exc:
             if old.exists() and not target.exists():
                 old.rename(target)
