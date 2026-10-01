@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import threading
 from pathlib import Path
 
 import video_report_agent
@@ -21,6 +22,9 @@ def ensure_models_json(data_dir) -> None:
 
 PROTOCOL_APIS = {"openai": "openai-completions", "anthropic": "anthropic-messages"}
 COMPACTION_RESERVE = 0.3  # of the window: Pi compacts at 70%, whatever the window (PLAN 15.4.14 I)
+# Startup, the daily catalogue thread and 保存 each read, change and rewrite models.json and Pi's
+# settings.json; one at a time, or a reader meets a file another thread has just emptied.
+_REWRITE = threading.RLock()
 
 
 def custom_base_url(custom: dict) -> str:
@@ -56,37 +60,44 @@ def apply_compaction(data_dir, window) -> None:
     """Pi compacts past 「window − reserveTokens」; its fixed 16384 left runanytime's real 100k no room for one
     chapter read in. The reserve is a share of the window; an unknown window leaves Pi's own (PLAN 15.4.14 I)."""
     target = paths.pi_config_dir(data_dir) / "settings.json"
-    document = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else {}
-    compaction = dict(document.get("compaction") or {})
-    if window:
-        compaction["reserveTokens"] = int(window * COMPACTION_RESERVE)
-    else:
-        compaction.pop("reserveTokens", None)
-    if compaction:
-        document["compaction"] = compaction
-    else:
-        document.pop("compaction", None)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    with _REWRITE:
+        document = json.loads(target.read_text(encoding="utf-8")) if target.is_file() else {}
+        compaction = dict(document.get("compaction") or {})
+        if window:
+            compaction["reserveTokens"] = int(window * COMPACTION_RESERVE)
+        else:
+            compaction.pop("reserveTokens", None)
+        if compaction:
+            document["compaction"] = compaction
+        else:
+            document.pop("compaction", None)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def refresh_custom_provider(data_dir, *, pi_cli=None) -> bool:
     """Rewrite the custom provider from the saved settings at startup (PLAN 15.4.10): installs
     from before the model parameters would otherwise keep Pi's 128k / 16k defaults until 保存. A built-in
     provider gets its own compaction reserve, not the last relay's."""
-    llm = store.load(data_dir)["llm"]
-    if llm["provider"] != "custom":
-        _source, fields = model_fields(data_dir, {"kind": llm["provider"], "model": llm["model"]}, pi_cli=pi_cli)
-        apply_compaction(data_dir, fields.get("contextWindow"))
-        return False
-    apply_custom_provider(data_dir, llm.get("custom"), pi_cli=pi_cli)
-    return True
+    with _REWRITE:
+        llm = store.load(data_dir)["llm"]
+        if llm["provider"] != "custom":
+            _source, fields = model_fields(data_dir, {"kind": llm["provider"], "model": llm["model"]}, pi_cli=pi_cli)
+            apply_compaction(data_dir, fields.get("contextWindow"))
+            return False
+        apply_custom_provider(data_dir, llm.get("custom"), pi_cli=pi_cli)
+        return True
 
 
 def apply_custom_provider(data_dir, custom: dict, *, pi_cli=None) -> None:
     """Write the custom provider into models.json (PLAN 8.9, 15.2-2) with the model's context,
     output, thinking levels and compat filled in; the profile's own numbers win (PLAN 15.4.10).
     """
+    with _REWRITE:
+        _apply_custom_provider(data_dir, custom, pi_cli=pi_cli)
+
+
+def _apply_custom_provider(data_dir, custom: dict, *, pi_cli=None) -> None:
     target = paths.models_json(data_dir)
     document = json.loads(target.read_text(encoding="utf-8"))
     settings = store.load(data_dir)
