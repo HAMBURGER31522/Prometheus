@@ -259,3 +259,28 @@ def test_startup_leaves_models_json_alone_for_a_builtin_provider(tmp_path, pi_cl
         assert json.loads(after)["providers"]["deepseek"] == json.loads(before)["providers"]["deepseek"]
     finally:
         state.shutdown()
+
+
+def test_rewrites_from_two_threads_never_read_a_half_written_file(tmp_path, pi_cli):
+    """CI 2026-09-30: the startup catalogue thread rewrote Pi's settings.json while 保存 read it, and the
+    request failed on an empty file. Startup, the daily catalogue update and 保存 all rewrite both files."""
+    import threading
+
+    data_dir = data_dir_with(tmp_path, {**RELAY, "context_window": 100000})
+    errors = []
+
+    def rewrite():
+        for _ in range(25):
+            try:
+                pi_models.refresh_custom_provider(data_dir, pi_cli=pi_cli)
+            except Exception as exc:  # noqa: BLE001 - collected for the assertion
+                errors.append(repr(exc))
+
+    threads = [threading.Thread(target=rewrite) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    assert pi_settings(data_dir)["compaction"]["reserveTokens"] == 30000
+    assert json.loads(paths.models_json(data_dir).read_text(encoding="utf-8"))["providers"]["custom"]["models"]
