@@ -1,6 +1,12 @@
 # Local scratch (reference clones, experiments)
 tmp/
 
+# Design and process records, notes for development agents: kept on this machine only,
+# docs/ in its own local git repository
+docs/
+AGENTS.md
+CLAUDE.md
+
 # Python
 .venv/
 __pycache__/
