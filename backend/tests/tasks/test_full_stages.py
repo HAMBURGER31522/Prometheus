@@ -139,7 +139,7 @@ def test_the_plan_stage_hands_the_item_and_one_stage_of_time_to_the_planner(data
     workspace_mod.run_plan_stage(data_dir, ctx.item_id, row, store.load(data_dir),
                                  node_exe="node.exe", pi_cli="cli.js", figures=False)
     assert seen["figures"] is False and seen["input_json"]["platform"] == "Bilibili" and seen["run_pi"] == "runner"
-    assert 1790 < seen["left"] <= 1800  # pi_timeout_seconds for an unknown duration
+    assert 1790 < seen["left"] <= 1800 + 1e-6  # pi_timeout_seconds for an unknown duration; float rounding
 
 
 def test_the_chapter_report_gets_the_review_setting_figures_progress_and_three_times_the_time(data_dir, monkeypatch):
