@@ -62,6 +62,7 @@ await shot("03-console-running");
 
 let row = null;
 let seen = "";
+const stages = [];
 const deadline = Date.now() + 120 * 60_000;
 while (Date.now() < deadline) {
   const rows = await (await fetch(`${api}/api/queue`, { headers: auth })).json();
@@ -69,6 +70,11 @@ while (Date.now() < deadline) {
   const now = row ? `${row.status} ${row.stage ?? ""} ${row.stage_detail ?? ""}` : "missing";
   if (now !== seen) log(now);
   seen = now;
+  if (row?.status === "running" && row.stage && !stages.includes(row.stage)) {
+    // the console at each new step, for the README and the promo (PLAN 15.4.17)
+    stages.push(row.stage);
+    await shot(`03-step-${String(stages.length).padStart(2, "0")}-${row.stage}`).catch((error) => log("step shot", error));
+  }
   if (row && ["done", "failed", "cancelled"].includes(row.status)) break;
   await new Promise((resolve) => setTimeout(resolve, 5000));
 }
@@ -84,6 +90,34 @@ for (const [index, name] of ["精读", "导图", "字幕"].entries()) {
   await page.getByRole("tablist", { name: "视图" }).getByRole("tab", { name }).click();
   await page.waitForTimeout(3500);
   await shot(`${String(index + 4).padStart(2, "0")}-reader-${name}`);
+}
+// Closer looks for the README and the promo (PLAN 15.4.17); a miss here does not fail the run.
+const tab = (name) => page.getByRole("tablist", { name: "视图" }).getByRole("tab", { name }).click();
+try {
+  await tab("精读");
+  await page.waitForTimeout(3000);
+  await page.frameLocator(".report-frame").locator("aside.viewpoint").first().scrollIntoViewIfNeeded();
+  await shot("07-reader-编者观点");
+} catch (error) {
+  log("viewpoint shot", error);
+}
+try {
+  await tab("导图");
+  await page.waitForTimeout(3500);
+  const leaf = page.locator(".react-flow__node", { has: page.locator(".mind-detail") }).nth(2);
+  for (let step = 0; step < 2; step += 1) {
+    const box = await leaf.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -200);
+    await page.waitForTimeout(600);
+  }
+  await leaf.click();
+  await page.getByRole("complementary", { name: "节点摘要" }).waitFor();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: join(shots, "08-reader-导图-要点.png") });
+  log("saved 08-reader-导图-要点");
+} catch (error) {
+  log("map node shot", error);
 }
 writeFileSync(join(shots, "result.json"), JSON.stringify(row, null, 2));
 log("done", row.id);
