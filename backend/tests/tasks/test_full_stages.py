@@ -172,7 +172,7 @@ def test_the_chapter_report_gets_the_review_setting_figures_progress_and_three_t
     assert report == paths.work_dir(data_dir, ctx.item_id) / "report.html"
     assert seen["review"] is False and seen["figures"] is True and seen["progress"] is progress
     assert seen["units"] == UNITS and seen["input_json"]["platform"] == "Bilibili"
-    assert 3 * 1800 - 10 < seen["left"] <= 3 * 1800
+    assert 3 * 1800 - 10 < seen["left"] <= 3 * 1800 + 1e-6  # float rounding of (t + d) - t
 
 
 def test_the_review_thinks_one_level_down():
@@ -392,8 +392,8 @@ def test_the_time_limit_grows_with_the_thinking_level(data_dir, monkeypatch, thi
     workspace_mod.run_plan_stage(data_dir, ctx.item_id, row, store.load(data_dir), node_exe="n", pi_cli="c",
                                  figures=False)
     report, plan = seen
-    assert times * 1800 - 10 < report <= times * 1800
-    assert max(1, times / 3) * 1800 - 10 < plan <= max(1, times / 3) * 1800
+    assert times * 1800 - 10 < report <= times * 1800 + 1e-6  # float rounding of (t + d) - t
+    assert max(1, times / 3) * 1800 - 10 < plan <= max(1, times / 3) * 1800 + 1e-6
 
 
 def test_the_chapter_report_opens_the_editors_links_through_the_proxy(data_dir, monkeypatch):
